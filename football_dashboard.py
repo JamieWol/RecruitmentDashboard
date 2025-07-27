@@ -178,7 +178,6 @@ if not pizza_metrics:
 filtered_df = df[
     (df["Primary Position"].isin(selected_positions)) &
     (df["Age"].between(*selected_age)) &
-    (df["Height"].between(*selected_height)) &
     (df["Minutes Played"].between(*selected_minutes)) &
     (df["Team"].isin(selected_teams)) &
     (df["Competition"].isin(selected_comps))
