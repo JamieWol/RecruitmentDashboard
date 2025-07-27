@@ -141,7 +141,7 @@ def load_data(file=None):
         df = pd.read_csv(file)
     else:
         df = pd.read_csv("CBs.csv")
-    df = df.dropna(subset=["Age", "Height", "Minutes Played", "Name", "Primary Position", "Team", "Competition"])
+    df = df.dropna(subset=["Age", "Minutes Played", "Name", "Primary Position", "Team", "Competition"])
     df["Age"] = pd.to_numeric(df["Age"], errors='coerce')
     df["Minutes Played"] = pd.to_numeric(df["Minutes Played"], errors='coerce')
     df["Name"] = df["Name"].astype(str)
@@ -213,7 +213,7 @@ st.title("⚽ Recruitment Dashboard")
 st.subheader("🏅 Player Ranking")
 st.dataframe(
     filtered_df[
-        ["Name", "Team", "Primary Position", "Age", "Height", "Minutes Played", "Competition", "Overall Score"] + pizza_metrics
+        ["Name", "Team", "Primary Position", "Age", "Minutes Played", "Competition", "Overall Score"] + pizza_metrics
     ]
     .style.format({"Overall Score": "{:.3f}"})
     .highlight_max(subset=["Overall Score"], color="lightgreen")
