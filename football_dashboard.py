@@ -213,10 +213,6 @@ df["Competition"] = df["Competition"].astype(str)
 
 
 
-# --- File Uploader ---
-uploaded_file = st.sidebar.file_uploader("Upload CSV file", type=["csv"])
-df = load_data(uploaded_file)
-
 # --- Sidebar Filters ---
 st.sidebar.header("Filters")
 positions = sorted(df["Primary Position"].dropna().unique())
