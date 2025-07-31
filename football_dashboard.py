@@ -8,123 +8,97 @@ import numpy as np
 position_metrics_map = {
     # Centre Backs
     "Centre Back": [
-        "Ball Recoveries", "Blocks/Shot", "Defensive Action Regains",
-        "Aerial Win%", "Pressure Regains", "Pressures",
-        "Long Balls", "Passing%", "OBV"
+        "Scoring Contribution", "PAdj Interceptions", "Aerial Win%", "Aerial Wins", "Dribbles Successfully Defended%", "PAdj Tackles", "Tack/Dribbled Past%", "xGBuildup", "Pass Forward%", "Long Ball%",    "Passing%", "Pressured Pass%", "OBV"
     ],
     "Left Centre Back": [
-        "Ball Recoveries", "Blocks/Shot", "Defensive Action Regains",
-        "Aerial Win%", "Pressure Regains", "Pressures",
-        "Long Balls", "Passing%", "OBV"
+        "Scoring Contribution", "PAdj Interceptions", "Aerial Win%", "Aerial Wins", "Dribbles Successfully Defended%", "PAdj Tackles", "Tack/Dribbled Past%", "xGBuildup", "Pass Forward%", "Long Ball%",    "Passing%", "Pressured Pass%", "OBV"
     ],
     "Right Centre Back": [
-        "Ball Recoveries", "Blocks/Shot", "Defensive Action Regains",
-        "Aerial Win%", "Pressure Regains", "Pressures",
-        "Long Balls", "Passing%", "OBV"
+        "Scoring Contribution", "PAdj Interceptions", "Aerial Win%", "Aerial Wins", "Dribbles Successfully Defended%", "PAdj Tackles", "Tack/Dribbled Past%", "xGBuildup", "Pass Forward%", "Long Ball%",    "Passing%", "Pressured Pass%", "OBV"
     ],
 
     # Full Backs & Wide Midfielders
     "Full Back": [
-        "Assists", "xG Assisted", "Successful Dribbles", "xG",
-        "Defensive Action Regains", "Dribbles Successfully Defended%",
-        "Pressure Regains", "Pressures", "Successful Box Cross%",
-        "Successful Crosses", "OBV"
-    ],
+        "Key Passes", "xG Assisted", "Successful Dribbles", "Scoring Contribution", "PAdj Interceptions", "Dribbles Successfully Defended%", "PAdj Tackles", "Tack/Dribbled Past%", "Crossing%",    "Deep Completions", "Deep Progressions", "Passing%", "Dribble & Carry OBV"
+        ],
     "Left Back": [
-        "Assists", "xG Assisted", "Successful Dribbles", "xG",
-        "Defensive Action Regains", "Dribbles Successfully Defended%",
-        "Pressure Regains", "Pressures", "Successful Box Cross%",
-        "Successful Crosses", "OBV"
+        "Key Passes", "xG Assisted", "Successful Dribbles", "Scoring Contribution", "PAdj Interceptions", "Dribbles Successfully Defended%", "PAdj Tackles", "Tack/Dribbled Past%", "Crossing%",    "Deep Completions", "Deep Progressions", "Passing%", "Dribble & Carry OBV"
     ],
     "Right Back": [
-        "Assists", "xG Assisted", "Successful Dribbles", "xG",
-        "Defensive Action Regains", "Dribbles Successfully Defended%",
-        "Pressure Regains", "Pressures", "Successful Box Cross%",
-        "Successful Crosses", "OBV"
+        "Key Passes", "xG Assisted", "Successful Dribbles", "Scoring Contribution", "PAdj Interceptions", "Dribbles Successfully Defended%", "PAdj Tackles", "Tack/Dribbled Past%", "Crossing%",    "Deep Completions", "Deep Progressions", "Passing%", "Dribble & Carry OBV"
     ],
     "Left Wing Back": [
-        "Assists", "xG Assisted", "Successful Dribbles", "xG",
-        "Defensive Action Regains", "Dribbles Successfully Defended%",
-        "Pressure Regains", "Pressures", "Successful Box Cross%",
-        "Successful Crosses", "OBV"
+        "Key Passes", "xG Assisted", "Successful Dribbles", "Scoring Contribution", "PAdj Interceptions", "Dribbles Successfully Defended%", "PAdj Tackles", "Tack/Dribbled Past%", "Crossing%",    "Deep Completions", "Deep Progressions", "Passing%", "Dribble & Carry OBV"
     ],
     "Right Wing Back": [
-        "Assists", "xG Assisted", "Successful Dribbles", "xG",
-        "Defensive Action Regains", "Dribbles Successfully Defended%",
-        "Pressure Regains", "Pressures", "Successful Box Cross%",
-        "Successful Crosses", "OBV"
+        "Key Passes", "xG Assisted", "Successful Dribbles", "Scoring Contribution", "PAdj Interceptions", "Dribbles Successfully Defended%", "PAdj Tackles", "Tack/Dribbled Past%", "Crossing%",    "Deep Completions", "Deep Progressions", "Passing%", "Dribble & Carry OBV"
     ],
     "Left Midfielder": [
-        "Assists", "xG Assisted", "Successful Dribbles", "xG",
-        "Defensive Action Regains", "Dribbles Successfully Defended%",
-        "Pressure Regains", "Pressures", "Successful Box Cross%",
-        "Successful Crosses", "OBV"
+        "Key Passes", "Dribble%", "Scoring Contribution", "Non-Penalty Goals", "xG", "xG/Shot", "PAdj Pressures", "Crossing%", "Deep Completions",  "Deep Progressions", "Passing%", "Dribble & Carry OBV", "OBV"
     ],
     "Right Midfielder": [
-        "Assists", "xG Assisted", "Successful Dribbles", "xG",
-        "Defensive Action Regains", "Dribbles Successfully Defended%",
-        "Pressure Regains", "Pressures", "Successful Box Cross%",
-        "Successful Crosses", "OBV"
+        "Key Passes", "Dribble%", "Scoring Contribution", "Non-Penalty Goals", "xG", "xG/Shot", "PAdj Pressures", "Crossing%", "Deep Completions",  "Deep Progressions", "Passing%", "Dribble & Carry OBV", "OBV"
     ],
 
     # Defensive Midfielders
     "Centre Defensive Midfielder": [
-        "Assists", "xG Assisted", "Successful Dribbles", "Scoring Contribution",
-        "Goals & Penalty Goals", "Shooting%", "xG", "Ball Recoveries",
-        "Pressure Regains", "Pressures", "Touches In Box", "Passing%", "OBV"
+        "Key Passes", "Scoring Contribution", "Shots", "xG", "PAdj Interceptions", "PAdj Tackles", "Tack/Dribbled Past%", "PAdj Pressures", "Deep Progressions", "Pass Forward%", "Long Ball%",   "Passing%", "OBV"
     ],
     
     "Left Defensive Midfielder": [
-        "Assists", "xG Assisted", "Successful Dribbles", "Scoring Contribution",
-        "Goals & Penalty Goals", "Shooting%", "xG", "Ball Recoveries",
-        "Pressure Regains", "Pressures", "Touches In Box", "Passing%", "OBV"
+        "Key Passes", "Scoring Contribution", "Shots", "xG", "PAdj Interceptions", "PAdj Tackles", "Tack/Dribbled Past%", "PAdj Pressures", "Deep Progressions", "Pass Forward%", "Long Ball%",   "Passing%", "OBV"
+
     ],
     
     "Right Defensive Midfielder": [
-        "Assists", "xG Assisted", "Successful Dribbles", "Scoring Contribution",
-        "Goals & Penalty Goals", "Shooting%", "xG", "Ball Recoveries",
-        "Pressure Regains", "Pressures", "Touches In Box", "Passing%", "OBV"
-    ],
+        "Key Passes", "Scoring Contribution", "Shots", "xG", "PAdj Interceptions", "PAdj Tackles", "Tack/Dribbled Past%", "PAdj Pressures", "Deep Progressions", "Pass Forward%", "Long Ball%",   "Passing%", "OBV"
 
-    # Central/Attacking Midfielders
+    ],
+    
+    "Right Centre Midfielder": [
+        "Key Passes", "Scoring Contribution", "Shots", "xG", "PAdj Interceptions", "PAdj Tackles", "Tack/Dribbled Past%", "PAdj Pressures", "Deep Progressions", "Pass Forward%", "Long Ball%",   "Passing%", "OBV"
+
+    ],
+    
+    "Left Centre Midfielder":[
+        "Key Passes", "Scoring Contribution", "Shots", "xG", "PAdj Interceptions", "PAdj Tackles", "Tack/Dribbled Past%", "PAdj Pressures", "Deep Progressions", "Pass Forward%", "Long Ball%",   "Passing%", "OBV"
+
+    ],
+                              
+    # Central/Attacking Midfielders/Wingers
     "Centre Attacking Midfielder": [
-        "Assists", "xG Assisted", "Successful Dribbles", "Scoring Contribution",
-        "Goals & Penalty Goals", "Shooting%", "xG", "Ball Recoveries",
-        "Pressure Regains", "Pressures", "Touches In Box", "Passing%", "OBV"
+        "Key Passes", "Dribble%", "Scoring Contribution", "Non-Penalty Goals",   "xG", "xG/Shot", "PAdj Pressures", "Crossing%", "Deep Completions",  "Deep Progressions", "Passing%", "Dribble & Carry OBV", "OBV"
     ],
-
-    # Forwards / Wingers
-    "Centre Forward": [
-        "Assists", "xG Assisted", "Successful Dribbles", "Goal Conversion%",
-        "Goals & Penalty Goals", "Shooting%", "xG", "PAdj Interceptions",
-        "Aerial Win%", "Pressure Regains", "Pressures", "Touches In Box", "OBV"
+    
+    "Right Attacking Midfielder":[
+        "Key Passes", "Dribble%", "Scoring Contribution", "Non-Penalty Goals", "xG", "xG/Shot", "PAdj Pressures", "Crossing%", "Deep Completions",  "Deep Progressions", "Passing%", "Dribble & Carry OBV", "OBV"
+    ],
+    
+    "Left Attacking Midfielder":[
+        "Key Passes", "Dribble%", "Scoring Contribution", "Non-Penalty Goals", "xG", "xG/Shot", "PAdj Pressures", "Crossing%", "Deep Completions",  "Deep Progressions", "Passing%", "Dribble & Carry OBV", "OBV"
     ],
     "Left Wing": [
-        "Assists", "xG Assisted", "Successful Dribbles", "Goal Conversion%",
-        "Goals & Penalty Goals", "Shooting%", "xG", "PAdj Interceptions",
-        "Aerial Win%", "Pressure Regains", "Pressures", "Touches In Box", "OBV"
+        "Key Passes", "Dribble%", "Scoring Contribution", "Non-Penalty Goals",   "xG", "xG/Shot", "PAdj Pressures", "Crossing%", "Deep Completions",  "Deep Progressions", "Passing%", "Dribble & Carry OBV", "OBV"
     ],
     "Right Wing": [
-        "Assists", "xG Assisted", "Successful Dribbles", "Goal Conversion%",
-        "Goals & Penalty Goals", "Shooting%", "xG", "PAdj Interceptions",
-        "Aerial Win%", "Pressure Regains", "Pressures", "Touches In Box", "OBV"
+        "Key Passes", "Dribble%", "Scoring Contribution", "Non-Penalty Goals",   "xG", "xG/Shot", "PAdj Pressures", "Crossing%", "Deep Completions",  "Deep Progressions", "Passing%", "Dribble & Carry OBV", "OBV"
     ],
+    
+    # Forwards
+    "Centre Forward": [
+        "Key Passes", "Turnovers", "Scoring Contribution", "Goal Conversion%"   "Non-Penalty Goals", "xG", "xG/Shot", "Aerial Win%", "PAdj Pressures", "Deep Completions", "Touches In Box", "Passing%", "OBV"
+    ],
+
     "Right Centre Forward": [
-        "Assists", "xG Assisted", "Successful Dribbles", "Goal Conversion%",
-        "Goals & Penalty Goals", "Shooting%", "xG", "PAdj Interceptions",
-        "Aerial Win%", "Pressure Regains", "Pressures", "Touches In Box", "OBV"
+        "Key Passes", "Turnovers", "Scoring Contribution", "Goal Conversion%"   "Non-Penalty Goals", "xG", "xG/Shot", "Aerial Win%", "PAdj Pressures", "Deep Completions", "Touches In Box", "Passing%", "OBV"
     ],
     "Left Centre Forward": [
-        "Assists", "xG Assisted", "Successful Dribbles", "Goal Conversion%",
-        "Goals & Penalty Goals", "Shooting%", "xG", "PAdj Interceptions",
-        "Aerial Win%", "Pressure Regains", "Pressures", "Touches In Box", "OBV"
+        "Key Passes", "Turnovers", "Scoring Contribution", "Goal Conversion%"   "Non-Penalty Goals", "xG", "xG/Shot", "Aerial Win%", "PAdj Pressures", "Deep Completions", "Touches In Box", "Passing%", "OBV"
     ],
 
     # Goalkeepers
     "Goalkeeper": [
-        "Claims - CCAA%", "Pass into Pressure%", "Expected Save%",
-        "Goals Conceded", "Positioning Error", "Save%", "Shot Stopping%",
-        "Goalkeeper OBV"
+        "Claims - CCAA%", "Pass into Danger%", "Pass into Pressure%", "Positive Outcome", "Expected Save%", "Goals Saved Above Average", "Positioning Error", "PSxG Faced", "Save%", "Goalkeeper OBV"
     ]
 }
 
