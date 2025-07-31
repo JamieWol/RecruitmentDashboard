@@ -202,6 +202,24 @@ metric_higher_better = {
 uploaded_file = st.sidebar.file_uploader("Upload CSV file", type=["csv"])
 df = load_data(uploaded_file)
 
+if uploaded_file:
+    with st.spinner("Loading and processing player data..."):
+        df = pd.read_csv(uploaded_file)
+
+        # Preprocess positions
+        df["Primary Position List"] = df["Primary Position"].fillna("").apply(lambda x: [pos.strip() for pos in x.split(",")])
+
+        # Add any additional cleaning steps here
+
+        time.sleep(1)
+    st.success("✅ Data loaded successfully.")
+else:
+    st.markdown("<h2 style='text-align: center;'>⚽ Welcome to the Football Recruitment Dashboard</h2>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center;'>Upload a CSV file using the sidebar to get started!</p>", unsafe_allow_html=True)
+    st.image("https://upload.wikimedia.org/wikipedia/commons/1/15/Soccer_ball_animated.svg", width=150)  # Example image
+    st.stop()
+
+
 # --- Sidebar Filters ---
 st.sidebar.header("Filters")
 positions = sorted(df["Primary Position"].dropna().unique())
