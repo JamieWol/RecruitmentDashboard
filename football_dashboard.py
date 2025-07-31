@@ -188,12 +188,7 @@ metric_higher_better = {
 }
 
 # --- Load Data ---
-@st.cache_data
-def load_data(file=None):
-    if file is not None:
-        df = pd.read_csv(file)
-    else:
-        df = pd.read_csv("CBs.csv")
+
     df = df.dropna(subset=["Age", "Minutes Played", "Name", "Primary Position", "Team", "Competition"])
     df["Age"] = pd.to_numeric(df["Age"], errors='coerce')
     df["Minutes Played"] = pd.to_numeric(df["Minutes Played"], errors='coerce')
