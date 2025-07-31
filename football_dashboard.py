@@ -4,6 +4,40 @@ import matplotlib.pyplot as plt
 from mplsoccer import PyPizza
 import numpy as np
 
+import streamlit as st
+import pandas as pd
+import time
+
+st.set_page_config(layout="wide")
+
+st.title("Football Recruitment Dashboard")
+
+# Upload CSV
+uploaded_file = st.file_uploader("Upload Player Data CSV", type=["csv"])
+
+# Wait for upload
+if uploaded_file:
+    with st.spinner("Loading data and processing positions..."):
+        # Read CSV
+        df = pd.read_csv(uploaded_file)
+
+        # Preprocess data (e.g. split primary positions if needed)
+        df["Primary Position List"] = df["Primary Position"].fillna("").apply(lambda x: [pos.strip() for pos in x.split(",")])
+
+        # You can add other preprocessing steps here too...
+
+        time.sleep(1.5)  # Optional: Simulate loading delay
+
+    st.success("Data loaded successfully.")
+    
+    # Display preview (optional)
+    st.dataframe(df.head())
+    
+    # 🧠 Continue with your filters, visualizations, pizza charts, etc...
+else:
+    st.info("Please upload a CSV file to get started.")
+
+
 # --- Position to Metrics Mapping ---
 position_metrics_map = {
     # Centre Backs
