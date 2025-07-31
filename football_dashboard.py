@@ -186,7 +186,6 @@ metric_higher_better = {
 }
 
 # --- Load Data ---
-df = pd.read_csv(uploaded_file)
 df = df.dropna(subset=["Age", "Minutes Played", "Name", "Primary Position", "Team", "Competition"])
 df["Age"] = pd.to_numeric(df["Age"], errors='coerce')
 df["Minutes Played"] = pd.to_numeric(df["Minutes Played"], errors='coerce')
