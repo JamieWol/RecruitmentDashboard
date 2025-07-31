@@ -6,36 +6,34 @@ import numpy as np
 
 import streamlit as st
 import pandas as pd
-import time
 
 st.set_page_config(page_title="Football Recruitment Dashboard", layout="wide")
 
-st.sidebar.title("📂 Upload Player CSV")
-uploaded_file = st.sidebar.file_uploader("Upload your CSV file", type=["csv"])
+# Page title
+st.title("⚽ Football Recruitment Dashboard")
 
-# 🚫 Stop if no file uploaded, show welcome screen
+# File uploader in the main area (for initial file upload)
+uploaded_file = st.file_uploader("Upload your player data CSV", type=["csv"], key="main_uploader")
+
+# Sidebar CSV uploader (optional repeated one)
+with st.sidebar:
+    st.header("📁 Upload Data")
+    uploaded_file_sidebar = st.file_uploader("Upload CSV file", type=["csv"], key="sidebar_uploader")
+    uploaded_file = uploaded_file or uploaded_file_sidebar
+
+# Show a message if no file uploaded yet
 if not uploaded_file:
-    st.markdown("<h2 style='text-align: center;'>⚽ Welcome to the Football Recruitment Dashboard</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center;'>Please upload your player data CSV using the sidebar to get started.</p>", unsafe_allow_html=True)
-    st.image("https://upload.wikimedia.org/wikipedia/commons/1/15/Soccer_ball_animated.svg", width=120)
+    st.info("👈 Upload a CSV file to get started.")
     st.stop()
 
-# ✅ Load and preprocess data once uploaded
+# Load the uploaded file
 with st.spinner("Loading and processing player data..."):
     df = pd.read_csv(uploaded_file)
 
-    # Ensure consistent format for Primary Position
+    # Clean data
+    df = df.dropna(subset=["Age", "Minutes Played", "Name", "Primary Position", "Team", "Competition"])
     df["Primary Position"] = df["Primary Position"].fillna("")
     df["Primary Position List"] = df["Primary Position"].apply(lambda x: [pos.strip() for pos in x.split(",")])
-
-    time.sleep(1)
-
-st.success("✅ Data loaded successfully!")
-
-# 👉 Your dashboard logic and visualizations go here
-# Example:
-st.dataframe(df.head())
-
 
 
 # --- Position to Metrics Mapping ---
@@ -188,15 +186,22 @@ metric_higher_better = {
 }
 
 # --- Load Data ---
+def load_data(uploaded_file):
+    df = pd.read_csv(uploaded_file)
 
+    # Drop rows with missing important data
     df = df.dropna(subset=["Age", "Minutes Played", "Name", "Primary Position", "Team", "Competition"])
+
+    # Convert columns to appropriate types
     df["Age"] = pd.to_numeric(df["Age"], errors='coerce')
     df["Minutes Played"] = pd.to_numeric(df["Minutes Played"], errors='coerce')
     df["Name"] = df["Name"].astype(str)
     df["Primary Position"] = df["Primary Position"].astype(str)
     df["Team"] = df["Team"].astype(str)
     df["Competition"] = df["Competition"].astype(str)
+
     return df
+
 
 # --- File Uploader ---
 uploaded_file = st.sidebar.file_uploader("Upload CSV file", type=["csv"])
