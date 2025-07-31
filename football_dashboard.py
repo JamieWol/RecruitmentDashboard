@@ -4,38 +4,6 @@ import matplotlib.pyplot as plt
 from mplsoccer import PyPizza
 import numpy as np
 
-import streamlit as st
-import pandas as pd
-import numpy as np
-
-# --- Page Config ---
-st.set_page_config(page_title="Football Recruitment Dashboard", page_icon="⚽", layout="wide")
-
-# --- Sidebar Upload ---
-st.sidebar.title("Upload Your Player Data")
-uploaded_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
-
-# --- Welcome Page ---
-if uploaded_file is None:
-    st.title("📊 Football Recruitment Dashboard")
-    st.image("https://upload.wikimedia.org/wikipedia/commons/6/6e/Football_Icon.svg", width=100)
-
-    st.markdown("""
-    ## ⚽️ Welcome!
-    
-    This dashboard helps you scout and assess players based on position-specific metrics using radar charts and percentiles.
-    
-    To get started:
-    - Upload your CSV file using the **sidebar**
-    - Explore player insights and rankings
-    - Use filters for position, league, minutes played, and more
-
-    ---
-
-    👈 **Use the sidebar to upload your data file now.**
-    """)
-    st.stop()
-
 # --- Position to Metrics Mapping ---
 position_metrics_map = {
     # Centre Backs
@@ -185,33 +153,25 @@ metric_higher_better = {
     # Add others where lower is better...
 }
 
-def load_data(file):
+# --- Load Data ---
+@st.cache_data
+def load_data(file=None):
     if file is not None:
-        return pd.read_csv(file)
+        df = pd.read_csv(file)
     else:
-        return pd.DataFrame()
+        df = pd.read_csv("CBs.csv")
+    df = df.dropna(subset=["Age", "Minutes Played", "Name", "Primary Position", "Team", "Competition"])
+    df["Age"] = pd.to_numeric(df["Age"], errors='coerce')
+    df["Minutes Played"] = pd.to_numeric(df["Minutes Played"], errors='coerce')
+    df["Name"] = df["Name"].astype(str)
+    df["Primary Position"] = df["Primary Position"].astype(str)
+    df["Team"] = df["Team"].astype(str)
+    df["Competition"] = df["Competition"].astype(str)
+    return df
 
-# Load the file
+# --- File Uploader ---
 uploaded_file = st.sidebar.file_uploader("Upload CSV file", type=["csv"])
 df = load_data(uploaded_file)
-
-if df.empty:
-    st.title("⚽ Recruitment Dashboard")
-    st.write("Upload a CSV file using the sidebar to begin.")
-    st.stop()
-
-# Data cleaning
-df = df.dropna(subset=["Age", "Minutes Played", "Name", "Primary Position", "Team", "Competition"])
-df["Age"] = pd.to_numeric(df["Age"], errors='coerce')
-df["Minutes Played"] = pd.to_numeric(df["Minutes Played"], errors='coerce')
-df["Name"] = df["Name"].astype(str)
-df["Primary Position"] = df["Primary Position"].astype(str)
-df["Team"] = df["Team"].astype(str)
-df["Competition"] = df["Competition"].astype(str)
-
-# Now your filters and rest of code...
-
-
 
 # --- Sidebar Filters ---
 st.sidebar.header("Filters")
