@@ -185,7 +185,22 @@ metric_higher_better = {
     # Add others where lower is better...
 }
 
-# --- Load Data ---
+def load_data(file):
+    if file is not None:
+        return pd.read_csv(file)
+    else:
+        return pd.DataFrame()
+
+# Load the file
+uploaded_file = st.sidebar.file_uploader("Upload CSV file", type=["csv"])
+df = load_data(uploaded_file)
+
+if df.empty:
+    st.title("⚽ Recruitment Dashboard")
+    st.write("Upload a CSV file using the sidebar to begin.")
+    st.stop()
+
+# Data cleaning
 df = df.dropna(subset=["Age", "Minutes Played", "Name", "Primary Position", "Team", "Competition"])
 df["Age"] = pd.to_numeric(df["Age"], errors='coerce')
 df["Minutes Played"] = pd.to_numeric(df["Minutes Played"], errors='coerce')
@@ -193,6 +208,9 @@ df["Name"] = df["Name"].astype(str)
 df["Primary Position"] = df["Primary Position"].astype(str)
 df["Team"] = df["Team"].astype(str)
 df["Competition"] = df["Competition"].astype(str)
+
+# Now your filters and rest of code...
+
 
 
 # --- File Uploader ---
