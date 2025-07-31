@@ -6,35 +6,35 @@ import numpy as np
 
 import streamlit as st
 import pandas as pd
+import numpy as np
 
-st.set_page_config(page_title="Football Recruitment Dashboard", layout="wide")
+# --- Page Config ---
+st.set_page_config(page_title="Football Recruitment Dashboard", page_icon="⚽", layout="wide")
 
-# Page title
-st.title("⚽ Football Recruitment Dashboard")
+# --- Sidebar Upload ---
+st.sidebar.title("Upload Your Player Data")
+uploaded_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
 
-# File uploader in the main area (for initial file upload)
-uploaded_file = st.file_uploader("Upload your player data CSV", type=["csv"], key="main_uploader")
+# --- Welcome Page ---
+if uploaded_file is None:
+    st.title("📊 Football Recruitment Dashboard")
+    st.image("https://upload.wikimedia.org/wikipedia/commons/6/6e/Football_Icon.svg", width=100)
 
-# Sidebar CSV uploader (optional repeated one)
-with st.sidebar:
-    st.header("📁 Upload Data")
-    uploaded_file_sidebar = st.file_uploader("Upload CSV file", type=["csv"], key="sidebar_uploader")
-    uploaded_file = uploaded_file or uploaded_file_sidebar
+    st.markdown("""
+    ## ⚽️ Welcome!
+    
+    This dashboard helps you scout and assess players based on position-specific metrics using radar charts and percentiles.
+    
+    To get started:
+    - Upload your CSV file using the **sidebar**
+    - Explore player insights and rankings
+    - Use filters for position, league, minutes played, and more
 
-# Show a message if no file uploaded yet
-if not uploaded_file:
-    st.info("👈 Upload a CSV file to get started.")
+    ---
+
+    👈 **Use the sidebar to upload your data file now.**
+    """)
     st.stop()
-
-# Load the uploaded file
-with st.spinner("Loading and processing player data..."):
-    df = pd.read_csv(uploaded_file)
-
-    # Clean data
-    df = df.dropna(subset=["Age", "Minutes Played", "Name", "Primary Position", "Team", "Competition"])
-    df["Primary Position"] = df["Primary Position"].fillna("")
-    df["Primary Position List"] = df["Primary Position"].apply(lambda x: [pos.strip() for pos in x.split(",")])
-
 
 # --- Position to Metrics Mapping ---
 position_metrics_map = {
@@ -186,21 +186,14 @@ metric_higher_better = {
 }
 
 # --- Load Data ---
-def load_data(uploaded_file):
-    df = pd.read_csv(uploaded_file)
-
-    # Drop rows with missing important data
-    df = df.dropna(subset=["Age", "Minutes Played", "Name", "Primary Position", "Team", "Competition"])
-
-    # Convert columns to appropriate types
-    df["Age"] = pd.to_numeric(df["Age"], errors='coerce')
-    df["Minutes Played"] = pd.to_numeric(df["Minutes Played"], errors='coerce')
-    df["Name"] = df["Name"].astype(str)
-    df["Primary Position"] = df["Primary Position"].astype(str)
-    df["Team"] = df["Team"].astype(str)
-    df["Competition"] = df["Competition"].astype(str)
-
-    return df
+df = pd.read_csv(uploaded_file)
+df = df.dropna(subset=["Age", "Minutes Played", "Name", "Primary Position", "Team", "Competition"])
+df["Age"] = pd.to_numeric(df["Age"], errors='coerce')
+df["Minutes Played"] = pd.to_numeric(df["Minutes Played"], errors='coerce')
+df["Name"] = df["Name"].astype(str)
+df["Primary Position"] = df["Primary Position"].astype(str)
+df["Team"] = df["Team"].astype(str)
+df["Competition"] = df["Competition"].astype(str)
 
 
 # --- File Uploader ---
