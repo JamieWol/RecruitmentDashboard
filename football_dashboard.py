@@ -4,6 +4,22 @@ import matplotlib.pyplot as plt
 from mplsoccer import PyPizza
 import numpy as np
 
+# --- Load Data ---
+@st.cache_data
+def load_data(file=None):
+    if file is not None:
+        df = pd.read_csv(file)
+    else:
+        df = pd.read_csv("CBs.csv")
+    df = df.dropna(subset=["Age", "Minutes Played", "Name", "Primary Position", "Team", "Competition"])
+    df["Age"] = pd.to_numeric(df["Age"], errors='coerce')
+    df["Minutes Played"] = pd.to_numeric(df["Minutes Played"], errors='coerce')
+    df["Name"] = df["Name"].astype(str)
+    df["Primary Position"] = df["Primary Position"].astype(str)
+    df["Team"] = df["Team"].astype(str)
+    df["Competition"] = df["Competition"].astype(str)
+    return df
+
 # --- Position to Metrics Mapping ---
 position_metrics_map = {
     # Centre Backs
