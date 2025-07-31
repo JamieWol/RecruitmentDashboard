@@ -8,34 +8,34 @@ import streamlit as st
 import pandas as pd
 import time
 
-st.set_page_config(layout="wide")
+st.set_page_config(page_title="Football Recruitment Dashboard", layout="wide")
 
-st.title("Football Recruitment Dashboard")
+st.sidebar.title("📂 Upload Player CSV")
+uploaded_file = st.sidebar.file_uploader("Upload your CSV file", type=["csv"])
 
-# Upload CSV
-uploaded_file = st.file_uploader("Upload Player Data CSV", type=["csv"])
+# 🚫 Stop if no file uploaded, show welcome screen
+if not uploaded_file:
+    st.markdown("<h2 style='text-align: center;'>⚽ Welcome to the Football Recruitment Dashboard</h2>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center;'>Please upload your player data CSV using the sidebar to get started.</p>", unsafe_allow_html=True)
+    st.image("https://upload.wikimedia.org/wikipedia/commons/1/15/Soccer_ball_animated.svg", width=120)
+    st.stop()
 
-# Wait for upload
-if uploaded_file:
-    with st.spinner("Loading data and processing positions..."):
-        # Read CSV
-        df = pd.read_csv(uploaded_file)
+# ✅ Load and preprocess data once uploaded
+with st.spinner("Loading and processing player data..."):
+    df = pd.read_csv(uploaded_file)
 
-        # Preprocess data (e.g. split primary positions if needed)
-        df["Primary Position List"] = df["Primary Position"].fillna("").apply(lambda x: [pos.strip() for pos in x.split(",")])
+    # Ensure consistent format for Primary Position
+    df["Primary Position"] = df["Primary Position"].fillna("")
+    df["Primary Position List"] = df["Primary Position"].apply(lambda x: [pos.strip() for pos in x.split(",")])
 
-        # You can add other preprocessing steps here too...
+    time.sleep(1)
 
-        time.sleep(1.5)  # Optional: Simulate loading delay
+st.success("✅ Data loaded successfully!")
 
-    st.success("Data loaded successfully.")
-    
-    # Display preview (optional)
-    st.dataframe(df.head())
-    
-    # 🧠 Continue with your filters, visualizations, pizza charts, etc...
-else:
-    st.info("Please upload a CSV file to get started.")
+# 👉 Your dashboard logic and visualizations go here
+# Example:
+st.dataframe(df.head())
+
 
 
 # --- Position to Metrics Mapping ---
@@ -201,7 +201,6 @@ metric_higher_better = {
 # --- File Uploader ---
 uploaded_file = st.sidebar.file_uploader("Upload CSV file", type=["csv"])
 df = load_data(uploaded_file)
-
 
 # --- Sidebar Filters ---
 st.sidebar.header("Filters")
