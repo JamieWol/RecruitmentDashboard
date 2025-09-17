@@ -1,6 +1,0 @@
-streamlit
-pandas
-matplotlib
-mplsoccer
-numpy
-openpyxl
