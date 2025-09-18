@@ -447,21 +447,25 @@ if len(quad_metrics) == 4:
     ax.axvline(0, color="black", linestyle="--")
 
     # Expand limits so chart fills space
-    ax.set_xlim(df_plot["X"].min() - 0.1, df_plot["X"].max() + 0.1)
-    ax.set_ylim(df_plot["Y"].min() - 0.1, df_plot["Y"].max() + 0.1)
-
-    # Quadrant labels: top labels along top edge, bottom labels along bottom edge
     x_min, x_max = df_plot["X"].min(), df_plot["X"].max()
     y_min, y_max = df_plot["Y"].min(), df_plot["Y"].max()
     x_mid = (x_min + x_max) / 2
+    y_range = y_max - y_min
 
-    # Top metrics (top edge)
-    ax.text((x_min + x_mid)/2, y_max, m3, fontsize=14, color="blue", ha="center", va="top")
-    ax.text((x_mid + x_max)/2, y_max, m1, fontsize=14, color="blue", ha="center", va="top")
+    ax.set_xlim(x_min - 0.1, x_max + 0.1)
+    ax.set_ylim(y_min - 0.1, y_max + 0.1)
 
-    # Bottom metrics (bottom edge)
-    ax.text((x_min + x_mid)/2, y_min, m2, fontsize=14, color="blue", ha="center", va="bottom")
-    ax.text((x_mid + x_max)/2, y_min, m4, fontsize=14, color="blue", ha="center", va="bottom")
+    # Quadrant labels
+    top_offset = y_max + 0.02 * y_range        # above top points
+    bottom_offset = y_min - 0.02 * y_range     # below bottom points
+
+    # Top metrics (top-left and top-right quadrants)
+    ax.text((x_min + x_mid)/2, top_offset, m3, fontsize=14, color="black", ha="center", va="bottom", fontweight='bold')
+    ax.text((x_mid + x_max)/2, top_offset, m1, fontsize=14, color="black", ha="center", va="bottom", fontweight='bold')
+
+    # Bottom metrics (bottom-left and bottom-right quadrants, below bottom points)
+    ax.text((x_min + x_mid)/2, bottom_offset, m2, fontsize=14, color="black", ha="center", va="top", fontweight='bold')
+    ax.text((x_mid + x_max)/2, bottom_offset, m4, fontsize=14, color="black", ha="center", va="top", fontweight='bold')
 
     # Titles and labels
     ax.set_title("4-Quadrant Player Metric Map", fontsize=16, fontweight="bold", pad=20)
