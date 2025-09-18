@@ -406,6 +406,77 @@ league_avg_vals = league_avg_percentiles.tolist()
 p3_vals = filtered_df.loc[filtered_df["Name"] == p3, [m + " Percentile" for m in pizza_metrics]].values.flatten().tolist()
 plot_radar(pizza_metrics, [p3_vals, league_avg_vals], [p3, "League Average"], ["green", "red"])
 
+# --- Quadrant Plot Section ---
+st.subheader("🔲 4-Quadrant Metric Map")
+
+# Select 4 metrics
+quad_metrics = st.multiselect(
+    "Select 4 metrics to compare",
+    pizza_metrics,
+    default=pizza_metrics[:4]
+)
+
+if len(quad_metrics) == 4:
+    m1, m2, m3, m4 = quad_metrics
+
+    # Make a copy to avoid SettingWithCopyWarning
+    df_plot = filtered_df.copy()
+
+    # Calculate axes (percentiles)
+    df_plot["X"] = df_plot[m1 + " Percentile"] - df_plot[m2 + " Percentile"]
+    df_plot["Y"] = df_plot[m3 + " Percentile"] - df_plot[m4 + " Percentile"]
+
+    # Plot
+    fig, ax = plt.subplots(figsize=(10, 10))
+    ax.scatter(df_plot["X"], df_plot["Y"], s=80, color="green", alpha=0.6, edgecolor="black")
+
+    # Highlight selected player
+    highlight_player = st.selectbox("Highlight a player", df_plot["Name"].unique())
+    if highlight_player:
+        hp = df_plot[df_plot["Name"] == highlight_player]
+        ax.scatter(hp["X"], hp["Y"], s=250, color="red", edgecolor="black", zorder=5)
+        ax.text(hp["X"].values[0]+0.01, hp["Y"].values[0]+0.01, highlight_player,
+                fontsize=12, fontweight="bold", color="red")
+
+    # Labels for all players
+    for i, row in df_plot.iterrows():
+        ax.text(row["X"]+0.01, row["Y"]+0.01, row["Name"], fontsize=8, alpha=0.7)
+
+    # Quadrant lines
+    ax.axhline(0, color="black", linestyle="--")
+    ax.axvline(0, color="black", linestyle="--")
+
+    # Expand limits so chart fills space
+    ax.set_xlim(df_plot["X"].min() - 0.1, df_plot["X"].max() + 0.1)
+    ax.set_ylim(df_plot["Y"].min() - 0.1, df_plot["Y"].max() + 0.1)
+
+    # Quadrant labels: top labels along top edge, bottom labels along bottom edge
+    x_min, x_max = df_plot["X"].min(), df_plot["X"].max()
+    y_min, y_max = df_plot["Y"].min(), df_plot["Y"].max()
+    x_mid = (x_min + x_max) / 2
+
+    # Top metrics (top edge)
+    ax.text((x_min + x_mid)/2, y_max, m3, fontsize=14, color="blue", ha="center", va="top")
+    ax.text((x_mid + x_max)/2, y_max, m1, fontsize=14, color="blue", ha="center", va="top")
+
+    # Bottom metrics (bottom edge)
+    ax.text((x_min + x_mid)/2, y_min, m2, fontsize=14, color="blue", ha="center", va="bottom")
+    ax.text((x_mid + x_max)/2, y_min, m4, fontsize=14, color="blue", ha="center", va="bottom")
+
+    # Titles and labels
+    ax.set_title("4-Quadrant Player Metric Map", fontsize=16, fontweight="bold", pad=20)
+    ax.set_xlabel(f"{m1} ↔ {m2}", fontsize=12)
+    ax.set_ylabel(f"{m3} ↔ {m4}", fontsize=12)
+
+    ax.grid(alpha=0.3)
+    plt.tight_layout()
+
+    st.pyplot(fig)
+    plt.close(fig)
+else:
+    st.info("Please select exactly 4 metrics to generate the quadrant plot.")
+
+
 # --- CSV Export Section ---
 st.subheader("⬇️ Export Data")
 csv = filtered_df.to_csv(index=False).encode('utf-8')
