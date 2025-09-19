@@ -559,7 +559,7 @@ if len(two_metrics) == 2:
             fontsize=12, color="gold", ha="center", va="top", fontweight='bold')
 
     # Titles and labels
-    ax.set_title("2-Metric 4-Quadrant Player Map", fontsize=16, fontweight="bold", pad=20)
+    ax.set_title("SCATTER GRAPH", fontsize=16, fontweight="bold", pad=20)
     ax.set_xlabel(f"{mX} (relative)", fontsize=13)
     ax.set_ylabel(f"{mY} (relative)", fontsize=13)
     ax.grid(alpha=0.3)
