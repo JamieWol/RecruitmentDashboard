@@ -481,7 +481,7 @@ else:
     st.info("Please select exactly 4 metrics to generate the quadrant plot.")
 
 # --- 2-Metric 4-Quadrant Scatter with color-coded quadrants ---
-st.subheader("📊 2-Metric Quadrant Scatter")
+st.subheader("📊 Scatter Graph")
 
 two_metrics = st.multiselect(
     "Select 2 metrics to compare",
@@ -501,11 +501,11 @@ if len(two_metrics) == 2:
         if x >= 0 and y >= 0:
             return "green"   # Top Right = Strong in both
         elif x < 0 and y >= 0:
-            return "blue"  # Top Left = Strong Y, Weak X
+            return "blue"    # Top Left = Strong Y, Weak X
         elif x < 0 and y < 0:
-            return "red"    # Bottom Left = Below average in both
+            return "red"     # Bottom Left = Below average in both
         else:
-            return "gold" # Bottom Right = Strong X, Weak Y
+            return "gold"    # Bottom Right = Strong X, Weak Y
 
     df_plot["Color"] = df_plot.apply(lambda row: get_quadrant_color(row["X"], row["Y"]), axis=1)
 
@@ -517,17 +517,17 @@ if len(two_metrics) == 2:
     for i, row in df_plot.iterrows():
         ax.text(row["X"] + 0.01, row["Y"] + 0.01, row["Name"], fontsize=9, alpha=0.7)
 
-    # Highlight a selected player
-    highlight_player = st.selectbox(
-        "Highlight a player",
+    # Highlight selected players (multiselect)
+    highlight_players = st.multiselect(
+        "Highlight player(s)",
         df_plot["Name"].unique(),
-        key="highlight_player_2metric"
+        key="highlight_players_2metric"
     )
-    if highlight_player:
-        hp = df_plot[df_plot["Name"] == highlight_player]
-        ax.scatter(hp["X"], hp["Y"], s=250, color="red", edgecolor="black", zorder=5)
-        ax.text(hp["X"].values[0] + 0.01, hp["Y"].values[0] + 0.01, highlight_player,
-                fontsize=12, fontweight="bold", color="red")
+    for hp_name in highlight_players:
+        hp = df_plot[df_plot["Name"] == hp_name]
+        ax.scatter(hp["X"], hp["Y"], s=300, color="black", edgecolor="white", zorder=5)  # larger black circle
+        ax.text(hp["X"].values[0] + 0.01, hp["Y"].values[0] + 0.01, hp_name,
+                fontsize=12, fontweight="bold", color="black")
 
     # Quadrant lines
     ax.axhline(0, color="black", linestyle="--")
@@ -543,8 +543,8 @@ if len(two_metrics) == 2:
     ax.set_ylim(y_min - 0.1, y_max + 0.1)
 
     # Quadrant label positions
-    top_y = y_max + 0.07 * y_range      # above the chart
-    bottom_y = y_min - 0.05 * y_range   # below the chart
+    top_y = y_max + 0.07 * y_range
+    bottom_y = y_min - 0.05 * y_range
     left_x = (x_min + x_mid) / 2
     right_x = (x_mid + x_max) / 2
 
