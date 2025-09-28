@@ -228,9 +228,15 @@ if filtered_df.empty:
 # --- Percentile Rankings ---
 for m in pizza_metrics:
     if m in filtered_df.columns:
-        filtered_df[m + " Percentile"] = filtered_df[m].rank(pct=True)
+        if metric_higher_better.get(m, True):
+            # Higher = better (default)
+            filtered_df[m + " Percentile"] = filtered_df[m].rank(pct=True)
+        else:
+            # Lower = better → invert ranking
+            filtered_df[m + " Percentile"] = filtered_df[m].rank(pct=True, ascending=False)
     else:
         st.warning(f"Metric '{m}' not found in data.")
+
 
 percentile_columns = [m + " Percentile" for m in pizza_metrics if m + " Percentile" in filtered_df.columns]
 league_avg_percentiles = filtered_df[percentile_columns].mean().values
@@ -406,47 +412,42 @@ league_avg_vals = league_avg_percentiles.tolist()
 p3_vals = filtered_df.loc[filtered_df["Name"] == p3, [m + " Percentile" for m in pizza_metrics]].values.flatten().tolist()
 plot_radar(pizza_metrics, [p3_vals, league_avg_vals], [p3, "League Average"], ["green", "red"])
 
-# --- Quadrant Plot Section ---
+# --- 4-Metric 4-Quadrant Plot ---
 st.subheader("🔲 4-Quadrant Metric Map")
 
-# Select 4 metrics
 quad_metrics = st.multiselect(
     "Select 4 metrics to compare",
     pizza_metrics,
-    default=pizza_metrics[:4]
+    default=pizza_metrics[:4],
+    key="quad_metrics"  # unique key for this multiselect
 )
 
 if len(quad_metrics) == 4:
     m1, m2, m3, m4 = quad_metrics
-
-    # Make a copy to avoid SettingWithCopyWarning
     df_plot = filtered_df.copy()
-
-    # Calculate axes (percentiles)
     df_plot["X"] = df_plot[m1 + " Percentile"] - df_plot[m2 + " Percentile"]
     df_plot["Y"] = df_plot[m3 + " Percentile"] - df_plot[m4 + " Percentile"]
 
-    # Plot
     fig, ax = plt.subplots(figsize=(10, 10))
     ax.scatter(df_plot["X"], df_plot["Y"], s=80, color="green", alpha=0.6, edgecolor="black")
 
-    # Highlight selected player
-    highlight_player = st.selectbox("Highlight a player", df_plot["Name"].unique())
+    highlight_player = st.selectbox(
+        "Highlight a player",
+        df_plot["Name"].unique(),
+        key="highlight_player_4quad"  # unique key
+    )
     if highlight_player:
         hp = df_plot[df_plot["Name"] == highlight_player]
         ax.scatter(hp["X"], hp["Y"], s=250, color="red", edgecolor="black", zorder=5)
         ax.text(hp["X"].values[0]+0.01, hp["Y"].values[0]+0.01, highlight_player,
                 fontsize=12, fontweight="bold", color="red")
 
-    # Labels for all players
     for i, row in df_plot.iterrows():
         ax.text(row["X"]+0.01, row["Y"]+0.01, row["Name"], fontsize=8, alpha=0.7)
 
-    # Quadrant lines
     ax.axhline(0, color="black", linestyle="--")
     ax.axvline(0, color="black", linestyle="--")
 
-    # Expand limits so chart fills space
     x_min, x_max = df_plot["X"].min(), df_plot["X"].max()
     y_min, y_max = df_plot["Y"].min(), df_plot["Y"].max()
     x_mid = (x_min + x_max) / 2
@@ -455,30 +456,28 @@ if len(quad_metrics) == 4:
     ax.set_xlim(x_min - 0.1, x_max + 0.1)
     ax.set_ylim(y_min - 0.1, y_max + 0.1)
 
-    # Quadrant labels
-    top_offset = y_max + 0.02 * y_range        # above top points
-    bottom_offset = y_min - 0.02 * y_range     # below bottom points
+    # Top and bottom quadrant labels
+    top_offset = y_max + 0.02 * y_range
+    bottom_offset = y_min - 0.02 * y_range
 
-    # Top metrics (top-left and top-right quadrants)
+    # Top metrics
     ax.text((x_min + x_mid)/2, top_offset, m3, fontsize=14, color="black", ha="center", va="bottom", fontweight='bold')
     ax.text((x_mid + x_max)/2, top_offset, m1, fontsize=14, color="black", ha="center", va="bottom", fontweight='bold')
 
-    # Bottom metrics (bottom-left and bottom-right quadrants, below bottom points)
+    # Bottom metrics
     ax.text((x_min + x_mid)/2, bottom_offset, m2, fontsize=14, color="black", ha="center", va="top", fontweight='bold')
     ax.text((x_mid + x_max)/2, bottom_offset, m4, fontsize=14, color="black", ha="center", va="top", fontweight='bold')
 
-    # Titles and labels
     ax.set_title("4-Quadrant Player Metric Map", fontsize=16, fontweight="bold", pad=20)
     ax.set_xlabel(f"{m1} ↔ {m2}", fontsize=12)
     ax.set_ylabel(f"{m3} ↔ {m4}", fontsize=12)
-
     ax.grid(alpha=0.3)
     plt.tight_layout()
-
     st.pyplot(fig)
     plt.close(fig)
 else:
     st.info("Please select exactly 4 metrics to generate the quadrant plot.")
+
 
 # --- 2-Metric 4-Quadrant Scatter with color-coded quadrants ---
 st.subheader("📊 Scatter Graph")
@@ -559,7 +558,7 @@ if len(two_metrics) == 2:
             fontsize=12, color="gold", ha="center", va="top", fontweight='bold')
 
     # Titles and labels
-    ax.set_title("SCATTER GRAPH", fontsize=16, fontweight="bold", pad=20)
+    ax.set_title("2-Metric 4-Quadrant Player Map", fontsize=16, fontweight="bold", pad=20)
     ax.set_xlabel(f"{mX} (relative)", fontsize=13)
     ax.set_ylabel(f"{mY} (relative)", fontsize=13)
     ax.grid(alpha=0.3)
@@ -569,8 +568,6 @@ if len(two_metrics) == 2:
     plt.close(fig)
 else:
     st.info("Please select exactly 2 metrics to generate the 2-metric quadrant plot.")
-
-
 
 
 # --- CSV Export Section ---
