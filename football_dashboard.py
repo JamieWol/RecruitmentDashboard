@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from mplsoccer import PyPizza
 import numpy as np
+from matplotlib.patches import Patch
 
 # --- Load Data ---
 @st.cache_data
@@ -162,28 +163,11 @@ position_metrics_map = {
     ]
 }
 
-
 metric_higher_better = {
     "Goals Conceded": False,
     "Positioning Error": False,
     # Add others where lower is better...
 }
-
-# --- Load Data ---
-@st.cache_data
-def load_data(file=None):
-    if file is not None:
-        df = pd.read_csv(file)
-    else:
-        df = pd.read_csv("CBs.csv")
-    df = df.dropna(subset=["Age", "Minutes Played", "Name", "Primary Position", "Team", "Competition"])
-    df["Age"] = pd.to_numeric(df["Age"], errors='coerce')
-    df["Minutes Played"] = pd.to_numeric(df["Minutes Played"], errors='coerce')
-    df["Name"] = df["Name"].astype(str)
-    df["Primary Position"] = df["Primary Position"].astype(str)
-    df["Team"] = df["Team"].astype(str)
-    df["Competition"] = df["Competition"].astype(str)
-    return df
 
 # --- File Uploader ---
 uploaded_file = st.sidebar.file_uploader("Upload CSV file", type=["csv"])
@@ -203,7 +187,7 @@ selected_names = st.sidebar.multiselect("Player Name", sorted(df["Name"].dropna(
 pizza_metrics = []
 for pos in selected_positions:
     pizza_metrics += position_metrics_map.get(pos, [])
-pizza_metrics = list(set(pizza_metrics))
+pizza_metrics = list(dict.fromkeys(pizza_metrics))  # preserve uniqueness (order-agnostic)
 
 if not pizza_metrics:
     st.error("No metrics found for selected position(s). Please update the position_metrics_map.")
@@ -225,7 +209,8 @@ if filtered_df.empty:
     st.warning("No players match the filter criteria.")
     st.stop()
 
-# --- Percentile Rankings ---
+# --- Percentile Rankings (player-level) ---
+# Create percentile columns based on filtered_df (so percentiles are relative to the current filter)
 for m in pizza_metrics:
     if m in filtered_df.columns:
         if metric_higher_better.get(m, True):
@@ -237,12 +222,28 @@ for m in pizza_metrics:
     else:
         st.warning(f"Metric '{m}' not found in data.")
 
+# --- Compute League Average as raw mean, then convert to percentiles ---
+# league_avg_raw holds the mean raw metric values across the filtered players
+league_avg_raw = filtered_df[[m for m in pizza_metrics if m in filtered_df.columns]].mean()
 
+# Convert each league raw average into a percentile on the same scale as players
+league_avg_percentiles = []
+for m in pizza_metrics:
+    if m in filtered_df.columns:
+        # combine player raw values with the league mean as an extra value
+        combined = filtered_df[m].tolist() + [league_avg_raw[m]]
+        if metric_higher_better.get(m, True):
+            ranks = pd.Series(combined).rank(pct=True)
+        else:
+            ranks = pd.Series(combined).rank(pct=True, ascending=False)
+        league_avg_percentiles.append(ranks.iloc[-1])  # last item is the league average
+    else:
+        # If metric missing, append a neutral 0.5 (or you could skip; using 0.5 keeps shapes consistent)
+        league_avg_percentiles.append(0.5)
+
+# --- Overall Score (keep percentile-based overall score) ---
 percentile_columns = [m + " Percentile" for m in pizza_metrics if m + " Percentile" in filtered_df.columns]
-league_avg_percentiles = filtered_df[percentile_columns].mean().values
-
-
-filtered_df["Overall Score"] = filtered_df[[m + " Percentile" for m in pizza_metrics if m + " Percentile" in filtered_df.columns]].mean(axis=1)
+filtered_df["Overall Score"] = filtered_df[percentile_columns].mean(axis=1)
 filtered_df = filtered_df.sort_values("Overall Score", ascending=False).reset_index(drop=True)
 filtered_df.index += 1
 
@@ -251,29 +252,46 @@ st.title("⚽ Recruitment Dashboard")
 
 # --- Player Ranking Table ---
 st.subheader("🏅 Player Ranking")
+display_columns = ["Name", "Team", "Primary Position", "Age", "Minutes Played", "Competition", "Overall Score"] + [m for m in pizza_metrics if m in filtered_df.columns]
 st.dataframe(
-    filtered_df[
-        ["Name", "Team", "Primary Position", "Age", "Minutes Played", "Competition", "Overall Score"] + pizza_metrics
-    ]
+    filtered_df[display_columns]
     .style.format({"Overall Score": "{:.3f}"})
     .highlight_max(subset=["Overall Score"], color="lightgreen")
     .set_caption("Players ranked by average percentile across key metrics")
 )
 
 # --- Pizza Chart Function ---
-def plot_pizza(player, data, league_avg, metrics_list):
-    cols = [m + " Percentile" for m in metrics_list]
-    cols = [c for c in cols if c in data.columns]
+def plot_pizza(player, data, league_avg_percentiles, metrics_list):
+    cols = [m + " Percentile" for m in metrics_list if m + " Percentile" in data.columns]
+    cols_metrics = [m for m in metrics_list if m + " Percentile" in data.columns]  # aligned metrics actually present
+    if len(cols_metrics) == 0:
+        st.warning("No metrics available to plot for this player.")
+        return
+
+    # player's percentiles in same order as cols_metrics
     player_percentiles_raw = data.loc[data["Name"] == player, cols].values.flatten().tolist()
-    league_avg_raw = league_avg
+    # ensure league list matches the same metrics (filter by existence)
+    league_vals = [v for m, v in zip(metrics_list, league_avg_percentiles) if m + " Percentile" in data.columns]
+
+    # Defensive check: lengths should match
+    if len(player_percentiles_raw) != len(league_vals):
+        # If mismatch due to missing metrics, align league_vals to available metrics
+        league_vals = []
+        for m in cols_metrics:
+            idx = metrics_list.index(m.replace(" Percentile", "")) if (m.replace(" Percentile", "") in metrics_list) else None
+            if idx is not None:
+                league_vals.append(league_avg_percentiles[idx])
+        # if still mismatch, pad with 0.5
+        while len(league_vals) < len(player_percentiles_raw):
+            league_vals.append(0.5)
 
     player_percentiles_str = [f"{int(p * 100)}%" for p in player_percentiles_raw]
-    league_percentiles_str = [f"{int(p * 100)}%" for p in league_avg_raw]
+    league_percentiles_str = [f"{int(p * 100)}%" for p in league_vals]
 
     pizza = PyPizza(
-        params=metrics_list,
-        min_range=[0] * len(metrics_list),
-        max_range=[1] * len(metrics_list),
+        params=cols_metrics,
+        min_range=[0] * len(cols_metrics),
+        max_range=[1] * len(cols_metrics),
         background_color="#f0f8ff",
         straight_line_color="black",
         straight_line_lw=1,
@@ -282,31 +300,17 @@ def plot_pizza(player, data, league_avg, metrics_list):
     )
 
     fig, ax = pizza.make_pizza(
-        league_avg_raw,
+        league_vals,
         figsize=(6, 6),
         color_blank_space="same",
-        kwargs_slices=dict(
-            facecolor="#FFFF00",
-            edgecolor="black",
-            linewidth=1.5,
-            alpha=1,
-            zorder=5
-        ),
-        kwargs_params=dict(
-            color="black",
-            fontsize=6,
-            fontweight="bold"
-        ),
-        kwargs_values=dict(
-            color="black",
-            fontsize=8,
-            fontweight="bold",
-            zorder=10,
-            bbox=dict(edgecolor="black", facecolor="#FFFF00", boxstyle="round,pad=0.15")
-        )
+        kwargs_slices=dict(facecolor="#FFFF00", edgecolor="black", linewidth=1.5, alpha=1, zorder=5),
+        kwargs_params=dict(color="black", fontsize=6, fontweight="bold"),
+        kwargs_values=dict(color="black", fontsize=8, fontweight="bold",
+                           zorder=10, bbox=dict(edgecolor="black", facecolor="#FFFF00", boxstyle="round,pad=0.15"))
     )
 
-    for text_obj, pct_str in zip(ax.texts[-len(metrics_list):], league_percentiles_str):
+    # Replace the default last-added texts (league) with formatted percentage labels
+    for text_obj, pct_str in zip(ax.texts[-len(cols_metrics):], league_percentiles_str):
         text_obj.set_text(pct_str)
         text_obj.set_zorder(15)
 
@@ -314,32 +318,15 @@ def plot_pizza(player, data, league_avg, metrics_list):
         player_percentiles_raw,
         ax=ax,
         color_blank_space="same",
-        kwargs_slices=dict(
-            facecolor="#1a78cf",
-            edgecolor="black",
-            linewidth=2,
-            alpha=0.8,
-            zorder=5
-        ),
-        kwargs_params=dict(
-            color="black",
-            fontsize=6,
-            fontweight="bold"
-        ),
-        kwargs_values=dict(
-            color="white",
-            fontsize=8,
-            fontweight="bold",
-            zorder=20,
-            bbox=dict(edgecolor="#000000", facecolor="#1a78cf", boxstyle="round,pad=0.2", alpha=0.7)
-        )
+        kwargs_slices=dict(facecolor="#1a78cf", edgecolor="black", linewidth=2, alpha=0.8, zorder=5),
+        kwargs_params=dict(color="black", fontsize=6, fontweight="bold"),
+        kwargs_values=dict(color="white", fontsize=8, fontweight="bold",
+                           zorder=20, bbox=dict(edgecolor="#000000", facecolor="#1a78cf", boxstyle="round,pad=0.2", alpha=0.7))
     )
 
-    for text_obj, pct_str in zip(ax.texts[-len(metrics_list):], player_percentiles_str):
+    for text_obj, pct_str in zip(ax.texts[-len(cols_metrics):], player_percentiles_str):
         text_obj.set_text(pct_str)
         text_obj.set_zorder(25)
-
-    from matplotlib.patches import Patch
 
     legend_patches = [
         Patch(facecolor="#1a78cf", edgecolor="black", label=player),
@@ -361,7 +348,12 @@ def plot_pizza(player, data, league_avg, metrics_list):
 
 # --- Radar Chart Function ---
 def plot_radar(labels, values_list, labels_list, colors):
+    # labels: list of metric names (already present)
     num_vars = len(labels)
+    if num_vars == 0:
+        st.warning("No metrics to plot on radar.")
+        return
+
     angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
     angles += angles[:1]
 
@@ -380,7 +372,16 @@ def plot_radar(labels, values_list, labels_list, colors):
             ax.text(angle, r, f"{int(r * 100)}", size=9, fontweight='bold', color="black", ha='center', va='center')
 
     for values, label, color in zip(values_list, labels_list, colors):
-        vals = values + values[:1]
+        # ensure values length matches num_vars
+        if len(values) != num_vars:
+            # try to align or pad/truncate
+            if len(values) < num_vars:
+                vals = values + [0.5] * (num_vars - len(values))
+            else:
+                vals = values[:num_vars]
+        else:
+            vals = values
+        vals = vals + vals[:1]
         ax.plot(angles, vals, color=color, linewidth=2.5, label=label)
         ax.fill(angles, vals, color=color, alpha=0.3)
 
@@ -400,25 +401,28 @@ st.subheader("📈 Radar Chart: Player vs Player Comparison")
 p1 = st.selectbox("Select Player 1", players_available)
 p2 = st.selectbox("Select Player 2", players_available, index=1)
 if p1 != p2:
-    vals1 = filtered_df.loc[filtered_df["Name"] == p1, [m + " Percentile" for m in pizza_metrics]].values.flatten().tolist()
-    vals2 = filtered_df.loc[filtered_df["Name"] == p2, [m + " Percentile" for m in pizza_metrics]].values.flatten().tolist()
-    plot_radar(pizza_metrics, [vals1, vals2], [p1, p2], ["red", "blue"])
+    # Prepare percentile vectors in the order of pizza_metrics (only include metrics that exist)
+    metrics_present = [m for m in pizza_metrics if m + " Percentile" in filtered_df.columns]
+    vals1 = filtered_df.loc[filtered_df["Name"] == p1, [m + " Percentile" for m in metrics_present]].values.flatten().tolist()
+    vals2 = filtered_df.loc[filtered_df["Name"] == p2, [m + " Percentile" for m in metrics_present]].values.flatten().tolist()
+    plot_radar(metrics_present, [vals1, vals2], [p1, p2], ["red", "blue"])
 else:
     st.info("Select two different players.")
 
 st.subheader("📊 Radar Chart: Player vs League Average")
 p3 = st.selectbox("Select Player", players_available, key="league_player")
-league_avg_vals = league_avg_percentiles.tolist()
-p3_vals = filtered_df.loc[filtered_df["Name"] == p3, [m + " Percentile" for m in pizza_metrics]].values.flatten().tolist()
-plot_radar(pizza_metrics, [p3_vals, league_avg_vals], [p3, "League Average"], ["green", "red"])
+metrics_present = [m for m in pizza_metrics if m + " Percentile" in filtered_df.columns]
+league_avg_vals = [v for m, v in zip(pizza_metrics, league_avg_percentiles) if m in metrics_present]
+p3_vals = filtered_df.loc[filtered_df["Name"] == p3, [m + " Percentile" for m in metrics_present]].values.flatten().tolist()
+plot_radar(metrics_present, [p3_vals, league_avg_vals], [p3, "League Average"], ["green", "red"])
 
 # --- 4-Metric 4-Quadrant Plot ---
 st.subheader("🔲 4-Quadrant Metric Map")
 
 quad_metrics = st.multiselect(
     "Select 4 metrics to compare",
-    pizza_metrics,
-    default=pizza_metrics[:4],
+    [m for m in pizza_metrics if m + " Percentile" in filtered_df.columns],
+    default=[m for m in pizza_metrics if m + " Percentile" in filtered_df.columns][:4],
     key="quad_metrics"  # unique key for this multiselect
 )
 
@@ -478,14 +482,13 @@ if len(quad_metrics) == 4:
 else:
     st.info("Please select exactly 4 metrics to generate the quadrant plot.")
 
-
 # --- 2-Metric 4-Quadrant Scatter with color-coded quadrants ---
 st.subheader("📊 Scatter Graph")
 
 two_metrics = st.multiselect(
     "Select 2 metrics to compare",
-    pizza_metrics,
-    default=pizza_metrics[:2],
+    [m for m in pizza_metrics if m + " Percentile" in filtered_df.columns],
+    default=[m for m in pizza_metrics if m + " Percentile" in filtered_df.columns][:2],
     key="two_metrics"
 )
 
@@ -568,7 +571,6 @@ if len(two_metrics) == 2:
     plt.close(fig)
 else:
     st.info("Please select exactly 2 metrics to generate the 2-metric quadrant plot.")
-
 
 # --- CSV Export Section ---
 st.subheader("⬇️ Export Data")
