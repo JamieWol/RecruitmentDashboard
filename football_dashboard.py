@@ -482,105 +482,90 @@ if len(quad_metrics) == 4:
 else:
     st.info("Please select exactly 4 metrics to generate the quadrant plot.")
 
-# --- 2-Metric 4-Quadrant Scatter with color-coded quadrants ---
+# --- Corrected Gradient Scatter: best = GREEN, worst = RED ---
 st.subheader("📊 Scatter Graph")
 
 two_metrics = st.multiselect(
     "Select 2 metrics to compare",
     [m for m in pizza_metrics if m + " Percentile" in filtered_df.columns],
     default=[m for m in pizza_metrics if m + " Percentile" in filtered_df.columns][:2],
-    key="two_metrics"
+    key="gradient_scatter_corrected"
 )
 
 if len(two_metrics) == 2:
     mX, mY = two_metrics
     df_plot = filtered_df.copy()
-    df_plot["X"] = df_plot[mX + " Percentile"] - 0.5
-    df_plot["Y"] = df_plot[mY + " Percentile"] - 0.5
 
-    # --- Add colors by quadrant ---
-    def get_quadrant_color(x, y):
-        if x >= 0 and y >= 0:
-            return "green"   # Top Right = Strong in both
-        elif x < 0 and y >= 0:
-            return "blue"    # Top Left = Strong Y, Weak X
-        elif x < 0 and y < 0:
-            return "red"     # Bottom Left = Below average in both
-        else:
-            return "gold"    # Bottom Right = Strong X, Weak Y
+    # Percentiles clipped to 0..1
+    df_plot["X"] = df_plot[mX + " Percentile"].clip(0, 1)
+    df_plot["Y"] = df_plot[mY + " Percentile"].clip(0, 1)
+    df_plot["MeanPct"] = (df_plot["X"] + df_plot["Y"]) / 2
 
-    df_plot["Color"] = df_plot.apply(lambda row: get_quadrant_color(row["X"], row["Y"]), axis=1)
+    # Bigger figure so labels fit comfortably
+    fig, ax = plt.subplots(figsize=(14, 12))
 
-    # Plot
-    fig, ax = plt.subplots(figsize=(12, 12))
-    ax.scatter(df_plot["X"], df_plot["Y"], s=80, c=df_plot["Color"], alpha=0.6, edgecolor="black")
+    # Gradient background (best = green, worst = red)
+    xv, yv = np.meshgrid(np.linspace(-0.05, 1.05, 600), np.linspace(-0.05, 1.05, 600))
+    Z = ((xv.clip(0, 1)) + (yv.clip(0, 1))) / 2.0
+    cmap = plt.cm.get_cmap("RdYlGn")
+    ax.imshow(Z, extent=(-0.05, 1.05, -0.05, 1.05), origin="lower",
+              cmap=cmap, alpha=0.62, aspect="auto")
 
-    # Labels for all players
-    for i, row in df_plot.iterrows():
-        ax.text(row["X"] + 0.01, row["Y"] + 0.01, row["Name"], fontsize=9, alpha=0.7)
+    # Plot all players
+    ax.scatter(df_plot["X"], df_plot["Y"], s=140, facecolors="white",
+               edgecolors="black", zorder=5, alpha=0.95)
 
-    # Highlight selected players (multiselect)
-    highlight_players = st.multiselect(
-        "Highlight player(s)",
-        df_plot["Name"].unique(),
-        key="highlight_players_2metric"
-    )
-    for hp_name in highlight_players:
-        hp = df_plot[df_plot["Name"] == hp_name]
-        ax.scatter(hp["X"], hp["Y"], s=300, color="black", edgecolor="white", zorder=5)  # larger black circle
-        ax.text(hp["X"].values[0] + 0.01, hp["Y"].values[0] + 0.01, hp_name,
-                fontsize=12, fontweight="bold", color="black")
+    # Annotate players
+    for _, r in df_plot.iterrows():
+        ax.text(r["X"] + 0.012, r["Y"] + 0.012, r["Name"],
+                fontsize=9.5, alpha=0.9, color="black")
 
-    # Quadrant lines
-    ax.axhline(0, color="black", linestyle="--")
-    ax.axvline(0, color="black", linestyle="--")
+    # Highlight selected players
+    highlight_players = st.multiselect("Highlight player(s)", df_plot["Name"].unique(), key="gradient_corrected_highlight")
+    for hp in highlight_players:
+        hp_row = df_plot[df_plot["Name"] == hp]
+        ax.scatter(hp_row["X"], hp_row["Y"], s=480, facecolors="none",
+                   edgecolors="black", linewidths=2.4, zorder=9)
+        ax.text(hp_row["X"].values[0] + 0.015, hp_row["Y"].values[0] + 0.015, hp,
+                fontsize=11, fontweight="bold", color="black")
 
-    # Axis limits
-    x_min, x_max = df_plot["X"].min(), df_plot["X"].max()
-    y_min, y_max = df_plot["Y"].min(), df_plot["Y"].max()
-    x_mid = (x_min + x_max) / 2
-    y_range = y_max - y_min
+    # --- Dynamic quadrant labels (adjusted positions) ---
+    quadrant_labels = {
+        "top_right": "Strong In Both",
+        "top_left": f"Strong In {mY} only",
+        "bottom_right": f"Strong In {mX} only",
+        "bottom_left": "Weak In Both"
+    }
 
-    ax.set_xlim(x_min - 0.1, x_max + 0.1)
-    ax.set_ylim(y_min - 0.1, y_max + 0.1)
+    label_kwargs = dict(fontsize=14, fontweight="bold", ha="center", va="center",
+                        bbox=dict(facecolor="white", alpha=0.7,
+                                  edgecolor="black", boxstyle="round,pad=0.3"))
 
-    # Quadrant label positions
-    top_y = y_max + 0.07 * y_range
-    bottom_y = y_min - 0.05 * y_range
-    left_x = (x_min + x_mid) / 2
-    right_x = (x_mid + x_max) / 2
+    # Nudged positions for better spacing + updated colors
+    ax.text(0.75, 1.02, quadrant_labels["top_right"], color="#006837", **label_kwargs)   # dark green
+    ax.text(0.25, 1.02, quadrant_labels["top_left"], color="#FFD700", **label_kwargs)    # yellow
+    ax.text(0.75, -0.02, quadrant_labels["bottom_right"], color="#9ACD32", **label_kwargs) # light green
+    ax.text(0.25, -0.02, quadrant_labels["bottom_left"], color="#d73027", **label_kwargs) # red
 
-    # Descriptive labels
-    ax.text(left_x, top_y, "Strong In Y Metric & Weak In X Metric",
-            fontsize=12, color="blue", ha="center", va="bottom", fontweight='bold')
-    ax.text(right_x, top_y, "Strong In Both",
-            fontsize=12, color="green", ha="center", va="bottom", fontweight='bold')
-    ax.text(left_x, bottom_y, "Below Average In Both",
-            fontsize=12, color="red", ha="center", va="top", fontweight='bold')
-    ax.text(x_mid + (x_max - x_mid) / 1.5, bottom_y, "Strong In X Metric & Weak In Y Metric",
-            fontsize=12, color="gold", ha="center", va="top", fontweight='bold')
+    # Median lines
+    ax.axhline(0.5, color="black", linestyle="--", lw=1)
+    ax.axvline(0.5, color="black", linestyle="--", lw=1)
 
-    # Titles and labels
-    ax.set_title("2-Metric 4-Quadrant Player Map", fontsize=16, fontweight="bold", pad=20)
-    ax.set_xlabel(f"{mX} (relative)", fontsize=13)
-    ax.set_ylabel(f"{mY} (relative)", fontsize=13)
-    ax.grid(alpha=0.3)
-    plt.tight_layout()
+    # Axis and title setup
+    ax.set_xlim(-0.05, 1.05)
+    ax.set_ylim(-0.05, 1.05)
+    ax.set_xlabel(f"{mX} Percentile", fontsize=13, fontweight="bold")
+    ax.set_ylabel(f"{mY} Percentile", fontsize=13, fontweight="bold")
+    ax.set_title("Player Scatter Graph", fontsize=16, fontweight="bold", pad=15)
 
+    ax.grid(False)
+    plt.tight_layout(pad=3)
     st.pyplot(fig)
     plt.close(fig)
-else:
-    st.info("Please select exactly 2 metrics to generate the 2-metric quadrant plot.")
 
-# --- CSV Export Section ---
-st.subheader("⬇️ Export Data")
-csv = filtered_df.to_csv(index=False).encode('utf-8')
-st.download_button(
-    label="Download Filtered Player Data as CSV",
-    data=csv,
-    file_name='filtered_players.csv',
-    mime='text/csv'
-)
+else:
+    st.info("Please select exactly 2 metrics to generate this scatter plot.")
+
 
 
 
