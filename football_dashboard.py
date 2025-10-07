@@ -515,19 +515,22 @@ if len(two_metrics) == 2:
     ax.scatter(df_plot["X"], df_plot["Y"], s=140, facecolors="white",
                edgecolors="black", zorder=5, alpha=0.95)
 
-    # Annotate players
-    for _, r in df_plot.iterrows():
-        ax.text(r["X"] + 0.012, r["Y"] + 0.012, r["Name"],
-                fontsize=9.5, alpha=0.9, color="black")
-
-    # Highlight selected players
+    # Highlight selected players first
     highlight_players = st.multiselect("Highlight player(s)", df_plot["Name"].unique(), key="gradient_corrected_highlight")
+
+    # Annotate only non-highlighted players
+    for _, r in df_plot.iterrows():
+        if r["Name"] not in highlight_players:  # skip if highlighted
+            ax.text(r["X"] + 0.012, r["Y"] + 0.012, r["Name"],
+                    fontsize=9.5, alpha=0.9, color="black")
+
+    # Then highlight selected players (bold + black circle)
     for hp in highlight_players:
         hp_row = df_plot[df_plot["Name"] == hp]
         ax.scatter(hp_row["X"], hp_row["Y"], s=480, facecolors="none",
                    edgecolors="black", linewidths=2.4, zorder=9)
         ax.text(hp_row["X"].values[0] + 0.015, hp_row["Y"].values[0] + 0.015, hp,
-                fontsize=11, fontweight="bold", color="black")
+                fontsize=12, fontweight="bold", color="black")
 
     # --- Dynamic quadrant labels (adjusted positions) ---
     quadrant_labels = {
@@ -541,11 +544,11 @@ if len(two_metrics) == 2:
                         bbox=dict(facecolor="white", alpha=0.7,
                                   edgecolor="black", boxstyle="round,pad=0.3"))
 
-    # Nudged positions for better spacing + updated colors
-    ax.text(0.75, 1.02, quadrant_labels["top_right"], color="#006837", **label_kwargs)   # dark green
-    ax.text(0.25, 1.02, quadrant_labels["top_left"], color="#FFD700", **label_kwargs)    # yellow
-    ax.text(0.75, -0.02, quadrant_labels["bottom_right"], color="#9ACD32", **label_kwargs) # light green
-    ax.text(0.25, -0.02, quadrant_labels["bottom_left"], color="#d73027", **label_kwargs) # red
+    # Adjusted label positions and colors
+    ax.text(0.75, 1.02, quadrant_labels["top_right"], color="#006837", **label_kwargs)
+    ax.text(0.25, 1.02, quadrant_labels["top_left"], color="#FFD700", **label_kwargs)
+    ax.text(0.75, -0.02, quadrant_labels["bottom_right"], color="#9ACD32", **label_kwargs)
+    ax.text(0.25, -0.02, quadrant_labels["bottom_left"], color="#d73027", **label_kwargs)
 
     # Median lines
     ax.axhline(0.5, color="black", linestyle="--", lw=1)
@@ -565,6 +568,7 @@ if len(two_metrics) == 2:
 
 else:
     st.info("Please select exactly 2 metrics to generate this scatter plot.")
+
 
 
 
