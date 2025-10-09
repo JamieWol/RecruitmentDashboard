@@ -166,6 +166,7 @@ position_metrics_map = {
 metric_higher_better = {
     "Goals Conceded": False,
     "Positioning Error": False,
+    "Turnovers": False,
     # Add others where lower is better...
 }
 
