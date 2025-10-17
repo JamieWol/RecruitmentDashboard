@@ -570,6 +570,102 @@ if len(two_metrics) == 2:
 else:
     st.info("Please select exactly 2 metrics to generate this scatter plot.")
 
+# --- Player Bar Chart: Player vs League Average (All Metrics) ---
+st.subheader("📈 Player Performance vs League Average")
+
+player_choice = st.selectbox(
+    "Select a Player",
+    filtered_df["Name"].unique(),
+    key="player_bar_chart"
+)
+
+if player_choice:
+    player_data = filtered_df[filtered_df["Name"] == player_choice].iloc[0]
+
+    # Compute player percentiles
+    player_percentiles = []
+    for m in pizza_metrics:
+        if m in filtered_df.columns:
+            if metric_higher_better.get(m, True):
+                p = filtered_df[m].rank(pct=True)[player_data.name]
+            else:
+                p = filtered_df[m].rank(pct=True, ascending=False)[player_data.name]
+        else:
+            p = 0.5
+        player_percentiles.append(p)
+
+    plot_df = pd.DataFrame({
+        "Metric": pizza_metrics,
+        "Player Value": [player_data[m] for m in pizza_metrics],
+        "Player Percentile": player_percentiles
+    })
+
+    # Colors based on percentile
+    cmap = plt.cm.get_cmap("RdYlGn")
+    colors = [cmap(p) for p in plot_df["Player Percentile"]]
+
+    # Figure size
+    fig_height = max(6, len(plot_df) * 0.6)
+    fig_width = 14
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+
+    # Horizontal bars (percentile-based)
+    bars = ax.barh(
+        plot_df["Metric"],
+        plot_df["Player Percentile"] * 100,
+        color=colors,
+        alpha=0.9,
+        label=player_choice
+    )
+
+    # Numeric labels at bar ends
+    label_offset = 2
+    for bar, metric, val in zip(bars, plot_df["Metric"], plot_df["Player Value"]):
+        if "%" in metric:
+            display_val = val
+            if val <= 1:  # convert 0-1 to 0-100
+                display_val = val * 100
+            label_text = f"{display_val:.0f}%"
+        else:
+            label_text = f"{val:.2f}"
+        ax.text(
+            bar.get_width() + label_offset,
+            bar.get_y() + bar.get_height()/2,
+            label_text,
+            ha="left",
+            va="center",
+            fontsize=10,
+            fontweight="bold",
+            color="white"
+        )
+
+    # Bold metric labels
+    ax.set_yticks(range(len(plot_df)))
+    ax.set_yticklabels(plot_df["Metric"], fontsize=10, fontweight="bold", color="white")
+
+    # Single vertical average line at 50
+    ax.axvline(50, color="yellow", linestyle="--", linewidth=2, alpha=0.9, label="Average (50)")
+
+    # Style
+    ax.set_facecolor("#1e1e1e")
+    fig.patch.set_facecolor("#1e1e1e")
+    ax.tick_params(colors="white", labelsize=10)
+    ax.set_xticks(range(0, 101, 10))
+    ax.set_xticklabels(range(0, 101, 10), fontweight='bold', color='white')  # bold x-axis numbers
+    for spine in ["top", "right", "left", "bottom"]:
+        ax.spines[spine].set_visible(False)
+
+    ax.set_xlim(0, 100)
+    ax.set_xlabel("Score", color="white", fontsize=12, fontweight="bold")
+    ax.set_ylabel("")
+    ax.set_title(f"{player_choice} vs League Average", color="white", fontsize=14, fontweight="bold", pad=15)
+
+    # Legend
+    ax.legend(facecolor="#1e1e1e", edgecolor="white", labelcolor="white", loc='upper right', bbox_to_anchor=(1.25, 1))
+
+    plt.tight_layout()
+    st.pyplot(fig)
+    plt.close(fig)
 
 
 
