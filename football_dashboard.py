@@ -668,7 +668,7 @@ if player_choice:
     plt.close(fig)
 
 
-st.subheader("📋 Player Metric Ranks (Vertical Table)")
+st.subheader("📋 Player Metric Ranks")
 
 selected_rank_player = st.selectbox(
     "Select a player to view detailed ranks", filtered_df["Name"].unique(), key="rank_table_vertical"
