@@ -668,5 +668,118 @@ if player_choice:
     plt.close(fig)
 
 
+st.subheader("📋 Player Metric Ranks (Vertical Table)")
+
+selected_rank_player = st.selectbox(
+    "Select a player to view detailed ranks", filtered_df["Name"].unique(), key="rank_table_vertical"
+)
+
+# Define which metrics are percentages
+percentage_metrics = [m for m in pizza_metrics if "%" in m]
+
+if selected_rank_player:
+    player_row = filtered_df[filtered_df["Name"] == selected_rank_player].iloc[0]
+    total_players = len(filtered_df)
+
+    table_data = []
+    cell_colors = []
+
+    # Determine max length for metric names to adjust column width
+    max_metric_length = max(len(m) for m in pizza_metrics)
+    metric_col_width = min(0.5, 0.05 * max_metric_length)  # scale to fit largest metric
+
+    for m in pizza_metrics:
+        if m in filtered_df.columns:
+            val = player_row[m]
+            rank = filtered_df[m].rank(ascending=not metric_higher_better.get(m, True), method="min")[player_row.name]
+            percentile_val = player_row[m + " Percentile"] * 100 if m + " Percentile" in filtered_df.columns else np.nan
+            league_avg = league_avg_raw.get(m, np.nan)
+
+            # --- Format values ---
+            if m in percentage_metrics and isinstance(val, (int, float)):
+                val_display = f"{val*100:.1f}%"
+            else:
+                val_display = round(val, 2) if not pd.isna(val) else "N/A"
+
+            if m in percentage_metrics and isinstance(league_avg, (int, float)):
+                league_display = f"{league_avg*100:.1f}%"
+            else:
+                league_display = round(league_avg, 2) if not pd.isna(league_avg) else "N/A"
+
+            if m in percentage_metrics and isinstance(percentile_val, (int, float)):
+                percentile_display = f"{percentile_val:.1f}%"
+            else:
+                percentile_display = round(percentile_val, 1) if not pd.isna(percentile_val) else "N/A"
+
+            # Highlighting
+            if isinstance(percentile_val, (int, float)):
+                if percentile_val >= 75:
+                    color = '#00CC66'  # Green
+                elif percentile_val >= 50:
+                    color = '#FFCC00'  # Yellow
+                else:
+                    color = '#FF4C4C'  # Red
+            else:
+                color = None
+
+            table_data.append([m, val_display, int(rank), percentile_display, league_display, total_players])
+            cell_colors.append([None, color, color, color, None, None])
+        else:
+            table_data.append([m, "N/A", "N/A", "N/A", "N/A", total_players])
+            cell_colors.append([None]*6)
+
+    columns = ["Metric", "Player Value", "Rank", "Percentile", "League Avg", "Out Of"]
+
+    # --- Figure setup ---
+    fig_width = 10
+    fig_height = max(6, len(table_data) * 0.5)
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+    ax.axis('off')
+
+    table = ax.table(
+        cellText=table_data,
+        colLabels=columns,
+        cellLoc='center',
+        colLoc='center',
+        loc='center'
+    )
+
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)
+
+    # Adjust column widths
+    col_widths = [metric_col_width, 0.12, 0.12, 0.12, 0.18, 0.1]
+    for j, width in enumerate(col_widths):
+        for i in range(len(table_data) + 1):
+            table[i, j].set_width(width)
+
+    # Header & cell styling
+    for (i, j), cell in table.get_celld().items():
+        if i == 0:
+            cell.set_facecolor('#FFFF66')  # yellow header
+            cell.get_text().set_fontweight('bold')
+            cell.get_text().set_color('black')
+        else:
+            bg = cell_colors[i-1][j]
+            cell.set_facecolor(bg if bg else 'white')
+            cell.get_text().set_fontweight('bold')
+            cell.get_text().set_color('black')
+        cell.set_edgecolor('black')
+        cell.set_linewidth(1)
+
+    plt.tight_layout()
+    st.pyplot(fig, use_container_width=True)
+
+    # Downloadable PNG
+    fig.savefig(f"{selected_rank_player}_metric_ranks_vertical.png", dpi=200, bbox_inches='tight')
+    with open(f"{selected_rank_player}_metric_ranks_vertical.png", "rb") as f:
+        st.download_button(
+            label="📥 Download Table as PNG",
+            data=f,
+            file_name=f"{selected_rank_player}_metric_ranks_vertical.png",
+            mime="image/png"
+        )
+
+    plt.close(fig)
 
 
