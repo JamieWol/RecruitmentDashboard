@@ -782,4 +782,125 @@ if selected_rank_player:
 
     plt.close(fig)
 
+# Tabs for new features
+tabs = st.tabs([
+    "Shortlist Players",
+    "Similar Players",
+    "Custom Scoring",
+    "Role Profiles"
+    
+])
+
+import streamlit as st
+import pandas as pd
+import io
+
+# --- Persistent Shortlist Log ---
+if "shortlist_log" not in st.session_state:
+    st.session_state.shortlist_log = pd.DataFrame()
+
+# --- Tab 1: Shortlist Players ---
+with tabs[0]:
+    st.subheader("🏆 Shortlist Players")
+
+    # Filtered players table
+    num_shortlist = st.slider("Number of top players to show", 1, 20, 5)
+    top_players = filtered_df.head(num_shortlist)
+
+    st.dataframe(
+        top_players[["Name", "Team", "Primary Position", "Overall Score"] +
+                    [m for m in pizza_metrics if m in filtered_df.columns]]
+    )
+
+    # --- Searchable Selection ---
+    st.markdown("### 🔍 Select Players to Add to Shortlist")
+    player_options = filtered_df["Name"].tolist()
+    selected_players = st.multiselect("Select players by name", options=player_options)
+
+    if st.button("➕ Add Selected Players to Shortlist Log"):
+        if selected_players:
+            players_to_add = filtered_df[filtered_df["Name"].isin(selected_players)][
+                ["Name", "Team", "Primary Position", "Overall Score"]
+            ]
+            # Add without duplicates
+            st.session_state.shortlist_log = pd.concat([
+                st.session_state.shortlist_log,
+                players_to_add
+            ]).drop_duplicates(subset=["Name"]).reset_index(drop=True)
+            st.success(f"{len(players_to_add)} players added to shortlist log.")
+        else:
+            st.warning("No players selected.")
+
+    # --- Display Shortlist Log as Positions Across Top ---
+    st.subheader("📋 Current Shortlist Log by Position")
+
+    if not st.session_state.shortlist_log.empty:
+        positions = sorted(st.session_state.shortlist_log["Primary Position"].unique())
+        max_rows = st.session_state.shortlist_log.groupby("Primary Position").size().max()
+
+        # Create an empty DataFrame with positions as columns
+        table = pd.DataFrame(index=range(max_rows), columns=positions)
+
+        # Fill table with player names under their positions
+        for pos in positions:
+            players = st.session_state.shortlist_log[st.session_state.shortlist_log["Primary Position"] == pos]["Name"].tolist()
+            for i, player in enumerate(players):
+                table.at[i, pos] = player
+
+        table.index = table.index + 1  # <-- Row numbers start at 1
+        st.dataframe(table.fillna(""))
+
+    # Download full shortlist log
+    csv_buffer = io.StringIO()
+    st.session_state.shortlist_log.to_csv(csv_buffer, index=False)
+    st.download_button(
+        label="📥 Download Full Shortlist Log CSV",
+        data=csv_buffer.getvalue(),
+        file_name="shortlist_log.csv",
+        mime="text/csv"
+    )
+
+# --- Tab 2: Similar Players ---
+with tabs[1]:
+    st.subheader("🤝 Find Similar Players")
+    selected_player_sim = st.selectbox("Select Player to Find Similar Ones", filtered_df["Name"].unique())
+    if selected_player_sim:
+        metrics_for_similarity = [m + " Percentile" for m in pizza_metrics if m + " Percentile" in filtered_df.columns]
+        player_vector = filtered_df.loc[filtered_df["Name"] == selected_player_sim, metrics_for_similarity].values
+        other_vectors = filtered_df[metrics_for_similarity].values
+        distances = np.linalg.norm(other_vectors - player_vector, axis=1)
+        sim_df = filtered_df.copy()
+        sim_df["Similarity Score"] = 1 / (1 + distances)
+        sim_df = sim_df[sim_df["Name"] != selected_player_sim].sort_values("Similarity Score", ascending=False)
+        st.dataframe(sim_df[["Name", "Team", "Primary Position", "Similarity Score"]].head(10))
+
+# --- Tab 3: Custom Scoring ---
+with tabs[2]:
+    st.subheader("⚖️ Custom Scoring")
+    st.info("Assign weights to metrics for a custom overall score.")
+    weights = {}
+    for m in pizza_metrics:
+        if m + " Percentile" in filtered_df.columns:
+            w = st.slider(f"Weight for {m}", 0.0, 2.0, 1.0, step=0.05)
+            weights[m] = w
+    if weights:
+        weighted_cols = [m + " Percentile" for m in weights.keys() if m + " Percentile" in filtered_df.columns]
+        weight_values = np.array(list(weights.values()))
+        filtered_df["Custom Score"] = filtered_df[weighted_cols].values.dot(weight_values) / weight_values.sum()
+        st.dataframe(filtered_df[["Name", "Team", "Primary Position", "Custom Score"]].sort_values("Custom Score", ascending=False).head(10))
+
+# --- Tab 4: Role Profiles ---
+with tabs[3]:
+    st.subheader("📝 Role Profiles")
+    selected_position_role = st.selectbox("Select Position to View Role Profile", sorted(df["Primary Position"].unique()))
+    if selected_position_role:
+        role_metrics = position_metrics_map.get(selected_position_role, [])
+        role_metrics_present = [m for m in role_metrics if m in df.columns]
+        if role_metrics_present:
+            role_avg = df[role_metrics_present].mean()
+            st.write(f"Average metrics for {selected_position_role}:")
+            st.dataframe(role_avg.to_frame("Average").sort_values("Average", ascending=False))
+        else:
+            st.warning(f"No metrics defined for {selected_position_role}.")
+
 
