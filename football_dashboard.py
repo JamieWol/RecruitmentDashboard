@@ -731,8 +731,8 @@ if selected_rank_player:
     columns = ["Metric", "Player Value", "Rank", "Percentile", "League Avg", "Out Of"]
 
     # --- Figure setup ---
-    fig_width = 6
-    fig_height = max(9, len(table_data) * 1)
+    fig_width = 7
+    fig_height = max(9, len(table_data) * 0.5)
     fig, ax = plt.subplots(figsize=(fig_width, fig_height))
     ax.axis('off')
 
@@ -748,7 +748,7 @@ if selected_rank_player:
     table.set_fontsize(10)
 
     # Adjust column widths
-    col_widths = [metric_col_width, 0.12, 0.12, 0.12, 0.18, 0.1]
+    col_widths = [metric_col_width, 0.15, 0.15, 0.15, 0.2, 0.1]
     for j, width in enumerate(col_widths):
         for i in range(len(table_data) + 1):
             table[i, j].set_width(width)
