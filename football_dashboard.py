@@ -731,8 +731,8 @@ if selected_rank_player:
     columns = ["Metric", "Player Value", "Rank", "Percentile", "League Avg", "Out Of"]
 
     # --- Figure setup ---
-    fig_width = 10
-    fig_height = max(6, len(table_data) * 0.5)
+    fig_width = 6
+    fig_height = max(9, len(table_data) * 0.5)
     fig, ax = plt.subplots(figsize=(fig_width, fig_height))
     ax.axis('off')
 
