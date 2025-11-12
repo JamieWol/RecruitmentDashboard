@@ -732,7 +732,7 @@ if selected_rank_player:
 
     # --- Figure setup ---
     fig_width = 6
-    fig_height = max(9, len(table_data) * 0.5)
+    fig_height = max(9, len(table_data) * 1)
     fig, ax = plt.subplots(figsize=(fig_width, fig_height))
     ax.axis('off')
 
