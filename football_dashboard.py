@@ -728,7 +728,7 @@ if selected_rank_player:
             table_data.append([m, "N/A", "N/A", "N/A", "N/A", total_players])
             cell_colors.append([None]*6)
 
-    columns = ["Metric", "Player Value", "Rank", "Percentile", "League Avg", "Out Of"]
+    columns = ["Metric", "Score", "Rank", "Percentile", "League Avg", "Out Of"]
 
     # --- Figure setup ---
     fig_width = 7
