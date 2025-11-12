@@ -705,11 +705,14 @@ if selected_rank_player:
                 league_display = f"{league_avg*100:.1f}%"
             else:
                 league_display = round(league_avg, 2) if not pd.isna(league_avg) else "N/A"
-
-            if m in percentage_metrics and isinstance(percentile_val, (int, float)):
+                
+            if isinstance(percentile_val, (int, float)) and not pd.isna(percentile_val):
                 percentile_display = f"{percentile_val:.1f}%"
             else:
-                percentile_display = round(percentile_val, 1) if not pd.isna(percentile_val) else "N/A"
+                percentile_display = "N/A"
+
+
+            
 
             # Highlighting
             if isinstance(percentile_val, (int, float)):
