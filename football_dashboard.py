@@ -710,21 +710,22 @@ if selected_rank_player:
                 percentile_display = f"{percentile_val:.1f}%"
             else:
                 percentile_display = "N/A"
-                
+                           
             # Highlighting based on percentile
             if isinstance(percentile_val, (int, float)):
                 if percentile_val >= 75:
-                    color = '#00CC66'  # Green
+                    color = '#00CC66'  # Green (Top 25%)
                 elif percentile_val >= 50:
-                    color = '#FFA500'  # Orange
+                    color = '#FFA500'  # Orange (50–75%)
                 elif percentile_val >= 25:
-                    color = None       # Clear / White
+                    color = None       # Clear / White (25–50%)
                 else:
-                    color = '#FF4C4C'  # Red
-                else:
-                    color = None
+                    color = '#FF4C4C'  # Red (Bottom 25%)
+            else:
+                color = None
 
-
+            
+                
             table_data.append([m, val_display, int(rank), percentile_display, league_display, total_players])
             cell_colors.append([None, color, color, color, None, None])
         else:
