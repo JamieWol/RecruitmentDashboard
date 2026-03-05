@@ -66,6 +66,32 @@ def plot_pizza(player, data, league_avg, metrics_list):
     player_percentiles_str = [f"{int(p)}%" for p in player_percentiles_raw]
     league_percentiles_str = [f"{int(p)}%" for p in league_avg_raw]
 
+    # --- Compute League Average as raw mean, then convert to percentiles ---
+# league_avg_raw holds the mean raw metric values across the filtered players
+league_avg_raw = filtered_df[[m for m in pizza_metrics if m in filtered_df.columns]].mean()
+
+# Convert each league raw average into a percentile on the same scale as players
+league_avg_percentiles = []
+for m in pizza_metrics:
+    if m in filtered_df.columns:
+        # combine player raw values with the league mean as an extra value
+        combined = filtered_df[m].tolist() + [league_avg_raw[m]]
+        if metric_higher_better.get(m, True):
+            ranks = pd.Series(combined).rank(pct=True)
+        else:
+            ranks = pd.Series(combined).rank(pct=True, ascending=False)
+        league_avg_percentiles.append(ranks.iloc[-1])  # last item is the league average
+    else:
+        # If metric missing, append a neutral 0.5 (or you could skip; using 0.5 keeps shapes consistent)
+        league_avg_percentiles.append(0.5)
+
+# --- Overall Score (keep percentile-based overall score) ---
+percentile_columns = [m + " Percentile" for m in pizza_metrics if m + " Percentile" in filtered_df.columns]
+filtered_df["Overall Score"] = filtered_df[percentile_columns].mean(axis=1)
+filtered_df = filtered_df.sort_values("Overall Score", ascending=False).reset_index(drop=True)
+filtered_df.index += 1
+
+    
     pizza = PyPizza(
         params=metrics_list,
         min_range=[0] * len(metrics_list),
