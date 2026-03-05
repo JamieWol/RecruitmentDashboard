@@ -15,6 +15,11 @@ position_metrics_map_wyscout = {
         "Shots blocked per 90", "PAdj Interceptions", "Accurate passes, %",
         "Accurate forward passes, %", "Accurate long passes, %"
     ],
+    "6s": [
+        "Duels won, %", "Defensive duels won, %", "Aerial duels won, %", "PAdj Interceptions", "xG", 
+        "Shots per 90",	"Progressive runs per 90", "Accurate passes, %", "Accurate forward passes, %", "Accurate long passes, %", 
+        "Key passes per 90", "Deep completions per 90",	"Progressive passes per 90"
+    ],
     "WB": [
         "xG", "xA", "Successful defensive actions per 90", "Defensive duels per 90",
         "Defensive duels won, %", "PAdj Interceptions", "Accurate crosses, %",
