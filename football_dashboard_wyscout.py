@@ -62,27 +62,27 @@ def plot_pizza(player, data, league_avg, metrics_list):
         other_circle_lw=0
     )
 
-    # Draw league average (yellow)
+    # Draw league average (yellow) WITHOUT labels
     fig, ax = pizza.make_pizza(
         league_percentiles,
         figsize=(7,7),
         color_blank_space="same",
         kwargs_slices=dict(facecolor="#FFFF00", edgecolor="black", linewidth=1.5, alpha=0.8),
-        kwargs_params=dict(color="black", fontsize=7, fontweight="bold"),
-        kwargs_values=dict(color="black", fontsize=0)  # Hide default numbers
+        kwargs_params=dict(color="none", fontsize=0),
+        kwargs_values=dict(color="none", fontsize=0)
     )
 
-    # Draw player (blue)
+    # Draw player (blue) WITHOUT labels
     pizza.make_pizza(
         player_percentiles,
         ax=ax,
         color_blank_space="same",
         kwargs_slices=dict(facecolor="#1a78cf", edgecolor="black", linewidth=2, alpha=0.8),
-        kwargs_params=dict(color="black", fontsize=7, fontweight="bold"),
-        kwargs_values=dict(color="black", fontsize=0)  # Hide default numbers
+        kwargs_params=dict(color="none", fontsize=0),
+        kwargs_values=dict(color="none", fontsize=0)
     )
 
-    # ---------------- Boxed labels only ----------------
+    # ---------------- Boxed labels only at slice ends ----------------
     player_percentiles_int = [int(round(p)) for p in player_percentiles]
     league_percentiles_int = [int(round(p)) for p in league_percentiles]
 
@@ -101,7 +101,7 @@ def plot_pizza(player, data, league_avg, metrics_list):
         Patch(facecolor="#1a78cf", edgecolor="black", label=player),
         Patch(facecolor="#FFFF00", edgecolor="black", label="League Average")
     ]
-    ax.legend(handles=legend_patches, loc="upper right", bbox_to_anchor=(1.1, 1.05))
+    ax.legend(handles=legend_patches, loc="upper right", bbox_to_anchor=(1.1,1.05))
 
     st.pyplot(fig)
     plt.close(fig)
