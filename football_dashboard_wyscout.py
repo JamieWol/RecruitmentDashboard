@@ -60,17 +60,14 @@ def load_data(file):
 # -------------------------------
 def plot_pizza(player, data, league_avg, metrics_list):
     cols = [m + " Percentile" for m in metrics_list if m + " Percentile" in data.columns]
+
     player_percentiles_raw = data.loc[data["Player"] == player, cols].values.flatten().tolist()
     league_percentiles_raw = league_avg
 
-    # Convert to integers for whole numbers
-    player_percentiles = [int(round(p)) for p in player_percentiles_raw]
-    league_percentiles = [int(round(p)) for p in league_percentiles_raw]
-
     pizza = PyPizza(
         params=metrics_list,
-        min_range=[0] * len(metrics_list),
-        max_range=[100] * len(metrics_list),
+        min_range=[0]*len(metrics_list),
+        max_range=[100]*len(metrics_list),
         background_color="#f0f8ff",
         straight_line_color="black",
         straight_line_lw=1,
@@ -78,25 +75,39 @@ def plot_pizza(player, data, league_avg, metrics_list):
         other_circle_lw=0
     )
 
-    # League Average (yellow)
+    # Plot league average first (yellow)
     fig, ax = pizza.make_pizza(
-        league_percentiles,
-        figsize=(7, 7),
+        league_percentiles_raw,
+        figsize=(7,7),
         color_blank_space="same",
         kwargs_slices=dict(facecolor="#FFFF00", edgecolor="black", linewidth=1.5, alpha=1),
         kwargs_params=dict(color="black", fontsize=7, fontweight="bold"),
         kwargs_values=dict(color="black", fontsize=9, fontweight="bold")
     )
 
-    # Player (blue)
+    # Plot player (blue)
     pizza.make_pizza(
-        player_percentiles,
+        player_percentiles_raw,
         ax=ax,
         color_blank_space="same",
         kwargs_slices=dict(facecolor="#1a78cf", edgecolor="black", linewidth=2, alpha=0.8),
         kwargs_params=dict(color="black", fontsize=7, fontweight="bold"),
         kwargs_values=dict(color="white", fontsize=9, fontweight="bold")
     )
+
+    # ---------------- Boxed labels (whole numbers) ----------------
+    player_percentiles_int = [int(round(p)) for p in player_percentiles_raw]
+    league_percentiles_int = [int(round(p)) for p in league_percentiles_raw]
+
+    # Player boxes (blue)
+    for text_obj, pct in zip(ax.texts[-len(metrics_list):], player_percentiles_int):
+        text_obj.set_text(f"{pct}%")
+        text_obj.set_bbox(dict(facecolor="#1a78cf", edgecolor="black", boxstyle="round,pad=0.25", alpha=0.9))
+
+    # League boxes (yellow)
+    for text_obj, pct in zip(ax.texts[-2*len(metrics_list):-len(metrics_list)], league_percentiles_int):
+        text_obj.set_text(f"{pct}%")
+        text_obj.set_bbox(dict(facecolor="#FFFF00", edgecolor="black", boxstyle="round,pad=0.25", alpha=0.9))
 
     # Legend
     legend_patches = [
@@ -116,7 +127,7 @@ def plot_radar(labels, values_list, labels_list, colors):
     angles = np.linspace(0, 2*np.pi, num_vars, endpoint=False).tolist()
     angles += angles[:1]
 
-    fig, ax = plt.subplots(figsize=(7, 7), subplot_kw=dict(polar=True))
+    fig, ax = plt.subplots(figsize=(7,7), subplot_kw=dict(polar=True))
     ax.set_theta_offset(np.pi/2)
     ax.set_theta_direction(-1)
     ax.set_xticks(angles[:-1])
@@ -143,7 +154,6 @@ if uploaded_file:
     df = load_data(uploaded_file)
     st.success(f"Loaded {len(df)} rows successfully!")
 
-    # Position selection
     position_options = list(position_metrics_map_wyscout.keys())
     selected_position = st.sidebar.selectbox("Select Position", position_options)
     metrics = position_metrics_map_wyscout[selected_position]
@@ -165,23 +175,18 @@ if uploaded_file:
 
     st.sidebar.success(f"Filtered down to {len(df)} players")
 
-    # Percentiles (rounded to whole numbers)
+    # Percentiles (rounded for display but keep floats for league avg calculation)
     for m in metrics:
         if m in df.columns:
-            df[m + " Percentile"] = (
-                df[m]
-                .rank(pct=True)
-                .mul(100)
-                .round(0)
-                .fillna(0)
-                .astype(int)
-            )
+            df[m + " Percentile"] = (df[m].rank(pct=True) * 100).fillna(0)
 
     percentile_columns = [m + " Percentile" for m in metrics if m + " Percentile" in df.columns]
-    league_avg_percentiles = df[percentile_columns].mean().round(0).astype(int).values
+
+    league_avg_percentiles = df[percentile_columns].mean().values  # keep float for proper curve
+    league_avg_display = np.round(league_avg_percentiles).astype(int)  # for labels
 
     # Overall Score
-    df["Overall Score"] = df[percentile_columns].mean(axis=1).round(0)
+    df["Overall Score"] = df[percentile_columns].mean(axis=1)
     df = df.sort_values("Overall Score", ascending=False).reset_index(drop=True)
     df.index += 1
 
@@ -190,7 +195,7 @@ if uploaded_file:
     st.subheader("🏅 Player Ranking")
     st.dataframe(
         df[["Player", "Minutes played", "Overall Score"] + metrics]
-        .style.format({"Overall Score": "{:.0f}"})
+        .style.format({"Overall Score": "{:.1f}"})
         .highlight_max(subset=["Overall Score"], color="lightgreen")
     )
 
