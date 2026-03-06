@@ -62,36 +62,36 @@ def plot_pizza(player, data, league_avg, metrics_list):
         other_circle_lw=0
     )
 
-    # Draw league average (yellow) WITHOUT labels
+    # Draw league average (yellow) with slice-end labels (metric names only)
     fig, ax = pizza.make_pizza(
         league_percentiles,
         figsize=(7,7),
         color_blank_space="same",
         kwargs_slices=dict(facecolor="#FFFF00", edgecolor="black", linewidth=1.5, alpha=0.8),
-        kwargs_params=dict(color="none", fontsize=0),
-        kwargs_values=dict(color="none", fontsize=0)
+        kwargs_params=dict(color="black", fontsize=8, fontweight="bold"),  # metric names
+        kwargs_values=dict(color="none")  # hide default values
     )
 
-    # Draw player (blue) WITHOUT labels
+    # Draw player (blue) on top
     pizza.make_pizza(
         player_percentiles,
         ax=ax,
         color_blank_space="same",
         kwargs_slices=dict(facecolor="#1a78cf", edgecolor="black", linewidth=2, alpha=0.8),
-        kwargs_params=dict(color="none", fontsize=0),
-        kwargs_values=dict(color="none", fontsize=0)
+        kwargs_params=dict(color="none"),  # hide metric names on top layer
+        kwargs_values=dict(color="none")  # hide default values
     )
 
-    # ---------------- Boxed labels only at slice ends ----------------
+    # Boxed labels for percentages at slice ends
     player_percentiles_int = [int(round(p)) for p in player_percentiles]
     league_percentiles_int = [int(round(p)) for p in league_percentiles]
 
-    # Player labels (blue)
+    # Player percentages (blue)
     for text_obj, pct in zip(ax.texts[-len(metrics_list):], player_percentiles_int):
         text_obj.set_text(f"{pct}%")
         text_obj.set_bbox(dict(facecolor="#1a78cf", edgecolor="black", boxstyle="round,pad=0.25", alpha=0.9))
 
-    # League labels (yellow)
+    # League percentages (yellow)
     for text_obj, pct in zip(ax.texts[-2*len(metrics_list):-len(metrics_list)], league_percentiles_int):
         text_obj.set_text(f"{pct}%")
         text_obj.set_bbox(dict(facecolor="#FFFF00", edgecolor="black", boxstyle="round,pad=0.25", alpha=0.9))
@@ -105,109 +105,3 @@ def plot_pizza(player, data, league_avg, metrics_list):
 
     st.pyplot(fig)
     plt.close(fig)
-
-# -------------------------------
-# Radar Chart
-# -------------------------------
-def plot_radar(labels, values_list, labels_list, colors):
-    num_vars = len(labels)
-    angles = np.linspace(0, 2*np.pi, num_vars, endpoint=False).tolist()
-    angles += angles[:1]
-
-    fig, ax = plt.subplots(figsize=(7,7), subplot_kw=dict(polar=True))
-    ax.set_theta_offset(np.pi/2)
-    ax.set_theta_direction(-1)
-    ax.set_xticks(angles[:-1])
-    ax.set_xticklabels(labels, fontsize=11, fontweight='bold')
-    ax.set_yticklabels([])
-    ax.set_ylim(0,100)
-
-    for values, label, color in zip(values_list, labels_list, colors):
-        vals = values + values[:1]
-        ax.plot(angles, vals, color=color, linewidth=2.5, label=label)
-        ax.fill(angles, vals, color=color, alpha=0.3)
-
-    ax.legend(loc='upper right', bbox_to_anchor=(1.2,1.1))
-    st.pyplot(fig)
-    plt.close(fig)
-
-# -------------------------------
-# Streamlit UI
-# -------------------------------
-st.sidebar.header("Upload Wyscout File")
-uploaded_file = st.sidebar.file_uploader("Upload CSV or Excel file", type=["csv", "xlsx", "xls"])
-
-if uploaded_file:
-    df = load_data(uploaded_file)
-    st.success(f"Loaded {len(df)} rows successfully!")
-
-    position_options = list(position_metrics_map_wyscout.keys())
-    selected_position = st.sidebar.selectbox("Select Position", position_options)
-    metrics = position_metrics_map_wyscout[selected_position]
-
-    # Filters
-    st.sidebar.subheader("Filters")
-    min_minutes = int(df["Minutes played"].min())
-    max_minutes = int(df["Minutes played"].max())
-    minutes_range = st.sidebar.slider("Minutes Played", min_value=min_minutes, max_value=max_minutes,
-                                      value=(min_minutes, max_minutes), step=50)
-    df = df[df["Minutes played"].between(minutes_range[0], minutes_range[1])]
-
-    if "Age" in df.columns:
-        min_age = int(df["Age"].min())
-        max_age = int(df["Age"].max())
-        age_range = st.sidebar.slider("Age", min_value=min_age, max_value=max_age,
-                                      value=(min_age, max_age), step=1)
-        df = df[df["Age"].between(age_range[0], age_range[1])]
-
-    st.sidebar.success(f"Filtered down to {len(df)} players")
-
-    # Percentiles
-    for m in metrics:
-        if m in df.columns:
-            df[m + " Percentile"] = (df[m].rank(pct=True) * 100).fillna(0)
-
-    percentile_columns = [m + " Percentile" for m in metrics if m + " Percentile" in df.columns]
-    league_avg_percentiles = df[percentile_columns].mean().values
-
-    # Overall Score
-    df["Overall Score"] = df[percentile_columns].mean(axis=1)
-    df = df.sort_values("Overall Score", ascending=False).reset_index(drop=True)
-    df.index += 1
-
-    # Dashboard
-    st.title(f"⚽ Recruitment Dashboard - {selected_position}")
-    st.subheader("🏅 Player Ranking")
-    st.dataframe(
-        df[["Player","Minutes played","Overall Score"] + metrics]
-        .style.format({"Overall Score":"{:.1f}"})
-        .highlight_max(subset=["Overall Score"],color="lightgreen")
-    )
-
-    # Pizza Chart
-    st.subheader("📊 Pizza Chart: Player vs League Average")
-    player_list = df["Player"].tolist()
-    selected_player = st.selectbox("Select Player", player_list)
-    if selected_player:
-        plot_pizza(selected_player, df, league_avg_percentiles, metrics)
-
-    # Radar Chart (Player vs Player)
-    st.subheader("📈 Radar Chart: Player vs Player Comparison")
-    if len(player_list) >= 2:
-        p1 = st.selectbox("Player 1", player_list)
-        p2 = st.selectbox("Player 2", player_list, index=1)
-        if p1 != p2:
-            vals1 = df.loc[df["Player"] == p1, percentile_columns].values.flatten().tolist()
-            vals2 = df.loc[df["Player"] == p2, percentile_columns].values.flatten().tolist()
-            plot_radar(metrics,[vals1,vals2],[p1,p2],["red","blue"])
-
-    # Radar Chart (Player vs League)
-    st.subheader("📊 Radar Chart: Player vs League Average")
-    p3 = st.selectbox("Player vs League Average", player_list, key="league_player")
-    vals = df.loc[df["Player"] == p3, percentile_columns].values.flatten().tolist()
-    plot_radar(metrics,[vals,league_avg_percentiles.tolist()],[p3,"League Average"],["green","red"])
-
-    # Export
-    st.subheader("⬇️ Export Data")
-    csv = df.to_csv(index=False).encode('utf-8')
-    st.download_button("Download Filtered Data", data=csv, file_name="filtered_wyscout.csv", mime="text/csv")
