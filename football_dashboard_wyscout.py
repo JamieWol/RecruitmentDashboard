@@ -9,39 +9,27 @@ from matplotlib.patches import Patch
 # Position to Metrics Mapping
 # -------------------------------
 position_metrics_map_wyscout = {
-    "CB": [
-        "xG", "Successful defensive actions per 90", "Defensive duels per 90",
-        "Defensive duels won, %", "Aerial duels per 90", "Aerial duels won, %",
-        "Shots blocked per 90", "PAdj Interceptions", "Accurate passes, %",
-        "Accurate forward passes, %", "Accurate long passes, %"
-    ],
-    "6s": [
-        "Duels won, %", "Defensive duels won, %", "Aerial duels won, %", "PAdj Interceptions", "xG",
-        "Shots per 90", "Progressive runs per 90", "Accurate passes, %",
-        "Accurate forward passes, %", "Accurate long passes, %",
-        "Key passes per 90", "Deep completions per 90", "Progressive passes per 90"
-    ],
-    "WB": [
-        "xG", "xA", "Successful defensive actions per 90", "Defensive duels per 90",
-        "Defensive duels won, %", "PAdj Interceptions", "Accurate crosses, %",
-        "Successful dribbles, %", "Progressive runs per 90", "Accelerations per 90",
-        "Accurate passes, %", "Key passes per 90", "Deep completions per 90"
-    ],
-    "CF": [
-        "xG", "xA", "Successful defensive actions per 90", "Aerial duels won, %",
-        "Non-penalty goals per 90", "Goal conversion, %", "Offensive duels won, %",
-        "Touches in box per 90", "Accurate passes, %", "Key passes per 90",
-        "Deep completions per 90"
-    ],
-    "10s": [
-        "xG", "Goals per 90", "Non-penalty goals per 90", "Shots per 90",
-        "Accurate crosses, %", "Dribbles per 90", "Successful dribbles, %",
-        "Accurate passes, %", "Key passes per 90", "Deep completions per 90"
-    ],
-    "GK": [
-        "Average long pass length, m", "Save rate, %", "Prevented goals",
-        "Prevented goals per 90", "Exits per 90", "Aerial duels per 90"
-    ]
+    "CB": ["xG", "Successful defensive actions per 90", "Defensive duels per 90",
+           "Defensive duels won, %", "Aerial duels per 90", "Aerial duels won, %",
+           "Shots blocked per 90", "PAdj Interceptions", "Accurate passes, %",
+           "Accurate forward passes, %", "Accurate long passes, %"],
+    "6s": ["Duels won, %", "Defensive duels won, %", "Aerial duels won, %", "PAdj Interceptions", "xG",
+           "Shots per 90", "Progressive runs per 90", "Accurate passes, %",
+           "Accurate forward passes, %", "Accurate long passes, %",
+           "Key passes per 90", "Deep completions per 90", "Progressive passes per 90"],
+    "WB": ["xG", "xA", "Successful defensive actions per 90", "Defensive duels per 90",
+           "Defensive duels won, %", "PAdj Interceptions", "Accurate crosses, %",
+           "Successful dribbles, %", "Progressive runs per 90", "Accelerations per 90",
+           "Accurate passes, %", "Key passes per 90", "Deep completions per 90"],
+    "CF": ["xG", "xA", "Successful defensive actions per 90", "Aerial duels won, %",
+           "Non-penalty goals per 90", "Goal conversion, %", "Offensive duels won, %",
+           "Touches in box per 90", "Accurate passes, %", "Key passes per 90",
+           "Deep completions per 90"],
+    "10s": ["xG", "Goals per 90", "Non-penalty goals per 90", "Shots per 90",
+            "Accurate crosses, %", "Dribbles per 90", "Successful dribbles, %",
+            "Accurate passes, %", "Key passes per 90", "Deep completions per 90"],
+    "GK": ["Average long pass length, m", "Save rate, %", "Prevented goals",
+           "Prevented goals per 90", "Exits per 90", "Aerial duels per 90"]
 }
 
 # -------------------------------
@@ -56,13 +44,12 @@ def load_data(file):
     return df
 
 # -------------------------------
-# Pizza Chart Function
+# Pizza Chart
 # -------------------------------
 def plot_pizza(player, data, league_avg, metrics_list):
     cols = [m + " Percentile" for m in metrics_list if m + " Percentile" in data.columns]
-
-    player_percentiles_raw = data.loc[data["Player"] == player, cols].values.flatten().tolist()
-    league_percentiles_raw = league_avg
+    player_percentiles = data.loc[data["Player"] == player, cols].values.flatten().tolist()
+    league_percentiles = league_avg
 
     pizza = PyPizza(
         params=metrics_list,
@@ -75,36 +62,36 @@ def plot_pizza(player, data, league_avg, metrics_list):
         other_circle_lw=0
     )
 
-    # Plot league average first (yellow)
+    # Draw league average (yellow)
     fig, ax = pizza.make_pizza(
-        league_percentiles_raw,
+        league_percentiles,
         figsize=(7,7),
         color_blank_space="same",
-        kwargs_slices=dict(facecolor="#FFFF00", edgecolor="black", linewidth=1.5, alpha=1),
+        kwargs_slices=dict(facecolor="#FFFF00", edgecolor="black", linewidth=1.5, alpha=0.8),
         kwargs_params=dict(color="black", fontsize=7, fontweight="bold"),
-        kwargs_values=dict(color="black", fontsize=9, fontweight="bold")
+        kwargs_values=dict(color="black", fontsize=0)  # Hide default numbers
     )
 
-    # Plot player (blue)
+    # Draw player (blue)
     pizza.make_pizza(
-        player_percentiles_raw,
+        player_percentiles,
         ax=ax,
         color_blank_space="same",
         kwargs_slices=dict(facecolor="#1a78cf", edgecolor="black", linewidth=2, alpha=0.8),
         kwargs_params=dict(color="black", fontsize=7, fontweight="bold"),
-        kwargs_values=dict(color="white", fontsize=9, fontweight="bold")
+        kwargs_values=dict(color="black", fontsize=0)  # Hide default numbers
     )
 
-    # ---------------- Boxed labels (whole numbers) ----------------
-    player_percentiles_int = [int(round(p)) for p in player_percentiles_raw]
-    league_percentiles_int = [int(round(p)) for p in league_percentiles_raw]
+    # ---------------- Boxed labels only ----------------
+    player_percentiles_int = [int(round(p)) for p in player_percentiles]
+    league_percentiles_int = [int(round(p)) for p in league_percentiles]
 
-    # Player boxes (blue)
+    # Player labels (blue)
     for text_obj, pct in zip(ax.texts[-len(metrics_list):], player_percentiles_int):
         text_obj.set_text(f"{pct}%")
         text_obj.set_bbox(dict(facecolor="#1a78cf", edgecolor="black", boxstyle="round,pad=0.25", alpha=0.9))
 
-    # League boxes (yellow)
+    # League labels (yellow)
     for text_obj, pct in zip(ax.texts[-2*len(metrics_list):-len(metrics_list)], league_percentiles_int):
         text_obj.set_text(f"{pct}%")
         text_obj.set_bbox(dict(facecolor="#FFFF00", edgecolor="black", boxstyle="round,pad=0.25", alpha=0.9))
@@ -120,7 +107,7 @@ def plot_pizza(player, data, league_avg, metrics_list):
     plt.close(fig)
 
 # -------------------------------
-# Radar Chart Function
+# Radar Chart
 # -------------------------------
 def plot_radar(labels, values_list, labels_list, colors):
     num_vars = len(labels)
@@ -133,14 +120,14 @@ def plot_radar(labels, values_list, labels_list, colors):
     ax.set_xticks(angles[:-1])
     ax.set_xticklabels(labels, fontsize=11, fontweight='bold')
     ax.set_yticklabels([])
-    ax.set_ylim(0, 100)
+    ax.set_ylim(0,100)
 
     for values, label, color in zip(values_list, labels_list, colors):
         vals = values + values[:1]
         ax.plot(angles, vals, color=color, linewidth=2.5, label=label)
         ax.fill(angles, vals, color=color, alpha=0.3)
 
-    ax.legend(loc='upper right', bbox_to_anchor=(1.2, 1.1))
+    ax.legend(loc='upper right', bbox_to_anchor=(1.2,1.1))
     st.pyplot(fig)
     plt.close(fig)
 
@@ -175,15 +162,13 @@ if uploaded_file:
 
     st.sidebar.success(f"Filtered down to {len(df)} players")
 
-    # Percentiles (rounded for display but keep floats for league avg calculation)
+    # Percentiles
     for m in metrics:
         if m in df.columns:
             df[m + " Percentile"] = (df[m].rank(pct=True) * 100).fillna(0)
 
     percentile_columns = [m + " Percentile" for m in metrics if m + " Percentile" in df.columns]
-
-    league_avg_percentiles = df[percentile_columns].mean().values  # keep float for proper curve
-    league_avg_display = np.round(league_avg_percentiles).astype(int)  # for labels
+    league_avg_percentiles = df[percentile_columns].mean().values
 
     # Overall Score
     df["Overall Score"] = df[percentile_columns].mean(axis=1)
@@ -194,19 +179,19 @@ if uploaded_file:
     st.title(f"⚽ Recruitment Dashboard - {selected_position}")
     st.subheader("🏅 Player Ranking")
     st.dataframe(
-        df[["Player", "Minutes played", "Overall Score"] + metrics]
-        .style.format({"Overall Score": "{:.1f}"})
-        .highlight_max(subset=["Overall Score"], color="lightgreen")
+        df[["Player","Minutes played","Overall Score"] + metrics]
+        .style.format({"Overall Score":"{:.1f}"})
+        .highlight_max(subset=["Overall Score"],color="lightgreen")
     )
 
     # Pizza Chart
     st.subheader("📊 Pizza Chart: Player vs League Average")
     player_list = df["Player"].tolist()
-    selected_player = st.selectbox("Select Player for Pizza Chart", player_list)
+    selected_player = st.selectbox("Select Player", player_list)
     if selected_player:
         plot_pizza(selected_player, df, league_avg_percentiles, metrics)
 
-    # Radar Chart (player vs player)
+    # Radar Chart (Player vs Player)
     st.subheader("📈 Radar Chart: Player vs Player Comparison")
     if len(player_list) >= 2:
         p1 = st.selectbox("Player 1", player_list)
@@ -214,13 +199,13 @@ if uploaded_file:
         if p1 != p2:
             vals1 = df.loc[df["Player"] == p1, percentile_columns].values.flatten().tolist()
             vals2 = df.loc[df["Player"] == p2, percentile_columns].values.flatten().tolist()
-            plot_radar(metrics, [vals1, vals2], [p1, p2], ["red", "blue"])
+            plot_radar(metrics,[vals1,vals2],[p1,p2],["red","blue"])
 
-    # Radar chart (player vs league avg)
+    # Radar Chart (Player vs League)
     st.subheader("📊 Radar Chart: Player vs League Average")
     p3 = st.selectbox("Player vs League Average", player_list, key="league_player")
-    p3_vals = df.loc[df["Player"] == p3, percentile_columns].values.flatten().tolist()
-    plot_radar(metrics, [p3_vals, league_avg_percentiles.tolist()], [p3, "League Average"], ["green", "red"])
+    vals = df.loc[df["Player"] == p3, percentile_columns].values.flatten().tolist()
+    plot_radar(metrics,[vals,league_avg_percentiles.tolist()],[p3,"League Average"],["green","red"])
 
     # Export
     st.subheader("⬇️ Export Data")
