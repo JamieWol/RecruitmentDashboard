@@ -189,7 +189,7 @@ if uploaded_file:
     st.title(f"⚽ Recruitment Dashboard - {selected_position}")
     st.subheader("🏅 Player Ranking")
     st.dataframe(
-        df[["Player", "Minutes played", "Overall Score"] + metrics]
+        df[["Player", "Team", "Position", "Age", "Overall Score", "Contract expires", "Minutes played", "Passport country", "Foot", "Height", "Weight"] + metrics]
         .style.format({"Overall Score": "{:.0f}"})
         .highlight_max(subset=["Overall Score"], color="lightgreen")
     )
