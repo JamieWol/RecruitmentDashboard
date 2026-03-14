@@ -5,18 +5,18 @@ import matplotlib.pyplot as plt
 from mplsoccer import PyPizza
 from matplotlib.patches import Patch
 
-# ---------------------------------
-# PAGE CONFIG
-# ---------------------------------
+# --------------------------------
+# PAGE SETTINGS
+# --------------------------------
 
 st.set_page_config(
     page_title="Football Recruitment Dashboard",
     layout="wide"
 )
 
-# ---------------------------------
+# --------------------------------
 # LOAD DATA
-# ---------------------------------
+# --------------------------------
 
 @st.cache_data
 def load_data(file):
@@ -30,9 +30,9 @@ def load_data(file):
     return df
 
 
-# ---------------------------------
+# --------------------------------
 # PIZZA CHART
-# ---------------------------------
+# --------------------------------
 
 def plot_pizza(player, df, metrics, league_avg):
 
@@ -78,6 +78,7 @@ def plot_pizza(player, df, metrics, league_avg):
         )
     )
 
+    # Player layer (no duplicate labels)
     pizza.make_pizza(
         player_values,
         ax=ax,
@@ -87,6 +88,7 @@ def plot_pizza(player, df, metrics, league_avg):
             linewidth=2,
             alpha=0.85
         ),
+        kwargs_params=dict(alpha=0),
         kwargs_values=dict(
             color="white",
             fontsize=10,
@@ -109,9 +111,9 @@ def plot_pizza(player, df, metrics, league_avg):
     plt.close(fig)
 
 
-# ---------------------------------
+# --------------------------------
 # RADAR CHART
-# ---------------------------------
+# --------------------------------
 
 def plot_radar(labels, values_list, labels_list):
 
@@ -144,9 +146,9 @@ def plot_radar(labels, values_list, labels_list):
     plt.close(fig)
 
 
-# ---------------------------------
+# --------------------------------
 # SIDEBAR
-# ---------------------------------
+# --------------------------------
 
 st.sidebar.header("Upload Data")
 
@@ -155,9 +157,9 @@ uploaded_file = st.sidebar.file_uploader(
     type=["csv","xlsx","xls"]
 )
 
-# ---------------------------------
+# --------------------------------
 # MAIN APP
-# ---------------------------------
+# --------------------------------
 
 if uploaded_file:
 
@@ -165,9 +167,9 @@ if uploaded_file:
 
     st.success(f"{len(df)} rows loaded")
 
-    # ---------------------------------
-    # AUTO METRIC DETECTION
-    # ---------------------------------
+    # --------------------------------
+    # AUTO DETECT METRICS
+    # --------------------------------
 
     ignore_cols = [
         "Player","Team","Position","Age","Minutes played",
@@ -181,9 +183,9 @@ if uploaded_file:
         and pd.api.types.is_numeric_dtype(df[col])
     ]
 
-    # ---------------------------------
+    # --------------------------------
     # FILTERS
-    # ---------------------------------
+    # --------------------------------
 
     st.sidebar.subheader("Filters")
 
@@ -213,9 +215,9 @@ if uploaded_file:
 
         df = df[df["Age"].between(age_range[0],age_range[1])]
 
-    # ---------------------------------
+    # --------------------------------
     # METRIC SELECTOR
-    # ---------------------------------
+    # --------------------------------
 
     st.sidebar.subheader("Metrics")
 
@@ -226,13 +228,12 @@ if uploaded_file:
     )
 
     if len(metrics) == 0:
-
         st.warning("Select at least one metric")
         st.stop()
 
-    # ---------------------------------
+    # --------------------------------
     # PERCENTILES
-    # ---------------------------------
+    # --------------------------------
 
     for m in metrics:
 
@@ -246,9 +247,9 @@ if uploaded_file:
 
     percentile_cols = [m+" Percentile" for m in metrics]
 
-    # ---------------------------------
+    # --------------------------------
     # LEAGUE AVERAGE
-    # ---------------------------------
+    # --------------------------------
 
     league_avg = (
         df[percentile_cols]
@@ -258,9 +259,9 @@ if uploaded_file:
         .tolist()
     )
 
-    # ---------------------------------
+    # --------------------------------
     # PLAYER RANKING
-    # ---------------------------------
+    # --------------------------------
 
     df["Overall Score"] = (
         df[percentile_cols]
@@ -268,40 +269,43 @@ if uploaded_file:
         .round(0)
     )
 
-    df = df.sort_values("Overall Score",ascending=False)
+    df = df.sort_values("Overall Score", ascending=False).reset_index(drop=True)
 
-    # ---------------------------------
+    df.index += 1
+    df.insert(0, "Rank", df.index)
+
+    # --------------------------------
     # DASHBOARD
-    # ---------------------------------
+    # --------------------------------
 
     st.title("⚽ Football Recruitment Dashboard")
 
     st.subheader("🏅 Player Ranking")
 
     st.dataframe(
-        df[["Player","Team","Minutes played","Overall Score"] + metrics]
+        df[["Rank","Player","Team","Minutes played","Overall Score"] + metrics]
     )
 
-    # ---------------------------------
+    # --------------------------------
     # PIZZA CHART
-    # ---------------------------------
+    # --------------------------------
 
     st.subheader("📊 Pizza Chart")
 
     player_list = df["Player"].tolist()
 
-    selected_player = st.selectbox("Select Player",player_list)
+    selected_player = st.selectbox("Select Player", player_list)
 
-    plot_pizza(selected_player,df,metrics,league_avg)
+    plot_pizza(selected_player, df, metrics, league_avg)
 
-    # ---------------------------------
-    # RADAR
-    # ---------------------------------
+    # --------------------------------
+    # RADAR COMPARISON
+    # --------------------------------
 
     st.subheader("📈 Player Comparison")
 
-    p1 = st.selectbox("Player 1",player_list)
-    p2 = st.selectbox("Player 2",player_list,index=1)
+    p1 = st.selectbox("Player 1", player_list)
+    p2 = st.selectbox("Player 2", player_list, index=1)
 
     if p1 != p2:
 
@@ -310,9 +314,9 @@ if uploaded_file:
 
         plot_radar(metrics,[vals1,vals2],[p1,p2])
 
-    # ---------------------------------
+    # --------------------------------
     # SCATTER GRAPH
-    # ---------------------------------
+    # --------------------------------
 
     st.subheader("📊 Scatter Graph")
 
@@ -322,9 +326,9 @@ if uploaded_file:
         default=metrics[:2]
     )
 
-    if len(two_metrics)==2:
+    if len(two_metrics) == 2:
 
-        mX,mY = two_metrics
+        mX, mY = two_metrics
 
         df_plot = df.copy()
 
@@ -333,7 +337,7 @@ if uploaded_file:
 
         fig, ax = plt.subplots(figsize=(14,12))
 
-        xv,yv = np.meshgrid(
+        xv, yv = np.meshgrid(
             np.linspace(-0.05,1.05,600),
             np.linspace(-0.05,1.05,600)
         )
@@ -361,7 +365,7 @@ if uploaded_file:
             df_plot["Player"]
         )
 
-        for _,r in df_plot.iterrows():
+        for _, r in df_plot.iterrows():
 
             if r["Player"] not in highlight:
 
@@ -409,9 +413,12 @@ if uploaded_file:
         st.pyplot(fig)
         plt.close(fig)
 
-    # ---------------------------------
+    else:
+        st.info("Select exactly 2 metrics.")
+
+    # --------------------------------
     # EXPORT
-    # ---------------------------------
+    # --------------------------------
 
     st.subheader("Download Data")
 
