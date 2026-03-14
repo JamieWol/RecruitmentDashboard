@@ -9,34 +9,6 @@ from matplotlib.patches import Patch
 # POSITION METRICS
 # -------------------------------
 
-position_metrics_map_wyscout = {
-    "CB": [
-        "xG","Successful defensive actions per 90","Defensive duels per 90",
-        "Defensive duels won, %","Aerial duels per 90","Aerial duels won, %",
-        "Shots blocked per 90","PAdj Interceptions","Accurate passes, %",
-        "Accurate forward passes, %","Accurate long passes, %"
-    ],
-    "6": [
-        "Duels won, %","Successful defensive actions per 90","Defensive duels per 90",
-        "Defensive duels won, %","Aerial duels per 90","Aerial duels won, %",
-        "PAdj Interceptions","xG","Shots per 90","Progressive runs per 90",
-        "Accurate passes, %","Successful dribbles, %","Accurate forward passes, %",
-        "Accurate long passes, %","Offensive duels won, %","Key passes per 90",
-        "Deep completions per 90","Progressive passes per 90","xA","Accelerations per 90"
-    ],
-    "WB": [
-        "xG","xA","Successful defensive actions per 90","Defensive duels per 90",
-        "Defensive duels won, %","PAdj Interceptions","Accurate crosses, %",
-        "Successful dribbles, %","Progressive runs per 90","Accelerations per 90",
-        "Accurate passes, %","Key passes per 90","Deep completions per 90"
-    ],
-    "CF": [
-        "xG","xA","Successful defensive actions per 90","Aerial duels won, %",
-        "Non-penalty goals per 90","Goal conversion, %","Offensive duels won, %",
-        "Touches in box per 90","Accurate passes, %","Key passes per 90",
-        "Deep completions per 90"
-    ]
-}
 
 # -------------------------------
 # LOAD DATA
