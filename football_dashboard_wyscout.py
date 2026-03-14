@@ -6,155 +6,159 @@ import numpy as np
 from matplotlib.patches import Patch
 
 # -------------------------------
-# Position to Metrics Mapping
+# POSITION METRICS
 # -------------------------------
+
 position_metrics_map_wyscout = {
     "CB": [
-        "xG", "Successful defensive actions per 90", "Defensive duels per 90",
-        "Defensive duels won, %", "Aerial duels per 90", "Aerial duels won, %",
-        "Shots blocked per 90", "PAdj Interceptions", "Accurate passes, %",
-        "Accurate forward passes, %", "Accurate long passes, %"
+        "xG","Successful defensive actions per 90","Defensive duels per 90",
+        "Defensive duels won, %","Aerial duels per 90","Aerial duels won, %",
+        "Shots blocked per 90","PAdj Interceptions","Accurate passes, %",
+        "Accurate forward passes, %","Accurate long passes, %"
     ],
-    "6s": [
-        "Duels won, %", "Successful defensive actions per 90", "Defensive duels per 90",
-        "Defensive duels won, %", "Aerial duels per 90", "Aerial duels won, %",
-        "PAdj Interceptions", "xG", "Shots per 90", "Progressive runs per 90",
-        "Accurate passes, %", "Successful dribbles, %", "Accurate forward passes, %",
-        "Accurate long passes, %", "Offensive duels won, %", "Key passes per 90",
-        "Deep completions per 90", "Progressive passes per 90", "xA", "Accelerations per 90"
+    "6": [
+        "Duels won, %","Successful defensive actions per 90","Defensive duels per 90",
+        "Defensive duels won, %","Aerial duels per 90","Aerial duels won, %",
+        "PAdj Interceptions","xG","Shots per 90","Progressive runs per 90",
+        "Accurate passes, %","Successful dribbles, %","Accurate forward passes, %",
+        "Accurate long passes, %","Offensive duels won, %","Key passes per 90",
+        "Deep completions per 90","Progressive passes per 90","xA","Accelerations per 90"
     ],
     "WB": [
-        "xG", "xA", "Successful defensive actions per 90", "Defensive duels per 90",
-        "Defensive duels won, %", "PAdj Interceptions", "Accurate crosses, %",
-        "Successful dribbles, %", "Progressive runs per 90", "Accelerations per 90",
-        "Accurate passes, %", "Key passes per 90", "Deep completions per 90"
+        "xG","xA","Successful defensive actions per 90","Defensive duels per 90",
+        "Defensive duels won, %","PAdj Interceptions","Accurate crosses, %",
+        "Successful dribbles, %","Progressive runs per 90","Accelerations per 90",
+        "Accurate passes, %","Key passes per 90","Deep completions per 90"
     ],
     "CF": [
-        "xG", "xA", "Successful defensive actions per 90", "Aerial duels won, %",
-        "Non-penalty goals per 90", "Goal conversion, %", "Offensive duels won, %",
-        "Touches in box per 90", "Accurate passes, %", "Key passes per 90",
+        "xG","xA","Successful defensive actions per 90","Aerial duels won, %",
+        "Non-penalty goals per 90","Goal conversion, %","Offensive duels won, %",
+        "Touches in box per 90","Accurate passes, %","Key passes per 90",
         "Deep completions per 90"
-    ],
-    "10s": [
-        "xG", "Goals per 90", "Non-penalty goals per 90", "Shots per 90",
-        "Accurate crosses, %", "Dribbles per 90", "Successful dribbles, %",
-        "Accurate passes, %", "Key passes per 90", "Deep completions per 90"
-    ],
-    "GK": [
-        "Average long pass length, m", "Save rate, %", "Prevented goals",
-        "Prevented goals per 90", "Exits per 90", "Aerial duels per 90"
     ]
 }
 
 # -------------------------------
-# Load Data
+# LOAD DATA
 # -------------------------------
+
 @st.cache_data
 def load_data(file):
-    df = pd.read_excel(file) if file.name.endswith(("xlsx", "xls")) else pd.read_csv(file)
-
-    df = df.dropna(subset=["Player", "Minutes played"])
-
-    df["Player"] = df["Player"].astype(str)
-    df["Minutes played"] = pd.to_numeric(df["Minutes played"], errors='coerce')
-
+    df = pd.read_excel(file) if file.name.endswith(("xlsx","xls")) else pd.read_csv(file)
+    df = df.dropna(subset=["Player","Minutes played"])
+    df["Minutes played"] = pd.to_numeric(df["Minutes played"], errors="coerce")
     return df
 
 
 # -------------------------------
-# Pizza Chart
+# PIZZA CHART
 # -------------------------------
-def plot_pizza(player, data, league_avg, metrics_list):
 
-    cols = [m + " Percentile" for m in metrics_list]
+def plot_pizza(player, df, metrics):
 
-    player_percentiles = (
-        data.loc[data["Player"] == player, cols]
+    cols = [m + " Percentile" for m in metrics]
+
+    player_values = (
+        df.loc[df["Player"] == player, cols]
         .values.flatten()
         .tolist()
     )
 
-    player_percentiles = [int(round(p)) for p in player_percentiles]
+    league_avg = [50]*len(metrics)
 
     pizza = PyPizza(
-        params=metrics_list,
-        min_range=[0] * len(metrics_list),
-        max_range=[100] * len(metrics_list),
-        background_color="#f0f8ff",
-        straight_line_color="black",
-        straight_line_lw=1,
+        params=metrics,
+        background_color="#dce6e6",
+        straight_line_color="#4a6f66",
+        straight_line_lw=1.5,
         last_circle_lw=1,
         other_circle_lw=0
     )
 
     fig, ax = pizza.make_pizza(
         league_avg,
-        figsize=(7,7),
-        color_blank_space="same",
+        figsize=(8,8),
         kwargs_slices=dict(
-            facecolor="#FFFF00",
+            facecolor="yellow",
             edgecolor="black",
-            linewidth=1.5,
-            alpha=1
+            linewidth=2
         ),
-        kwargs_params=dict(color="black", fontsize=8, fontweight="bold"),
-        kwargs_values=dict(color="black", fontsize=9)
+        kwargs_params=dict(
+            fontsize=10,
+            fontweight="bold"
+        ),
+        kwargs_values=dict(
+            color="black",
+            fontsize=10,
+            bbox=dict(
+                edgecolor="black",
+                facecolor="yellow",
+                boxstyle="round,pad=0.2"
+            )
+        )
     )
 
     pizza.make_pizza(
-        player_percentiles,
+        player_values,
         ax=ax,
-        color_blank_space="same",
         kwargs_slices=dict(
             facecolor="#1a78cf",
             edgecolor="black",
             linewidth=2,
-            alpha=0.8
+            alpha=0.85
         ),
-        kwargs_params=dict(color="black", fontsize=8),
-        kwargs_values=dict(color="white", fontsize=9)
+        kwargs_values=dict(
+            color="white",
+            fontsize=10,
+            bbox=dict(
+                edgecolor="#1a78cf",
+                facecolor="#1a78cf",
+                boxstyle="round,pad=0.2"
+            )
+        )
     )
 
-    legend_patches = [
-        Patch(facecolor="#1a78cf", edgecolor="black", label=player),
-        Patch(facecolor="#FFFF00", edgecolor="black", label="League Average")
+    legend = [
+        Patch(facecolor="#1a78cf", label=player),
+        Patch(facecolor="yellow", label="League Average")
     ]
 
-    ax.legend(handles=legend_patches, loc="upper right", bbox_to_anchor=(1.2,1.1))
+    ax.legend(handles=legend, loc="upper right")
 
     st.pyplot(fig)
     plt.close(fig)
 
 
 # -------------------------------
-# Radar Chart
+# RADAR CHART
 # -------------------------------
+
 def plot_radar(labels, values_list, labels_list):
 
-    num_vars = len(labels)
+    num_vars=len(labels)
 
-    angles = np.linspace(0, 2*np.pi, num_vars, endpoint=False).tolist()
-    angles += angles[:1]
+    angles=np.linspace(0,2*np.pi,num_vars,endpoint=False).tolist()
+    angles+=angles[:1]
 
-    fig, ax = plt.subplots(figsize=(7,7), subplot_kw=dict(polar=True))
+    fig, ax=plt.subplots(figsize=(7,7),subplot_kw=dict(polar=True))
 
     ax.set_theta_offset(np.pi/2)
     ax.set_theta_direction(-1)
 
     ax.set_xticks(angles[:-1])
-    ax.set_xticklabels(labels, fontsize=10)
+    ax.set_xticklabels(labels,fontsize=10)
 
     ax.set_ylim(0,100)
     ax.set_yticklabels([])
 
-    for values, label in zip(values_list, labels_list):
+    for values,label in zip(values_list,labels_list):
 
-        vals = values + values[:1]
+        vals=values+values[:1]
 
-        ax.plot(angles, vals, linewidth=2, label=label)
-        ax.fill(angles, vals, alpha=0.25)
+        ax.plot(angles,vals,linewidth=2,label=label)
+        ax.fill(angles,vals,alpha=0.25)
 
-    ax.legend(loc="upper right", bbox_to_anchor=(1.2,1.1))
+    ax.legend(loc="upper right")
 
     st.pyplot(fig)
     plt.close(fig)
@@ -163,10 +167,11 @@ def plot_radar(labels, values_list, labels_list):
 # -------------------------------
 # STREAMLIT UI
 # -------------------------------
+
 st.sidebar.header("Upload Wyscout File")
 
 uploaded_file = st.sidebar.file_uploader(
-    "Upload CSV or Excel file",
+    "Upload CSV or Excel",
     type=["csv","xlsx","xls"]
 )
 
@@ -174,185 +179,190 @@ if uploaded_file:
 
     df = load_data(uploaded_file)
 
-    st.success(f"Loaded {len(df)} rows")
+    st.success(f"{len(df)} rows loaded")
 
     # -------------------------------
     # POSITION
     # -------------------------------
-    position_options = list(position_metrics_map_wyscout.keys())
 
-    selected_position = st.sidebar.selectbox(
-        "Select Position",
-        position_options
+    position = st.sidebar.selectbox(
+        "Position",
+        list(position_metrics_map_wyscout.keys())
     )
 
     metrics = [
-        m for m in position_metrics_map_wyscout[selected_position]
+        m for m in position_metrics_map_wyscout[position]
         if m in df.columns
     ]
 
     # -------------------------------
     # FILTERS
     # -------------------------------
+
     st.sidebar.subheader("Filters")
 
-    min_minutes = int(df["Minutes played"].min())
-    max_minutes = int(df["Minutes played"].max())
+    min_mins=int(df["Minutes played"].min())
+    max_mins=int(df["Minutes played"].max())
 
-    minutes_range = st.sidebar.slider(
+    mins_range=st.sidebar.slider(
         "Minutes Played",
-        min_minutes,
-        max_minutes,
-        (min_minutes, max_minutes),
-        step=50
+        min_mins,
+        max_mins,
+        (min_mins,max_mins)
     )
 
-    df = df[df["Minutes played"].between(minutes_range[0], minutes_range[1])]
-
-    if "Age" in df.columns:
-
-        min_age = int(df["Age"].min())
-        max_age = int(df["Age"].max())
-
-        age_range = st.sidebar.slider(
-            "Age",
-            min_age,
-            max_age,
-            (min_age, max_age)
-        )
-
-        df = df[df["Age"].between(age_range[0], age_range[1])]
-
-    if df.empty:
-
-        st.warning("No players match the filters")
-
-        st.stop()
+    df=df[df["Minutes played"].between(mins_range[0],mins_range[1])]
 
     # -------------------------------
     # PERCENTILES
     # -------------------------------
+
     for m in metrics:
 
-        df[m + " Percentile"] = (
+        df[m+" Percentile"] = (
             df[m]
             .rank(pct=True)
-            .mul(100)
-            .round(0)
-            .astype(int)
         )
 
-    percentile_columns = [m + " Percentile" for m in metrics]
-
-    league_avg_percentiles = (
-        df[percentile_columns]
-        .mean()
-        .round(0)
-        .astype(int)
-        .tolist()
-    )
-
-    # -------------------------------
-    # OVERALL SCORE
-    # -------------------------------
-    df["Overall Score"] = df[percentile_columns].mean(axis=1).round(0)
-
-    df = df.sort_values("Overall Score", ascending=False).reset_index(drop=True)
-
-    df.index += 1
+    percentile_cols=[m+" Percentile" for m in metrics]
 
     # -------------------------------
     # DASHBOARD
     # -------------------------------
-    st.title(f"⚽ Recruitment Dashboard - {selected_position}")
 
-    st.subheader("🏅 Player Ranking")
+    st.title(f"⚽ Recruitment Dashboard - {position}")
 
-    info_columns = [
-        "Player","Team","Position","Age","Overall Score",
-        "Contract expires","Minutes played","Passport country",
-        "Foot","Height","Weight"
-    ]
+    st.subheader("Player Table")
 
-    existing_info_columns = [c for c in info_columns if c in df.columns]
+    st.dataframe(df[["Player","Team","Minutes played"]+metrics])
 
-    st.dataframe(
-        df[existing_info_columns + metrics]
-        .style.format({"Overall Score":"{:.0f}"})
-        .highlight_max(subset=["Overall Score"], color="lightgreen")
+    # -------------------------------
+    # PIZZA
+    # -------------------------------
+
+    st.subheader("Pizza Chart")
+
+    player_list=df["Player"].tolist()
+
+    selected_player=st.selectbox("Select Player",player_list)
+
+    plot_pizza(selected_player,df,metrics)
+
+    # -------------------------------
+    # RADAR
+    # -------------------------------
+
+    st.subheader("Player Comparison")
+
+    p1=st.selectbox("Player 1",player_list)
+    p2=st.selectbox("Player 2",player_list,index=1)
+
+    if p1!=p2:
+
+        vals1=df.loc[df["Player"]==p1,percentile_cols].values.flatten().tolist()
+        vals2=df.loc[df["Player"]==p2,percentile_cols].values.flatten().tolist()
+
+        plot_radar(metrics,[vals1,vals2],[p1,p2])
+
+    # -------------------------------
+    # SCATTER
+    # -------------------------------
+
+    st.subheader("📊 Scatter Graph")
+
+    two_metrics = st.multiselect(
+        "Select 2 metrics",
+        metrics,
+        default=metrics[:2]
     )
 
-    # -------------------------------
-    # PIZZA CHART
-    # -------------------------------
-    st.subheader("📊 Pizza Chart")
+    if len(two_metrics)==2:
 
-    player_list = df["Player"].tolist()
+        mX,mY=two_metrics
 
-    selected_player = st.selectbox(
-        "Select Player",
-        player_list
-    )
+        df_plot=df.copy()
 
-    plot_pizza(
-        selected_player,
-        df,
-        league_avg_percentiles,
-        metrics
-    )
+        df_plot["X"]=df_plot[mX+" Percentile"].clip(0,1)
+        df_plot["Y"]=df_plot[mY+" Percentile"].clip(0,1)
 
-    # -------------------------------
-    # RADAR PLAYER VS PLAYER
-    # -------------------------------
-    st.subheader("📈 Player Comparison")
+        fig, ax = plt.subplots(figsize=(14,12))
 
-    if len(player_list) >= 2:
+        xv,yv=np.meshgrid(
+            np.linspace(-0.05,1.05,600),
+            np.linspace(-0.05,1.05,600)
+        )
 
-        p1 = st.selectbox("Player 1", player_list)
+        Z=((xv.clip(0,1))+(yv.clip(0,1)))/2
 
-        p2 = st.selectbox("Player 2", player_list, index=1)
+        ax.imshow(
+            Z,
+            extent=(-0.05,1.05,-0.05,1.05),
+            origin="lower",
+            cmap="RdYlGn",
+            alpha=0.6,
+            aspect="auto"
+        )
 
-        if p1 != p2:
+        ax.scatter(
+            df_plot["X"],
+            df_plot["Y"],
+            s=140,
+            facecolors="white",
+            edgecolors="black"
+        )
 
-            vals1 = df.loc[df["Player"] == p1, percentile_columns].values.flatten().tolist()
+        highlight = st.multiselect(
+            "Highlight player(s)",
+            df_plot["Player"].unique()
+        )
 
-            vals2 = df.loc[df["Player"] == p2, percentile_columns].values.flatten().tolist()
+        for _,r in df_plot.iterrows():
 
-            plot_radar(
-                metrics,
-                [vals1, vals2],
-                [p1, p2]
+            if r["Player"] not in highlight:
+
+                ax.text(
+                    r["X"]+0.012,
+                    r["Y"]+0.012,
+                    r["Player"],
+                    fontsize=9
+                )
+
+        for hp in highlight:
+
+            row=df_plot[df_plot["Player"]==hp]
+
+            ax.scatter(
+                row["X"],
+                row["Y"],
+                s=480,
+                facecolors="none",
+                edgecolors="black",
+                linewidths=2.4
             )
 
-    # -------------------------------
-    # PLAYER VS LEAGUE
-    # -------------------------------
-    st.subheader("📊 Player vs League Average")
+            ax.text(
+                row["X"].values[0]+0.015,
+                row["Y"].values[0]+0.015,
+                hp,
+                fontsize=12,
+                fontweight="bold"
+            )
 
-    p3 = st.selectbox(
-        "Select Player",
-        player_list,
-        key="league_player"
-    )
+        ax.axhline(0.5,color="black",linestyle="--")
+        ax.axvline(0.5,color="black",linestyle="--")
 
-    vals3 = df.loc[df["Player"] == p3, percentile_columns].values.flatten().tolist()
+        ax.set_xlim(-0.05,1.05)
+        ax.set_ylim(-0.05,1.05)
 
-    plot_radar(
-        metrics,
-        [vals3, league_avg_percentiles],
-        [p3, "League Average"]
-    )
+        ax.set_xlabel(mX+" Percentile")
+        ax.set_ylabel(mY+" Percentile")
 
-    # -------------------------------
-    # EXPORT
-    # -------------------------------
-    st.subheader("Download Data")
+        ax.set_title("Player Scatter Graph")
 
-    csv = df.to_csv(index=False).encode("utf-8")
+        ax.grid(False)
 
-    st.download_button(
-        "Download Filtered Data",
-        csv,
-        "filtered_wyscout.csv",
-        "text/csv"
-    )
+        st.pyplot(fig)
+        plt.close(fig)
+
+    else:
+        st.info("Select exactly 2 metrics.")
