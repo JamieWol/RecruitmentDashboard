@@ -66,7 +66,7 @@ def plot_pizza(player, df, metrics, league_avg):
         figsize=(10,10),
 
         kwargs_slices=dict(
-            facecolor="#facc15",
+            facecolor="#7fb29c",
             edgecolor="white",
             linewidth=2
         ),
