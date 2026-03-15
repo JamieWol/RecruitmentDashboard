@@ -49,7 +49,7 @@ def plot_pizza(player, df, metrics, league_avg):
         min_range=[0]*len(metrics),
         max_range=[100]*len(metrics),
 
-        background_color="White",
+        background_color="white",
 
         straight_line_color="#4a6f66",
         straight_line_lw=1.5,
@@ -89,28 +89,26 @@ def plot_pizza(player, df, metrics, league_avg):
     )
 
     pizza.make_pizza(
-        player_values,
-        ax=ax,
+    player_values,
+    ax=ax,
 
-        kwargs_slices=dict(
+    kwargs_slices=dict(
+        facecolor="#3b82f6",
+        edgecolor="white",
+        linewidth=2,
+        alpha=0.9
+    ),
+
+    kwargs_values=dict(
+        fontsize=8,
+        color="white",
+        bbox=dict(
+            edgecolor="#3b82f6",
             facecolor="#3b82f6",
-            edgecolor="white",
-            linewidth=2,
-            alpha=0.9
-        ),
-
-        kwargs_params=dict(alpha=0),
-
-        kwargs_values=dict(
-            fontsize=8,
-            color="white",
-            bbox=dict(
-                edgecolor="#3b82f6",
-                facecolor="#3b82f6",
-                boxstyle="round,pad=0.25"
-            )
+            boxstyle="round,pad=0.25"
         )
     )
+)
 
     legend = [
         Patch(facecolor="#3b82f6", label=player),
