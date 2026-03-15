@@ -54,10 +54,10 @@ def plot_pizza(player, df, metrics, league_avg):
         straight_line_color="#4a6f66",
         straight_line_lw=1.5,
 
-        last_circle_color="#7fb29c",
+        last_circle_color="#black",
         last_circle_lw=2,
 
-        other_circle_color="#7fb29c",
+        other_circle_color="#black",
         other_circle_lw=1
     )
 
