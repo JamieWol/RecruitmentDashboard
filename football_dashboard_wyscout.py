@@ -58,9 +58,7 @@ def plot_pizza(player, df, metrics, league_avg):
         last_circle_lw=2,
 
         other_circle_color="#475569",
-        other_circle_lw=1,
-
-        param_location=110
+        other_circle_lw=1
     )
 
     fig, ax = pizza.make_pizza(
@@ -74,13 +72,13 @@ def plot_pizza(player, df, metrics, league_avg):
         ),
 
         kwargs_params=dict(
-            fontsize=9,
+            fontsize=8,
             color="white",
             fontweight="bold"
         ),
 
         kwargs_values=dict(
-            fontsize=9,
+            fontsize=8,
             color="black",
             bbox=dict(
                 edgecolor="white",
@@ -104,7 +102,7 @@ def plot_pizza(player, df, metrics, league_avg):
         kwargs_params=dict(alpha=0),
 
         kwargs_values=dict(
-            fontsize=9,
+            fontsize=8,
             color="white",
             bbox=dict(
                 edgecolor="#3b82f6",
@@ -119,7 +117,7 @@ def plot_pizza(player, df, metrics, league_avg):
         Patch(facecolor="#facc15", label="League Average")
     ]
 
-    ax.legend(handles=legend, loc="upper right", bbox_to_anchor=(1.2,1.1))
+    ax.legend(handles=legend, loc="upper right", bbox_to_anchor=(1.15,1.1))
 
     st.pyplot(fig)
     plt.close(fig)
