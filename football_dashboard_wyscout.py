@@ -49,15 +49,15 @@ def plot_pizza(player, df, metrics, league_avg):
         min_range=[0]*len(metrics),
         max_range=[100]*len(metrics),
 
-        background_color="#7fa896",
+        background_color="White",
 
-        straight_line_color="#94a3b8",
+        straight_line_color="#4a6f66",
         straight_line_lw=1.5,
 
-        last_circle_color="#94a3b8",
+        last_circle_color="#7fb29c",
         last_circle_lw=2,
 
-        other_circle_color="#475569",
+        other_circle_color="#7fb29c",
         other_circle_lw=1
     )
 
