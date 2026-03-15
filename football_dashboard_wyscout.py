@@ -38,76 +38,91 @@ def plot_pizza(player, df, metrics, league_avg):
 
     percentile_cols = [m + " Percentile" for m in metrics]
 
-    player_values = (
-        df.loc[df["Player"] == player, percentile_cols]
-        .values.flatten()
-        .tolist()
-    )
+player_values = (
+    df.loc[df["Player"] == player, percentile_cols]
+    .values.flatten()
+    .tolist()
+)
 
-    pizza = PyPizza(
-        params=metrics,
-        min_range=[0]*len(metrics),
-        max_range=[100]*len(metrics),
-        background_color="#dce6e6",
-        straight_line_color="#4a6f66",
-        straight_line_lw=1.5,
-        last_circle_lw=1,
-        other_circle_lw=0
-    )
+pizza = PyPizza(
+    params=metrics,
+    min_range=[0]*len(metrics),
+    max_range=[100]*len(metrics),
 
-    fig, ax = pizza.make_pizza(
-        league_avg,
-        figsize=(8,8),
-        kwargs_slices=dict(
-            facecolor="yellow",
-            edgecolor="black",
-            linewidth=2
-        ),
-        kwargs_params=dict(
-            fontsize=10,
-            fontweight="bold"
-        ),
-        kwargs_values=dict(
-            color="black",
-            fontsize=10,
-            bbox=dict(
-                edgecolor="black",
-                facecolor="yellow",
-                boxstyle="round,pad=0.25"
-            )
+    background_color="#0f172a",
+
+    straight_line_color="#94a3b8",
+    straight_line_lw=1.5,
+
+    last_circle_color="#94a3b8",
+    last_circle_lw=2,
+
+    other_circle_color="#475569",
+    other_circle_lw=1,
+
+    param_location=110   # pushes labels further out
+)
+
+fig, ax = pizza.make_pizza(
+    league_avg,
+    figsize=(10,10),
+
+    kwargs_slices=dict(
+        facecolor="#facc15",
+        edgecolor="white",
+        linewidth=2
+    ),
+
+    kwargs_params=dict(
+        fontsize=9,
+        color="white",
+        fontweight="bold"
+    ),
+
+    kwargs_values=dict(
+        fontsize=9,
+        color="black",
+        bbox=dict(
+            edgecolor="white",
+            facecolor="#facc15",
+            boxstyle="round,pad=0.25"
         )
     )
+)
 
-    pizza.make_pizza(
-        player_values,
-        ax=ax,
-        kwargs_slices=dict(
-            facecolor="#1a78cf",
-            edgecolor="black",
-            linewidth=2,
-            alpha=0.85
-        ),
-        kwargs_params=dict(alpha=0),
-        kwargs_values=dict(
-            color="white",
-            fontsize=10,
-            bbox=dict(
-                edgecolor="#1a78cf",
-                facecolor="#1a78cf",
-                boxstyle="round,pad=0.25"
-            )
+pizza.make_pizza(
+    player_values,
+    ax=ax,
+
+    kwargs_slices=dict(
+        facecolor="#3b82f6",
+        edgecolor="white",
+        linewidth=2,
+        alpha=0.9
+    ),
+
+    kwargs_params=dict(alpha=0),
+
+    kwargs_values=dict(
+        fontsize=9,
+        color="white",
+        bbox=dict(
+            edgecolor="#3b82f6",
+            facecolor="#3b82f6",
+            boxstyle="round,pad=0.25"
         )
     )
+)
 
-    legend = [
-        Patch(facecolor="#1a78cf", label=player),
-        Patch(facecolor="yellow", label="League Average")
-    ]
+legend = [
+    Patch(facecolor="#3b82f6", label=player),
+    Patch(facecolor="#facc15", label="League Average")
+]
 
-    ax.legend(handles=legend, loc="upper right", bbox_to_anchor=(1.15,1.1))
+ax.legend(handles=legend, loc="upper right", bbox_to_anchor=(1.2,1.1))
 
-    st.pyplot(fig)
-    plt.close(fig)
+st.pyplot(fig)
+plt.close(fig)
 
 
 # --------------------------------
