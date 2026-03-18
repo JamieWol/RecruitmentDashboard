@@ -51,10 +51,10 @@ def plot_pizza(player, df, metrics, league_avg):
 
         background_color="white",
 
-        straight_line_color="black",
+        straight_line_color="none",
         straight_line_lw=1.5,
 
-        last_circle_color="black",
+        last_circle_color="none",
         last_circle_lw=2,
 
     )
@@ -70,7 +70,7 @@ def plot_pizza(player, df, metrics, league_avg):
         ),
 
         kwargs_params=dict(
-            fontsize=8,
+            fontsize=7.5,
             color="white",
             fontweight="bold"
         ),
