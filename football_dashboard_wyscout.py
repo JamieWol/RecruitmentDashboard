@@ -71,7 +71,7 @@ def plot_pizza(player, df, metrics, league_avg):
         ),
 
         kwargs_params=dict(
-            fontsize=8,
+            fontsize=9,
             color="white",
             fontweight="bold"
         ),
@@ -100,7 +100,7 @@ def plot_pizza(player, df, metrics, league_avg):
 
     kwargs_values=dict(
         fontsize=8,
-        color="black",
+        color="white",
         bbox=dict(
             edgecolor="black",
             facecolor="#3b82f6",
