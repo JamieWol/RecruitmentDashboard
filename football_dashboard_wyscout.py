@@ -62,7 +62,7 @@ def plot_pizza(player, df, metrics, league_avg):
 
     fig, ax = pizza.make_pizza(
         league_avg,
-        figsize=(10,10),
+        figsize=(8,8),
 
         kwargs_slices=dict(
             facecolor="#facc15",
@@ -71,7 +71,7 @@ def plot_pizza(player, df, metrics, league_avg):
         ),
 
         kwargs_params=dict(
-            fontsize=6,
+            fontsize=8,
             color="white",
             fontweight="bold"
         ),
