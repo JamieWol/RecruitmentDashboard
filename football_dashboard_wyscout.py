@@ -57,7 +57,7 @@ def plot_pizza(player, df, metrics, league_avg):
         last_circle_color="black",
         last_circle_lw=2,
 
-        other_circle_color="black",
+        other_circle_color="white",
         other_circle_lw=1
     )
 
