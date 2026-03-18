@@ -103,7 +103,7 @@ def plot_pizza(player, df, metrics, league_avg):
         fontsize=8,
         color="black",
         bbox=dict(
-            edgecolor="#3b82f6",
+            edgecolor="#black",
             facecolor="#3b82f6",
             boxstyle="round,pad=0.25"
         )
