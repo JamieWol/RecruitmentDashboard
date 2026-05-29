@@ -442,7 +442,7 @@ if uploaded_file:
     else:
         st.info("Select exactly 2 metrics.")
 
-    import streamlit as st
+import streamlit as st
 import pandas as pd
 import io
 
