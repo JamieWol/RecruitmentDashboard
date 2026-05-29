@@ -446,6 +446,28 @@ import streamlit as st
 import pandas as pd
 import io
 
+# --------------------------------
+# TABS SETUP
+# --------------------------------
+
+# Ensure consistent dataframe naming
+filtered_df = df.copy()
+
+# Standardise column names for tab features
+filtered_df.rename(columns={
+    "Player": "Name",
+    "Position": "Primary Position"
+}, inplace=True)
+
+pizza_metrics = metrics  # reuse selected metrics
+
+# Create tabs
+tabs = st.tabs([
+    "🏆 Shortlist Players",
+    "🤝 Similar Players",
+    "⚖️ Custom Scoring",
+    "📝 Role Profiles"
+])
 # --- Persistent Shortlist Log ---
 if "shortlist_log" not in st.session_state:
     st.session_state.shortlist_log = pd.DataFrame()
