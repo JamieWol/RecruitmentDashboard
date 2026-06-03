@@ -23,11 +23,10 @@ def load_data(file):
 
     df = pd.read_excel(file) if file.name.endswith(("xlsx","xls")) else pd.read_csv(file)
 
-    df = df.dropna(subset=["Player","Minutes played", "Valuation", "Contract Expiry (days left)"])
+    df = df.dropna(subset=["Player","Minutes played"])
 
     df["Minutes played"] = pd.to_numeric(df["Minutes played"], errors="coerce")
-    df["Valuation"] = pd.to_numeric(df["Valuation"], errors="coerce")
-    df["Contract Expiry (days left)"] = pd.to_numeric(df["Contract Expiry (days left)"], errors="coerce")
+
 
     return df
 
@@ -180,7 +179,7 @@ if uploaded_file:
     ignore_cols = [
         "Player","Team","Position","Age","Minutes played",
         "Contract expires","Passport country","Foot",
-        "Height","Weight"
+        "Height","Weight", "Valuation", "Contract Expiry (days left)" 
     ]
 
     all_metrics = [
