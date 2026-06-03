@@ -23,7 +23,7 @@ def load_data(file):
 
     df = pd.read_excel(file) if file.name.endswith(("xlsx","xls")) else pd.read_csv(file)
 
-    df = df.dropna(subset=["Player","Minutes played"])
+    df = df.dropna(subset=["Player","Minutes played", "Valuation", "Contract Expiry (days left)"])
 
     df["Minutes played"] = pd.to_numeric(df["Minutes played"], errors="coerce")
 
