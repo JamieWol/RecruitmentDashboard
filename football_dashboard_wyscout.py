@@ -290,7 +290,7 @@ if uploaded_file:
     st.subheader("🏅 Player Ranking")
 
     st.dataframe(
-        df[["Rank","Player","Team","Minutes played","Overall Score"] + metrics]
+        df[["Rank","Player","Team","Minutes played","Valuation","Contract Expiry (days left)","Overall Score"] + metrics]
     )
 
     # --------------------------------
