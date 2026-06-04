@@ -134,7 +134,7 @@ def infer_metric_columns(df: pd.DataFrame) -> list[str]:
         "Minutes played", "Minutes", "mins", "Min", "Minutes Played",
         "Contract expires", "Passport country", "Foot", "Height", "Weight",
         "Valuation", "Contract Expiry (days left)", "Woman player no", "Player no",
-        "Match no", "Team no", "Season", "Appearances", "90s Played", "Starting Appearances"'
+        "Match no", "Team no", "Season", "Appearances", "90s Played", "Starting Appearances",
         "__player_name__", "__team__", "__league__", "__position__", "__row_id__",
         "Display Name", "Display Team", "Display League", "Display Position",
     }
