@@ -6,10 +6,11 @@ Run with:
 
 Goals:
 - Accept CSV or Excel uploads
-- Auto-detect player/team/position/minutes columns
+- Auto-detect player/team/league/position/minutes columns
 - Infer likely football metrics from numeric columns
 - Exclude obvious admin / ID / metadata fields
 - Avoid duplicate column-name crashes in Streamlit/Arrow
+- Filter by league when multiple leagues are uploaded
 - Keep the original-style pizza chart when mplsoccer is available
 """
 
@@ -42,6 +43,7 @@ st.set_page_config(page_title="Football Recruitment Dashboard", layout="wide")
 # --------------------------------
 NAME_CANDIDATES = ["Player", "Name", "player", "name", "Footballer"]
 TEAM_CANDIDATES = ["Team", "Club", "Squad", "team", "club"]
+LEAGUE_CANDIDATES = ["League", "Competition", "competition", "league"]
 POSITION_CANDIDATES = ["Position", "Primary Position", "Role", "position"]
 MINUTES_CANDIDATES = ["Minutes played", "Minutes", "mins", "Min", "minutes played"]
 AGE_CANDIDATES = ["Age", "age"]
@@ -51,6 +53,7 @@ AGE_CANDIDATES = ["Age", "age"]
 class ColumnMap:
     name: str
     team: Optional[str] = None
+    league: Optional[str] = None
     position: Optional[str] = None
     minutes: Optional[str] = None
     age: Optional[str] = None
@@ -98,6 +101,7 @@ def detect_columns(df: pd.DataFrame) -> ColumnMap:
     return ColumnMap(
         name=find_first_existing(df, NAME_CANDIDATES) or "",
         team=find_first_existing(df, TEAM_CANDIDATES),
+        league=find_first_existing(df, LEAGUE_CANDIDATES),
         position=find_first_existing(df, POSITION_CANDIDATES),
         minutes=find_first_existing(df, MINUTES_CANDIDATES),
         age=find_first_existing(df, AGE_CANDIDATES),
@@ -125,13 +129,14 @@ def infer_metric_columns(df: pd.DataFrame) -> list[str]:
     """Infer likely football performance metrics from a dataframe."""
 
     exclude_exact = {
-        "Player", "Name", "Team", "Club", "Squad", "Position", "Primary Position",
-        "Role", "Age", "Minutes played", "Minutes", "mins", "Min",
+        "Player", "Name", "Team", "Club", "Squad", "League", "Competition",
+        "Position", "Primary Position", "Role", "Age",
+        "Minutes played", "Minutes", "mins", "Min",
         "Contract expires", "Passport country", "Foot", "Height", "Weight",
         "Valuation", "Contract Expiry (days left)", "Woman player no", "Player no",
-        "Match no", "Team no", "Season", "League", "Competition",
-        "__player_name__", "__team__", "__position__", "__row_id__",
-        "Display Name", "Display Team", "Display Position",
+        "Match no", "Team no", "Season",
+        "__player_name__", "__team__", "__league__", "__position__", "__row_id__",
+        "Display Name", "Display Team", "Display League", "Display Position",
     }
 
     exclude_keywords = [
@@ -206,35 +211,29 @@ def display_table(df: pd.DataFrame, cols: list[str]) -> None:
     if not cols:
         st.info("No columns to display.")
         return
-    # Extra safety: if any uploaded file still introduces duplicate labels, collapse them.
     safe_df = df.loc[:, ~df.columns.duplicated()].copy()
     st.dataframe(safe_df[cols])
 
 
 def compute_similarity_frame(df: pd.DataFrame, player_name: str, metrics: list[str], top_n: int = 10) -> pd.DataFrame:
-    """Return a similarity-ranked dataframe using Euclidean distance on numeric metrics.
-
-    The function is defensive against:
-    - object dtypes
-    - missing values
-    - rows that do not have the selected player
-    - empty metric selections
-    """
+    """Return a similarity-ranked dataframe using Euclidean distance on numeric metrics."""
 
     if not metrics or "Display Name" not in df.columns:
         return pd.DataFrame()
 
-    working_cols = [c for c in ["Display Name", "Display Team", "Display Position"] if c in df.columns]
+    working_cols = [c for c in ["Display Name", "Display Team", "Display League", "Display Position"] if c in df.columns]
     working_cols += [m for m in metrics if m in df.columns]
 
     working = df[working_cols].copy()
 
-    for m in metrics:
-        if m in working.columns:
-            working[m] = pd.to_numeric(working[m], errors="coerce")
+    metric_cols = [m for m in metrics if m in working.columns]
+    if not metric_cols:
+        return pd.DataFrame()
 
-    # Only keep rows where all similarity metrics are available.
-    working = working.dropna(subset=[m for m in metrics if m in working.columns]).copy()
+    for m in metric_cols:
+        working[m] = pd.to_numeric(working[m], errors="coerce")
+
+    working = working.dropna(subset=metric_cols).copy()
     if working.empty:
         return pd.DataFrame()
 
@@ -242,14 +241,10 @@ def compute_similarity_frame(df: pd.DataFrame, player_name: str, metrics: list[s
     if player_row.empty:
         return pd.DataFrame()
 
-    metric_cols = [m for m in metrics if m in working.columns]
     player_vector = player_row.iloc[0][metric_cols].to_numpy(dtype=float)
     other_vectors = working[metric_cols].to_numpy(dtype=float)
-
-    # Distance computation is now guaranteed to be numeric.
     distances = np.linalg.norm(other_vectors - player_vector, axis=1)
     working["Similarity Score"] = 1 / (1 + distances)
-
     working = working[working["Display Name"] != player_name].sort_values("Similarity Score", ascending=False)
     return working.head(top_n)
 
@@ -286,10 +281,7 @@ def plot_radar(labels: list[str], values_list: list[list[float]], labels_list: l
 
 def plot_pizza_like(player: str, df: pd.DataFrame, metrics: list[str], league_avg: list[int]):
     """Render the original-style pizza chart when mplsoccer is available.
-
-    If mplsoccer is missing, fall back to a close polar approximation so the
-    app still runs in restricted environments.
-    """
+    Falls back to a close polar approximation if mplsoccer is missing."""
 
     percentile_cols = [m + " Percentile" for m in metrics]
     player_rows = df.loc[df["__player_name__"] == player, percentile_cols]
@@ -343,12 +335,11 @@ def plot_pizza_like(player: str, df: pd.DataFrame, metrics: list[str], league_av
             plt.Line2D([0], [0], color="#facc15", lw=10, label="League Average"),
         ]
         ax.legend(handles=legend_handles, loc="upper right", bbox_to_anchor=(1.15, 1.1))
-
         st.pyplot(fig)
         plt.close(fig)
         return
 
-    # Fallback
+    # Fallback if mplsoccer is missing.
     num_vars = len(metrics)
     angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
     angles += angles[:1]
@@ -384,6 +375,7 @@ def run_self_tests():
         {
             "Player": ["A", "B"],
             "Team": ["X", "Y"],
+            "League": ["EPL", "EPL"],
             "Minutes played": [100, 200],
             "xg": [0.2, 0.4],
             "passes": [10, 20],
@@ -402,21 +394,20 @@ def run_self_tests():
     assert "Minutes played" not in inferred, "Expected minutes to be excluded"
     assert "Age" not in inferred, "Expected age to be excluded"
 
+    cols = detect_columns(sample)
+    assert cols.league == "League", "Expected League column to be detected"
+
     sim_sample = pd.DataFrame(
         {
             "Display Name": ["A", "B", "C"],
             "Display Team": ["T1", "T2", "T3"],
+            "Display League": ["L1", "L1", "L2"],
             "Display Position": ["M", "M", "D"],
             "xg Percentile": [90, 80, np.nan],
             "passes Percentile": [70, 60, 50],
         }
     )
-    sim_result = compute_similarity_frame(
-        sim_sample,
-        "A",
-        ["xg Percentile", "passes Percentile"],
-        top_n=10,
-    )
+    sim_result = compute_similarity_frame(sim_sample, "A", ["xg Percentile", "passes Percentile"], top_n=10)
     assert not sim_result.empty, "Expected similarity result for valid numeric rows"
     assert sim_result.iloc[0]["Display Name"] == "B", "Expected B to be closest to A in the sample"
 
@@ -459,10 +450,19 @@ work = df.copy()
 work["__row_id__"] = np.arange(len(work))
 work["__player_name__"] = work[columns.name].astype(str)
 work["__team__"] = work[columns.team].astype(str) if columns.team else ""
+work["__league__"] = work[columns.league].astype(str) if columns.league else ""
 work["__position__"] = work[columns.position].astype(str) if columns.position else ""
 
 # Remove empty player rows.
 work = work[work["__player_name__"].notna() & (work["__player_name__"].str.strip() != "")].copy()
+
+# League filter before ranking and charts.
+if columns.league and columns.league in work.columns:
+    league_values = sorted(work[columns.league].dropna().astype(str).unique().tolist())
+    if len(league_values) > 1:
+        selected_league = st.sidebar.selectbox("League", ["All leagues"] + league_values)
+        if selected_league != "All leagues":
+            work = work[work[columns.league].astype(str) == selected_league].copy()
 
 # Clean minutes / age if present.
 if columns.minutes and columns.minutes in work.columns:
@@ -550,6 +550,7 @@ work.insert(0, "Rank", work.index)
 filtered_df = work.copy()
 filtered_df["Display Name"] = filtered_df["__player_name__"]
 filtered_df["Display Team"] = filtered_df["__team__"]
+filtered_df["Display League"] = filtered_df["__league__"]
 filtered_df["Display Position"] = filtered_df["__position__"]
 filtered_df = filtered_df.loc[:, ~filtered_df.columns.duplicated()].copy()
 
@@ -569,7 +570,7 @@ c3.metric("Top Score", f"{int(work['Overall Score'].max()) if len(work) else 0}"
 
 st.subheader("🏅 Player Ranking")
 show_cols = ["Rank", columns.name]
-for maybe_col in [columns.team, columns.position, columns.age, columns.minutes]:
+for maybe_col in [columns.team, columns.league, columns.position, columns.age, columns.minutes]:
     if maybe_col:
         show_cols.append(maybe_col)
 for optional_col in ["Valuation", "Contract Expiry (days left)"]:
@@ -682,7 +683,7 @@ with tabs[0]:
     num_shortlist = st.slider("Number of top players to show", 1, 20, 5)
     top_players = filtered_df.head(num_shortlist).copy()
 
-    shortlist_cols = [c for c in ["Display Name", "Display Team", "Display Position", "Overall Score"] if c in top_players.columns]
+    shortlist_cols = [c for c in ["Display Name", "Display Team", "Display League", "Display Position", "Overall Score"] if c in top_players.columns]
     shortlist_cols += [m for m in pizza_metrics if m in top_players.columns]
     shortlist_cols = unique_preserve_order(shortlist_cols)
     display_table(top_players, shortlist_cols)
@@ -693,7 +694,7 @@ with tabs[0]:
     if st.button("➕ Add Selected Players to Shortlist Log"):
         if selected_players:
             players_to_add = filtered_df[filtered_df["Display Name"].isin(selected_players)][
-                [c for c in ["Display Name", "Display Team", "Display Position", "Overall Score"] if c in filtered_df.columns]
+                [c for c in ["Display Name", "Display Team", "Display League", "Display Position", "Overall Score"] if c in filtered_df.columns]
             ].copy()
             st.session_state.shortlist_log = pd.concat(
                 [st.session_state.shortlist_log, players_to_add],
@@ -753,7 +754,7 @@ with tabs[1]:
                 st.info("No similar players could be calculated from the current metric set.")
             else:
                 sim_cols = [
-                    c for c in ["Display Name", "Display Team", "Display Position", "Similarity Score"]
+                    c for c in ["Display Name", "Display Team", "Display League", "Display Position", "Similarity Score"]
                     if c in sim_df.columns
                 ]
                 sim_cols = unique_preserve_order(sim_cols)
@@ -777,7 +778,7 @@ with tabs[2]:
         weight_values = np.array(list(weights.values()), dtype=float)
         if weight_values.sum() > 0 and weighted_cols:
             filtered_df["Custom Score"] = filtered_df[weighted_cols].values.dot(weight_values) / weight_values.sum()
-            custom_cols = [c for c in ["Display Name", "Display Team", "Display Position", "Custom Score"] if c in filtered_df.columns]
+            custom_cols = [c for c in ["Display Name", "Display Team", "Display League", "Display Position", "Custom Score"] if c in filtered_df.columns]
             custom_cols = unique_preserve_order(custom_cols)
             display_table(filtered_df.sort_values("Custom Score", ascending=False).head(10), custom_cols)
 
@@ -813,8 +814,7 @@ if "Overall Score" not in export_df.columns and "Overall Score" in work.columns:
 csv = export_df.to_csv(index=False).encode("utf-8")
 st.download_button("Download Filtered Data", csv, "recruitment_data.csv", "text/csv")
 
-# Keep a tiny visible sanity check to help debug upload issues.
-st.caption("Metric inference and duplicate-column protection are enabled.")
+st.caption("Metric inference, duplicate-column protection, and league filtering are enabled.")
 
 
 
