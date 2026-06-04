@@ -402,6 +402,24 @@ def run_self_tests():
     assert "Minutes played" not in inferred, "Expected minutes to be excluded"
     assert "Age" not in inferred, "Expected age to be excluded"
 
+    sim_sample = pd.DataFrame(
+        {
+            "Display Name": ["A", "B", "C"],
+            "Display Team": ["T1", "T2", "T3"],
+            "Display Position": ["M", "M", "D"],
+            "xg Percentile": [90, 80, np.nan],
+            "passes Percentile": [70, 60, 50],
+        }
+    )
+    sim_result = compute_similarity_frame(
+        sim_sample,
+        "A",
+        ["xg Percentile", "passes Percentile"],
+        top_n=10,
+    )
+    assert not sim_result.empty, "Expected similarity result for valid numeric rows"
+    assert sim_result.iloc[0]["Display Name"] == "B", "Expected B to be closest to A in the sample"
+
 
 # --------------------------------
 # SIDEBAR
@@ -711,20 +729,35 @@ with tabs[0]:
 # --- Tab 2: Similar Players ---
 with tabs[1]:
     st.subheader("🤝 Find Similar Players")
-    selected_player_sim = st.selectbox("Select Player to Find Similar Ones", filtered_df["Display Name"].dropna().unique())
-    if selected_player_sim:
-        metrics_for_similarity = [m + " Percentile" for m in pizza_metrics if m + " Percentile" in filtered_df.columns]
-        if metrics_for_similarity:
-            player_vector = filtered_df.loc[filtered_df["Display Name"] == selected_player_sim, metrics_for_similarity].values
-            other_vectors = filtered_df[metrics_for_similarity].values
-            distances = np.linalg.norm(other_vectors - player_vector, axis=1)
-            sim_df = filtered_df.copy()
-            sim_df["Similarity Score"] = 1 / (1 + distances)
-            sim_df = sim_df[sim_df["Display Name"] != selected_player_sim].sort_values("Similarity Score", ascending=False)
+    selected_player_sim = st.selectbox(
+        "Select Player to Find Similar Ones",
+        filtered_df["Display Name"].dropna().unique()
+    )
 
-            sim_cols = [c for c in ["Display Name", "Display Team", "Display Position", "Similarity Score"] if c in sim_df.columns]
-            sim_cols = unique_preserve_order(sim_cols)
-            display_table(sim_df.head(10), sim_cols)
+    if selected_player_sim:
+        metrics_for_similarity = [
+            m + " Percentile"
+            for m in pizza_metrics
+            if m + " Percentile" in filtered_df.columns
+        ]
+
+        if metrics_for_similarity:
+            sim_df = compute_similarity_frame(
+                filtered_df,
+                selected_player_sim,
+                metrics_for_similarity,
+                top_n=10,
+            )
+
+            if sim_df.empty:
+                st.info("No similar players could be calculated from the current metric set.")
+            else:
+                sim_cols = [
+                    c for c in ["Display Name", "Display Team", "Display Position", "Similarity Score"]
+                    if c in sim_df.columns
+                ]
+                sim_cols = unique_preserve_order(sim_cols)
+                display_table(sim_df, sim_cols)
         else:
             st.info("No percentile metrics available for similarity comparison.")
 
@@ -782,6 +815,7 @@ st.download_button("Download Filtered Data", csv, "recruitment_data.csv", "text/
 
 # Keep a tiny visible sanity check to help debug upload issues.
 st.caption("Metric inference and duplicate-column protection are enabled.")
+
 
 
 
