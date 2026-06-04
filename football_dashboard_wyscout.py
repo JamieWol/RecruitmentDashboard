@@ -25,6 +25,11 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
+try:
+    from mplsoccer import PyPizza
+except ImportError:
+    PyPizza = None
+
 
 # --------------------------------
 # PAGE SETTINGS
@@ -229,7 +234,11 @@ def plot_radar(labels: list[str], values_list: list[list[float]], labels_list: l
 
 
 def plot_pizza_like(player: str, df: pd.DataFrame, metrics: list[str], league_avg: list[int]):
-    """A self-contained polar chart that replaces the mplsoccer pizza chart."""
+    """Render the original-style pizza chart when mplsoccer is available.
+
+    If mplsoccer is missing, fall back to a close polar approximation so the
+    app still runs in restricted environments.
+    """
 
     percentile_cols = [m + " Percentile" for m in metrics]
     player_rows = df.loc[df["__player_name__"] == player, percentile_cols]
@@ -242,6 +251,52 @@ def plot_pizza_like(player: str, df: pd.DataFrame, metrics: list[str], league_av
         st.warning("Selected player does not have the right number of percentile values.")
         return
 
+    if PyPizza is not None:
+        pizza = PyPizza(
+            params=metrics,
+            min_range=[0] * len(metrics),
+            max_range=[100] * len(metrics),
+            background_color="white",
+            straight_line_color="black",
+            straight_line_lw=1.5,
+            last_circle_color="black",
+            last_circle_lw=2,
+            other_circle_color="none",
+        )
+
+        fig, ax = pizza.make_pizza(
+            league_avg,
+            figsize=(12, 12),
+            kwargs_slices=dict(facecolor="#facc15", edgecolor="black", linewidth=2),
+            kwargs_params=dict(fontsize=9, color="white", fontweight="bold"),
+            kwargs_values=dict(
+                fontsize=8,
+                color="black",
+                bbox=dict(edgecolor="black", facecolor="#facc15", boxstyle="round,pad=0.25"),
+            ),
+        )
+
+        pizza.make_pizza(
+            player_values,
+            ax=ax,
+            kwargs_slices=dict(facecolor="#3b82f6", edgecolor="black", linewidth=2, alpha=0.9),
+            kwargs_values=dict(
+                fontsize=8,
+                color="white",
+                bbox=dict(edgecolor="black", facecolor="#3b82f6", boxstyle="round,pad=0.25"),
+            ),
+        )
+
+        ax.legend(handles=[
+            plt.Line2D([0], [0], color="#3b82f6", lw=10, label=player),
+            plt.Line2D([0], [0], color="#facc15", lw=10, label="League Average"),
+        ], loc="upper right", bbox_to_anchor=(1.15, 1.1))
+
+        st.pyplot(fig)
+        plt.close(fig)
+        return
+
+    # Fallback
     num_vars = len(metrics)
     angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
     angles += angles[:1]
