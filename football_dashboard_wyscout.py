@@ -211,6 +211,49 @@ def display_table(df: pd.DataFrame, cols: list[str]) -> None:
     st.dataframe(safe_df[cols])
 
 
+def compute_similarity_frame(df: pd.DataFrame, player_name: str, metrics: list[str], top_n: int = 10) -> pd.DataFrame:
+    """Return a similarity-ranked dataframe using Euclidean distance on numeric metrics.
+
+    The function is defensive against:
+    - object dtypes
+    - missing values
+    - rows that do not have the selected player
+    - empty metric selections
+    """
+
+    if not metrics or "Display Name" not in df.columns:
+        return pd.DataFrame()
+
+    working_cols = [c for c in ["Display Name", "Display Team", "Display Position"] if c in df.columns]
+    working_cols += [m for m in metrics if m in df.columns]
+
+    working = df[working_cols].copy()
+
+    for m in metrics:
+        if m in working.columns:
+            working[m] = pd.to_numeric(working[m], errors="coerce")
+
+    # Only keep rows where all similarity metrics are available.
+    working = working.dropna(subset=[m for m in metrics if m in working.columns]).copy()
+    if working.empty:
+        return pd.DataFrame()
+
+    player_row = working[working["Display Name"] == player_name]
+    if player_row.empty:
+        return pd.DataFrame()
+
+    metric_cols = [m for m in metrics if m in working.columns]
+    player_vector = player_row.iloc[0][metric_cols].to_numpy(dtype=float)
+    other_vectors = working[metric_cols].to_numpy(dtype=float)
+
+    # Distance computation is now guaranteed to be numeric.
+    distances = np.linalg.norm(other_vectors - player_vector, axis=1)
+    working["Similarity Score"] = 1 / (1 + distances)
+
+    working = working[working["Display Name"] != player_name].sort_values("Similarity Score", ascending=False)
+    return working.head(top_n)
+
+
 # --------------------------------
 # CHARTS
 # --------------------------------
@@ -739,6 +782,7 @@ st.download_button("Download Filtered Data", csv, "recruitment_data.csv", "text/
 
 # Keep a tiny visible sanity check to help debug upload issues.
 st.caption("Metric inference and duplicate-column protection are enabled.")
+
 
 
 
