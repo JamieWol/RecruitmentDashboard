@@ -45,7 +45,7 @@ NAME_CANDIDATES = ["Player", "Name", "player", "name", "Footballer"]
 TEAM_CANDIDATES = ["Team", "Club", "Squad", "team", "club"]
 LEAGUE_CANDIDATES = ["League", "Competition", "competition", "league"]
 POSITION_CANDIDATES = ["Position", "Primary Position", "Role", "position"]
-MINUTES_CANDIDATES = ["Minutes played", "Minutes", "mins", "Min", "minutes played"]
+MINUTES_CANDIDATES = ["Minutes played", "Minutes", "mins", "Min", "minutes played","Minutes Played"]
 AGE_CANDIDATES = ["Age", "age"]
 
 
@@ -131,7 +131,7 @@ def infer_metric_columns(df: pd.DataFrame) -> list[str]:
     exclude_exact = {
         "Player", "Name", "Team", "Club", "Squad", "League", "Competition",
         "Position", "Primary Position", "Role", "Age",
-        "Minutes played", "Minutes", "mins", "Min",
+        "Minutes played", "Minutes", "mins", "Min", "Minutes Played",
         "Contract expires", "Passport country", "Foot", "Height", "Weight",
         "Valuation", "Contract Expiry (days left)", "Woman player no", "Player no",
         "Match no", "Team no", "Season",
