@@ -1,16 +1,16 @@
 """
 Football Recruitment Dashboard (Streamlit)
 
-Important:
-- Run this file with: streamlit run football_dashboard_wyscout.py
-- This file is meant for a local Python/Streamlit environment, not for browser-side Python execution.
+Run with:
+    streamlit run football_dashboard_wyscout.py
 
-Features:
-- Works with CSV or Excel uploads
-- Auto-detects player/team/position/minutes columns
-- Infers likely performance metrics from numeric columns
-- Excludes obvious IDs/admin metadata from metric filters
-- Includes built-in tests for the metric inference logic
+Goals:
+- Accept CSV or Excel uploads
+- Auto-detect player/team/position/minutes columns
+- Infer likely football metrics from numeric columns
+- Exclude obvious admin / ID / metadata fields
+- Avoid duplicate column-name crashes in Streamlit/Arrow
+- Keep the original-style pizza chart when mplsoccer is available
 """
 
 from __future__ import annotations
@@ -59,6 +59,8 @@ class ColumnMap:
 def clean_columns(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df.columns = [str(c).strip() for c in df.columns]
+    # Prevent pyarrow / streamlit failures caused by duplicate labels coming from source files.
+    df = df.loc[:, ~df.columns.duplicated()].copy()
     return df
 
 
@@ -106,18 +108,21 @@ def safe_numeric(series: pd.Series) -> pd.Series:
     return pd.to_numeric(series, errors="coerce")
 
 
+def unique_preserve_order(items: list[str]) -> list[str]:
+    seen = set()
+    out = []
+    for item in items:
+        if item not in seen:
+            seen.add(item)
+            out.append(item)
+    return out
+
+
 # --------------------------------
 # METRIC INFERENCE
 # --------------------------------
 def infer_metric_columns(df: pd.DataFrame) -> list[str]:
-    """Infer likely football performance metrics from a dataframe.
-
-    Rules:
-    - numeric only
-    - exclude obvious admin / identity / metadata fields
-    - prefer football-stat-like names
-    - fall back to other numeric columns that look like genuine measures
-    """
+    """Infer likely football performance metrics from a dataframe."""
 
     exclude_exact = {
         "Player", "Name", "Team", "Club", "Squad", "Position", "Primary Position",
@@ -126,6 +131,7 @@ def infer_metric_columns(df: pd.DataFrame) -> list[str]:
         "Valuation", "Contract Expiry (days left)", "Woman player no", "Player no",
         "Match no", "Team no", "Season", "League", "Competition",
         "__player_name__", "__team__", "__position__", "__row_id__",
+        "Display Name", "Display Team", "Display Position",
     }
 
     exclude_keywords = [
@@ -158,19 +164,11 @@ def infer_metric_columns(df: pd.DataFrame) -> list[str]:
             metrics.append(col)
             continue
 
-        # Fallback: keep numeric columns that look like real measures, not identifiers.
         nunique = df[col].nunique(dropna=True)
         if nunique >= 5 and not re.fullmatch(r"\d+", c):
             metrics.append(col)
 
-    # Deduplicate while preserving order
-    seen = set()
-    out = []
-    for col in metrics:
-        if col not in seen:
-            seen.add(col)
-            out.append(col)
-    return out
+    return unique_preserve_order(metrics)
 
 
 # --------------------------------
@@ -200,7 +198,17 @@ def compute_league_average(df: pd.DataFrame, metrics: list[str]) -> list[int]:
 
 
 def get_show_columns(df: pd.DataFrame, cols: list[str]) -> list[str]:
-    return [c for c in cols if c in df.columns]
+    return unique_preserve_order([c for c in cols if c in df.columns])
+
+
+def display_table(df: pd.DataFrame, cols: list[str]) -> None:
+    cols = get_show_columns(df, cols)
+    if not cols:
+        st.info("No columns to display.")
+        return
+    # Extra safety: if any uploaded file still introduces duplicate labels, collapse them.
+    safe_df = df.loc[:, ~df.columns.duplicated()].copy()
+    st.dataframe(safe_df[cols])
 
 
 # --------------------------------
@@ -287,10 +295,11 @@ def plot_pizza_like(player: str, df: pd.DataFrame, metrics: list[str], league_av
             ),
         )
 
-        ax.legend(handles=[
+        legend_handles = [
             plt.Line2D([0], [0], color="#3b82f6", lw=10, label=player),
             plt.Line2D([0], [0], color="#facc15", lw=10, label="League Average"),
-        ], loc="upper right", bbox_to_anchor=(1.15, 1.1))
+        ]
+        ax.legend(handles=legend_handles, loc="upper right", bbox_to_anchor=(1.15, 1.1))
 
         st.pyplot(fig)
         plt.close(fig)
@@ -350,8 +359,6 @@ def run_self_tests():
     assert "Minutes played" not in inferred, "Expected minutes to be excluded"
     assert "Age" not in inferred, "Expected age to be excluded"
 
-    return True
-
 
 # --------------------------------
 # SIDEBAR
@@ -393,10 +400,10 @@ work["__player_name__"] = work[columns.name].astype(str)
 work["__team__"] = work[columns.team].astype(str) if columns.team else ""
 work["__position__"] = work[columns.position].astype(str) if columns.position else ""
 
-# Remove empty player rows
+# Remove empty player rows.
 work = work[work["__player_name__"].notna() & (work["__player_name__"].str.strip() != "")].copy()
 
-# Clean minutes / age if present
+# Clean minutes / age if present.
 if columns.minutes and columns.minutes in work.columns:
     work[columns.minutes] = safe_numeric(work[columns.minutes])
     work = work[work[columns.minutes].notna()].copy()
@@ -404,7 +411,7 @@ if columns.minutes and columns.minutes in work.columns:
 if columns.age and columns.age in work.columns:
     work[columns.age] = safe_numeric(work[columns.age])
 
-# Infer metrics after cleanup
+# Infer metrics after cleanup.
 all_metrics = infer_metric_columns(work)
 
 if len(all_metrics) == 0:
@@ -474,6 +481,19 @@ work["Overall Score"] = work[percentile_cols].mean(axis=1).round(0)
 work = work.sort_values("Overall Score", ascending=False).reset_index(drop=True)
 work.index += 1
 work.insert(0, "Rank", work.index)
+
+
+# --------------------------------
+# DISPLAY ALIASES
+# --------------------------------
+filtered_df = work.copy()
+filtered_df["Display Name"] = filtered_df["__player_name__"]
+filtered_df["Display Team"] = filtered_df["__team__"]
+filtered_df["Display Position"] = filtered_df["__position__"]
+filtered_df = filtered_df.loc[:, ~filtered_df.columns.duplicated()].copy()
+
+pizza_metrics = metrics
+position_metrics_map = globals().get("position_metrics_map", {})
 
 
 # --------------------------------
@@ -585,14 +605,6 @@ else:
 # --------------------------------
 # TABS
 # --------------------------------
-filtered_df = work.copy()
-filtered_df.rename(
-    columns={"__player_name__": "Name", "__position__": "Primary Position", "__team__": "Team"},
-    inplace=True,
-)
-pizza_metrics = metrics
-position_metrics_map = globals().get("position_metrics_map", {})
-
 tabs = st.tabs([
     "🏆 Shortlist Players",
     "🤝 Similar Players",
@@ -607,36 +619,37 @@ if "shortlist_log" not in st.session_state:
 with tabs[0]:
     st.subheader("🏆 Shortlist Players")
     num_shortlist = st.slider("Number of top players to show", 1, 20, 5)
-    top_players = filtered_df.head(num_shortlist)
+    top_players = filtered_df.head(num_shortlist).copy()
 
-    shortlist_cols = [c for c in ["Name", "Team", "Primary Position", "Overall Score"] if c in top_players.columns]
+    shortlist_cols = [c for c in ["Display Name", "Display Team", "Display Position", "Overall Score"] if c in top_players.columns]
     shortlist_cols += [m for m in pizza_metrics if m in top_players.columns]
-    st.dataframe(top_players[shortlist_cols])
+    shortlist_cols = unique_preserve_order(shortlist_cols)
+    display_table(top_players, shortlist_cols)
 
     st.markdown("### 🔍 Select Players to Add to Shortlist")
-    selected_players = st.multiselect("Select players by name", options=filtered_df["Name"].dropna().tolist())
+    selected_players = st.multiselect("Select players by name", options=filtered_df["Display Name"].dropna().tolist())
 
     if st.button("➕ Add Selected Players to Shortlist Log"):
         if selected_players:
-            players_to_add = filtered_df[filtered_df["Name"].isin(selected_players)][
-                [c for c in ["Name", "Team", "Primary Position", "Overall Score"] if c in filtered_df.columns]
-            ]
+            players_to_add = filtered_df[filtered_df["Display Name"].isin(selected_players)][
+                [c for c in ["Display Name", "Display Team", "Display Position", "Overall Score"] if c in filtered_df.columns]
+            ].copy()
             st.session_state.shortlist_log = pd.concat(
                 [st.session_state.shortlist_log, players_to_add],
                 ignore_index=True,
-            ).drop_duplicates(subset=["Name"]).reset_index(drop=True)
+            ).drop_duplicates(subset=["Display Name"]).reset_index(drop=True)
             st.success(f"{len(players_to_add)} players added to shortlist log.")
         else:
             st.warning("No players selected.")
 
     st.subheader("📋 Current Shortlist Log by Position")
-    if not st.session_state.shortlist_log.empty and "Primary Position" in st.session_state.shortlist_log.columns:
-        positions = sorted(st.session_state.shortlist_log["Primary Position"].dropna().unique())
-        max_rows = st.session_state.shortlist_log.groupby("Primary Position").size().max()
+    if not st.session_state.shortlist_log.empty and "Display Position" in st.session_state.shortlist_log.columns:
+        positions = sorted(st.session_state.shortlist_log["Display Position"].dropna().unique())
+        max_rows = st.session_state.shortlist_log.groupby("Display Position").size().max()
         table = pd.DataFrame(index=range(max_rows), columns=positions)
 
         for pos in positions:
-            players = st.session_state.shortlist_log[st.session_state.shortlist_log["Primary Position"] == pos]["Name"].tolist()
+            players = st.session_state.shortlist_log[st.session_state.shortlist_log["Display Position"] == pos]["Display Name"].tolist()
             for i, player in enumerate(players):
                 table.at[i, pos] = player
 
@@ -655,19 +668,20 @@ with tabs[0]:
 # --- Tab 2: Similar Players ---
 with tabs[1]:
     st.subheader("🤝 Find Similar Players")
-    selected_player_sim = st.selectbox("Select Player to Find Similar Ones", filtered_df["Name"].dropna().unique())
+    selected_player_sim = st.selectbox("Select Player to Find Similar Ones", filtered_df["Display Name"].dropna().unique())
     if selected_player_sim:
         metrics_for_similarity = [m + " Percentile" for m in pizza_metrics if m + " Percentile" in filtered_df.columns]
         if metrics_for_similarity:
-            player_vector = filtered_df.loc[filtered_df["Name"] == selected_player_sim, metrics_for_similarity].values
+            player_vector = filtered_df.loc[filtered_df["Display Name"] == selected_player_sim, metrics_for_similarity].values
             other_vectors = filtered_df[metrics_for_similarity].values
             distances = np.linalg.norm(other_vectors - player_vector, axis=1)
             sim_df = filtered_df.copy()
             sim_df["Similarity Score"] = 1 / (1 + distances)
-            sim_df = sim_df[sim_df["Name"] != selected_player_sim].sort_values("Similarity Score", ascending=False)
+            sim_df = sim_df[sim_df["Display Name"] != selected_player_sim].sort_values("Similarity Score", ascending=False)
 
-            sim_cols = [c for c in ["Name", "Team", "Primary Position", "Similarity Score"] if c in sim_df.columns]
-            st.dataframe(sim_df[sim_cols].head(10))
+            sim_cols = [c for c in ["Display Name", "Display Team", "Display Position", "Similarity Score"] if c in sim_df.columns]
+            sim_cols = unique_preserve_order(sim_cols)
+            display_table(sim_df.head(10), sim_cols)
         else:
             st.info("No percentile metrics available for similarity comparison.")
 
@@ -687,16 +701,17 @@ with tabs[2]:
         weight_values = np.array(list(weights.values()), dtype=float)
         if weight_values.sum() > 0 and weighted_cols:
             filtered_df["Custom Score"] = filtered_df[weighted_cols].values.dot(weight_values) / weight_values.sum()
-            custom_cols = [c for c in ["Name", "Team", "Primary Position", "Custom Score"] if c in filtered_df.columns]
-            st.dataframe(filtered_df[custom_cols].sort_values("Custom Score", ascending=False).head(10))
+            custom_cols = [c for c in ["Display Name", "Display Team", "Display Position", "Custom Score"] if c in filtered_df.columns]
+            custom_cols = unique_preserve_order(custom_cols)
+            display_table(filtered_df.sort_values("Custom Score", ascending=False).head(10), custom_cols)
 
 # --- Tab 4: Role Profiles ---
 with tabs[3]:
     st.subheader("📝 Role Profiles")
-    if "Primary Position" in filtered_df.columns and filtered_df["Primary Position"].notna().any():
+    if "Display Position" in filtered_df.columns and filtered_df["Display Position"].notna().any():
         selected_position_role = st.selectbox(
             "Select Position to View Role Profile",
-            sorted(filtered_df["Primary Position"].dropna().unique()),
+            sorted(filtered_df["Display Position"].dropna().unique()),
         )
         if selected_position_role:
             role_metrics = position_metrics_map.get(selected_position_role, []) if isinstance(position_metrics_map, dict) else []
@@ -721,6 +736,10 @@ if "Overall Score" not in export_df.columns and "Overall Score" in work.columns:
 
 csv = export_df.to_csv(index=False).encode("utf-8")
 st.download_button("Download Filtered Data", csv, "recruitment_data.csv", "text/csv")
+
+# Keep a tiny visible sanity check to help debug upload issues.
+st.caption("Metric inference and duplicate-column protection are enabled.")
+
 
 
 
