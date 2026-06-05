@@ -299,7 +299,7 @@ def plot_pizza_like(player: str, df: pd.DataFrame, metrics: list[str], league_av
             params=metrics,
             min_range=[0] * len(metrics),
             max_range=[100] * len(metrics),
-            background_color="white",
+            background_color="#eaf4ff",
             straight_line_color="black",
             straight_line_lw=1.5,
             last_circle_color="black",
