@@ -304,7 +304,7 @@ def plot_pizza_like(player: str, df: pd.DataFrame, metrics: list[str], league_av
             straight_line_lw=1.5,
             last_circle_color="black",
             last_circle_lw=2,
-            other_circle_color="#none",
+            other_circle_color="none",
         )
 
         fig, ax = pizza.make_pizza(
