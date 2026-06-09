@@ -702,7 +702,7 @@ if player_list:
         "Select Player",
         player_list,
         index=player_list.index(selected_player_default) if selected_player_default in player_list else 0,
-        key="active_player",
+        key="active_player_selector",
     )
     st.session_state["active_player"] = selected_player
     active_player = selected_player
@@ -959,6 +959,7 @@ csv = export_df.to_csv(index=False).encode("utf-8")
 st.download_button("Download Filtered Data", csv, "recruitment_data.csv", "text/csv")
 
 st.caption("Metric inference, duplicate-column protection, league filtering, and Transfermarkt links are enabled.")
+
 
 
 
