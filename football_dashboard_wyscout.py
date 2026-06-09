@@ -126,10 +126,8 @@ def unique_preserve_order(items: list[str]) -> list[str]:
     return out
 
 
-def make_transfermarkt_url(player_name: str, team_name: str | None = None) -> str:
+def make_transfermarkt_url(player_name: str) -> str:
     query = player_name.strip()
-    if team_name:
-        query = f"{query} {team_name.strip()}"
     return f"https://www.transfermarkt.com/schnellsuche/ergebnis/schnellsuche?query={quote_plus(query)}"
 
 
@@ -161,13 +159,7 @@ def build_rank_view(
     if tm_url_col:
         view["Transfermarkt Link"] = view[tm_url_col].astype(str)
     elif "Display Name" in view.columns:
-        if "Display Team" in view.columns:
-            view["Transfermarkt Link"] = [
-                make_transfermarkt_url(n, t)
-                for n, t in zip(view["Display Name"].astype(str), view["Display Team"].astype(str))
-            ]
-        else:
-            view["Transfermarkt Link"] = [make_transfermarkt_url(n) for n in view["Display Name"].astype(str)]
+        view["Transfermarkt Link"] = [make_transfermarkt_url(n) for n in view["Display Name"].astype(str)]
 
     return view.loc[:, ~view.columns.duplicated()].copy()
 
@@ -599,8 +591,8 @@ position_metrics_map = globals().get("position_metrics_map", {})
 
 rank_view = build_rank_view(work, columns.name, columns.team, columns.league, columns.position)
 rank_view["Transfermarkt Link"] = [
-    make_transfermarkt_url(n, t)
-    for n, t in zip(rank_view["Display Name"].astype(str), rank_view["Display Team"].astype(str) if "Display Team" in rank_view.columns else [""] * len(rank_view))
+    make_transfermarkt_url(n)
+    for n in rank_view["Display Name"].astype(str)
 ]
 
 # Use the clicked player everywhere.
@@ -924,6 +916,7 @@ csv = export_df.to_csv(index=False).encode("utf-8")
 st.download_button("Download Filtered Data", csv, "recruitment_data.csv", "text/csv")
 
 st.caption("Metric inference, duplicate-column protection, league filtering, row-click selection, and Transfermarkt links are enabled.")
+
 
 
 
