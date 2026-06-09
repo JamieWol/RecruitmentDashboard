@@ -10,8 +10,8 @@ Features:
 - Infer likely football metrics from numeric columns
 - Exclude obvious admin / ID / metadata fields
 - League filter when multiple leagues are uploaded
-- Click a row in the ranking table to drive the rest of the app
-- Transfermarkt links per player
+- Select a player to drive the rest of the app
+- Transfermarkt links based on the player's full name
 - Original-style pizza chart when mplsoccer is available
 - White pizza-chart background, as requested
 """
@@ -149,7 +149,6 @@ def build_rank_view(
     if position_col and position_col in view.columns:
         view["Display Position"] = view[position_col].astype(str)
 
-    # Use a direct URL if the file already contains one, otherwise build a Transfermarkt search link.
     tm_url_col = None
     for candidate in ["Transfermarkt URL", "Transfermarkt", "TM URL", "tm_url", "Transfermarkt Link"]:
         if candidate in view.columns:
@@ -160,6 +159,10 @@ def build_rank_view(
         view["Transfermarkt Link"] = view[tm_url_col].astype(str)
     elif "Display Name" in view.columns:
         view["Transfermarkt Link"] = [make_transfermarkt_url(n) for n in view["Display Name"].astype(str)]
+
+    # Optional HTML-like clickable name, useful when you want the name itself to act as a link.
+    if "Display Name" in view.columns:
+        view["Player Link"] = [f"[{n}]({make_transfermarkt_url(n)})" for n in view["Display Name"].astype(str)]
 
     return view.loc[:, ~view.columns.duplicated()].copy()
 
@@ -179,6 +182,7 @@ def infer_metric_columns(df: pd.DataFrame) -> list[str]:
         "Match no", "Team no", "Season", "Appearances", "90s Played", "Starting Appearances",
         "__player_name__", "__team__", "__league__", "__position__", "__row_id__",
         "Display Name", "Display Team", "Display League", "Display Position",
+        "Player Link", "Transfermarkt Link",
     }
 
     exclude_keywords = [
@@ -331,7 +335,6 @@ def plot_pizza_like(player: str, df: pd.DataFrame, metrics: list[str], league_av
         return
 
     if PyPizza is not None:
-        # White pizza chart background, as requested.
         pizza = PyPizza(
             params=metrics,
             min_range=[0] * len(metrics),
@@ -376,7 +379,6 @@ def plot_pizza_like(player: str, df: pd.DataFrame, metrics: list[str], league_av
         plt.close(fig)
         return
 
-    # Fallback if mplsoccer is missing.
     num_vars = len(metrics)
     angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
     angles += angles[:1]
@@ -498,6 +500,19 @@ if columns.league and columns.league in work.columns:
         if selected_league != "All leagues":
             work = work[work[columns.league].astype(str) == selected_league].copy()
 
+# Position / team filters to help browsing large uploads.
+if columns.team and columns.team in work.columns:
+    team_values = sorted(work[columns.team].dropna().astype(str).unique().tolist())
+    if len(team_values) > 1:
+        selected_teams = st.sidebar.multiselect("Team", team_values, default=team_values)
+        work = work[work[columns.team].astype(str).isin(selected_teams)].copy()
+
+if columns.position and columns.position in work.columns:
+    position_values = sorted(work[columns.position].dropna().astype(str).unique().tolist())
+    if len(position_values) > 1:
+        selected_positions = st.sidebar.multiselect("Position", position_values, default=position_values)
+        work = work[work[columns.position].astype(str).isin(selected_positions)].copy()
+
 # Clean minutes / age if present.
 if columns.minutes and columns.minutes in work.columns:
     work[columns.minutes] = safe_numeric(work[columns.minutes])
@@ -590,15 +605,12 @@ pizza_metrics = metrics
 position_metrics_map = globals().get("position_metrics_map", {})
 
 rank_view = build_rank_view(work, columns.name, columns.team, columns.league, columns.position)
-rank_view["Transfermarkt Link"] = [
-    make_transfermarkt_url(n)
-    for n in rank_view["Display Name"].astype(str)
-]
+rank_view["Transfermarkt Link"] = [make_transfermarkt_url(n) for n in rank_view["Display Name"].astype(str)]
 
-# Use the clicked player everywhere.
-if "selected_player" not in st.session_state and len(rank_view) > 0:
-    st.session_state["selected_player"] = rank_view.iloc[0]["Display Name"]
-active_player = st.session_state.get("selected_player")
+# Use the selected player everywhere.
+if "active_player" not in st.session_state and len(rank_view) > 0:
+    st.session_state["active_player"] = rank_view.iloc[0]["Display Name"]
+active_player = st.session_state.get("active_player")
 
 
 # --------------------------------
@@ -611,15 +623,6 @@ c1.metric("Players", f"{len(work)}")
 c2.metric("Metrics", f"{len(metrics)}")
 c3.metric("Top Score", f"{int(work['Overall Score'].max()) if len(work) else 0}")
 
-if active_player and active_player in rank_view["Display Name"].tolist():
-    player_card = rank_view[rank_view["Display Name"] == active_player].iloc[0]
-    st.subheader("Selected Player")
-    pc1, pc2, pc3, pc4 = st.columns(4)
-    pc1.metric("Player", str(player_card.get("Display Name", "-")))
-    pc2.metric("Team", str(player_card.get("Display Team", "-")))
-    pc3.metric("League", str(player_card.get("Display League", "-")))
-    pc4.metric("Overall Score", f"{int(player_card.get('Overall Score', 0))}")
-
 st.subheader("🏅 Player Ranking")
 show_cols = ["Rank", "Display Name", "Display Team", "Display League", "Display Position"]
 for maybe_col in [columns.age, columns.minutes]:
@@ -631,8 +634,10 @@ for optional_col in ["Valuation", "Contract Expiry (days left)"]:
 show_cols.append("Overall Score")
 show_cols.extend(metrics)
 show_cols.append("Transfermarkt Link")
+show_cols.append("Player Link")
 show_cols = get_show_columns(rank_view, show_cols)
 
+# Row selection is optional. If selection works in the user’s Streamlit version, it updates the active player.
 selected_from_table = None
 try:
     rank_event = st.dataframe(
@@ -643,6 +648,7 @@ try:
         selection_mode="single-row",
         column_config={
             "Transfermarkt Link": st.column_config.LinkColumn("Transfermarkt Link"),
+            "Player Link": st.column_config.LinkColumn("Player Link"),
         },
     )
     if getattr(rank_event, "selection", None) and getattr(rank_event.selection, "rows", None):
@@ -650,13 +656,20 @@ try:
         if 0 <= row_idx < len(rank_view):
             selected_from_table = rank_view.iloc[row_idx]["Display Name"]
 except Exception:
-    st.dataframe(rank_view[show_cols], use_container_width=True)
+    st.dataframe(
+        rank_view[show_cols],
+        use_container_width=True,
+        column_config={
+            "Transfermarkt Link": st.column_config.LinkColumn("Transfermarkt Link"),
+            "Player Link": st.column_config.LinkColumn("Player Link"),
+        },
+    )
 
 if selected_from_table:
-    st.session_state["selected_player"] = selected_from_table
+    st.session_state["active_player"] = selected_from_table
     active_player = selected_from_table
 
-st.caption("Click a row in the ranking table to update the charts below.")
+st.caption("Use the player selector below to drive the charts. The links columns open Transfermarkt searches by full name.")
 
 
 # --------------------------------
@@ -679,18 +692,18 @@ st.dataframe(pd.DataFrame(top_players), use_container_width=True)
 # --------------------------------
 st.subheader("📊 Pizza Chart")
 player_list = work["__player_name__"].tolist()
-selected_player_default = st.session_state.get("selected_player", player_list[0] if player_list else None)
+selected_player_default = st.session_state.get("active_player", player_list[0] if player_list else None)
 if selected_player_default not in player_list and player_list:
     selected_player_default = player_list[0]
 
 if player_list:
     selected_player = st.selectbox(
-        "Select Player",
+        "Selected Player",
         player_list,
         index=player_list.index(selected_player_default) if selected_player_default in player_list else 0,
-        key="selected_player_selectbox",
+        key="active_player_selectbox",
     )
-    st.session_state["selected_player"] = selected_player
+    st.session_state["active_player"] = selected_player
     active_player = selected_player
     plot_pizza_like(selected_player, work, metrics, league_avg)
 else:
@@ -915,7 +928,8 @@ if "Overall Score" not in export_df.columns and "Overall Score" in work.columns:
 csv = export_df.to_csv(index=False).encode("utf-8")
 st.download_button("Download Filtered Data", csv, "recruitment_data.csv", "text/csv")
 
-st.caption("Metric inference, duplicate-column protection, league filtering, row-click selection, and Transfermarkt links are enabled.")
+st.caption("Metric inference, duplicate-column protection, league filtering, and Transfermarkt links are enabled.")
+
 
 
 
