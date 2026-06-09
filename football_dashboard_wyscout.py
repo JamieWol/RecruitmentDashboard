@@ -308,7 +308,13 @@ def percentile_style_table(df: pd.DataFrame, cols: list[str]) -> pd.io.formats.s
     styled = df[cols].style
     percentile_cols = [c for c in cols if c.endswith(" Percentile") or c == "Overall Score"]
     if percentile_cols:
-        styled = styled.applymap(color_value, subset=percentile_cols)
+        if hasattr(styled, "map"):
+            styled = styled.map(color_value, subset=percentile_cols)
+        else:
+            try:
+                styled = styled.applymap(color_value, subset=percentile_cols)
+            except Exception:
+                pass
     return styled
 
 
@@ -1059,6 +1065,7 @@ csv = export_df.to_csv(index=False).encode("utf-8")
 st.download_button("Download Filtered Data", csv, "recruitment_data.csv", "text/csv")
 
 st.caption("Metric inference, duplicate-column protection, league filtering, and Transfermarkt links are enabled.")
+
 
 
 
