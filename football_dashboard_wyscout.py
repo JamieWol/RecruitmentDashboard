@@ -10,10 +10,13 @@ Features:
 - Infer likely football metrics from numeric columns
 - Exclude obvious admin / ID / metadata fields
 - League filter when multiple leagues are uploaded
+- Team and position filters
+- Market opportunity filter (age < 25, contract expiry < 12 months, top score band)
 - Selected player from the ranking table drives the charts and tabs
 - Transfermarkt links based on the player's full name
 - Original-style pizza chart when mplsoccer is available
 - White pizza-chart background
+- Percentile colour coding in the ranking table
 """
 
 from __future__ import annotations
@@ -58,6 +61,18 @@ MINUTES_CANDIDATES = [
     "Minutes (Last 2 years)",
 ]
 AGE_CANDIDATES = ["Age", "age"]
+CONTRACT_DAYS_CANDIDATES = [
+    "Contract Expiry (days left)",
+    "Contract expiry (days left)",
+    "Contract days left",
+    "Days left on contract",
+]
+CONTRACT_DATE_CANDIDATES = [
+    "Contract expires",
+    "Contract Expiry",
+    "Contract end",
+    "Expiry",
+]
 
 
 @dataclass
@@ -68,6 +83,8 @@ class ColumnMap:
     position: Optional[str] = None
     minutes: Optional[str] = None
     age: Optional[str] = None
+    contract_days: Optional[str] = None
+    contract_date: Optional[str] = None
 
 
 # --------------------------------
@@ -117,6 +134,8 @@ def detect_columns(df: pd.DataFrame) -> ColumnMap:
         position=find_first_existing(df, POSITION_CANDIDATES),
         minutes=find_first_existing(df, MINUTES_CANDIDATES),
         age=find_first_existing(df, AGE_CANDIDATES),
+        contract_days=find_first_existing(df, CONTRACT_DAYS_CANDIDATES),
+        contract_date=find_first_existing(df, CONTRACT_DATE_CANDIDATES),
     )
 
 
@@ -263,6 +282,34 @@ def display_table(df: pd.DataFrame, cols: list[str]) -> None:
         return
     safe_df = df.loc[:, ~df.columns.duplicated()].copy()
     st.dataframe(safe_df[cols], use_container_width=True)
+
+
+def percentile_style_table(df: pd.DataFrame, cols: list[str]) -> pd.io.formats.style.Styler:
+    palette = [
+        (90, "#d1fae5"),
+        (70, "#dcfce7"),
+        (50, "#fef08a"),
+        (30, "#fdba74"),
+        (0, "#fecaca"),
+    ]
+
+    def color_value(v):
+        try:
+            if pd.isna(v):
+                return ""
+            v = float(v)
+        except Exception:
+            return ""
+        for threshold, color in palette:
+            if v >= threshold:
+                return f"background-color: {color};"
+        return ""
+
+    styled = df[cols].style
+    percentile_cols = [c for c in cols if c.endswith(" Percentile") or c == "Overall Score"]
+    if percentile_cols:
+        styled = styled.applymap(color_value, subset=percentile_cols)
+    return styled
 
 
 def compute_similarity_frame(df: pd.DataFrame, player_name: str, metrics: list[str], top_n: int = 10) -> pd.DataFrame:
@@ -427,6 +474,7 @@ def run_self_tests():
             "Woman player no": [1, 2],
             "shirt_number": [9, 10],
             "Age": [21, 24],
+            "Contract Expiry (days left)": [120, 300],
         }
     )
     sample = clean_columns(sample)
@@ -440,6 +488,7 @@ def run_self_tests():
 
     cols = detect_columns(sample)
     assert cols.league == "League", "Expected League column to be detected"
+    assert cols.contract_days == "Contract Expiry (days left)", "Expected contract days column to be detected"
 
     sim_sample = pd.DataFrame(
         {
@@ -513,13 +562,16 @@ if columns.position and columns.position in work.columns:
         selected_positions = st.sidebar.multiselect("Position", position_values, default=position_values)
         work = work[work[columns.position].astype(str).isin(selected_positions)].copy()
 
-# Clean minutes / age if present.
+# Clean minutes / age / contract if present.
 if columns.minutes and columns.minutes in work.columns:
     work[columns.minutes] = safe_numeric(work[columns.minutes])
     work = work[work[columns.minutes].notna()].copy()
 
 if columns.age and columns.age in work.columns:
     work[columns.age] = safe_numeric(work[columns.age])
+
+if columns.contract_days and columns.contract_days in work.columns:
+    work[columns.contract_days] = safe_numeric(work[columns.contract_days])
 
 all_metrics = infer_metric_columns(work)
 if len(all_metrics) == 0:
@@ -545,6 +597,34 @@ if columns.age and columns.age in work.columns and work[columns.age].notna().any
     max_age = int(work[columns.age].max())
     age_range = st.sidebar.slider("Age", min_age, max_age, (min_age, max_age))
     work = work[work[columns.age].between(age_range[0], age_range[1])].copy()
+
+# Market opportunity filter
+market_mode = st.sidebar.checkbox("Market opportunity filter", value=False)
+if market_mode:
+    age_ok = True
+    contract_ok = True
+    score_ok = True
+
+    if columns.age and columns.age in work.columns and work[columns.age].notna().any():
+        age_ok = work[columns.age] < 25
+    else:
+        age_ok = pd.Series(True, index=work.index)
+
+    if columns.contract_days and columns.contract_days in work.columns and work[columns.contract_days].notna().any():
+        contract_ok = work[columns.contract_days] < 365
+    elif columns.contract_date and columns.contract_date in work.columns:
+        contract_ok = pd.to_datetime(work[columns.contract_date], errors="coerce").notna()
+    else:
+        contract_ok = pd.Series(True, index=work.index)
+
+    # Top 20% by overall score will be applied once ranking exists.
+    # For now, compute a temporary score later after metrics are selected.
+    work = work.copy()
+    work["__market_filter_age_ok__"] = age_ok if isinstance(age_ok, pd.Series) else pd.Series(age_ok, index=work.index)
+    work["__market_filter_contract_ok__"] = contract_ok if isinstance(contract_ok, pd.Series) else pd.Series(contract_ok, index=work.index)
+else:
+    work["__market_filter_age_ok__"] = True
+    work["__market_filter_contract_ok__"] = True
 
 
 # --------------------------------
@@ -593,6 +673,19 @@ league_avg = compute_league_average(work, metrics)
 # PLAYER RANKING
 # --------------------------------
 work["Overall Score"] = work[percentile_cols].mean(axis=1).round(0)
+
+# Apply market opportunity filter score threshold if requested.
+if market_mode and len(work) > 0:
+    score_threshold = work["Overall Score"].quantile(0.80)
+    work = work[
+        work["__market_filter_age_ok__"]
+        & work["__market_filter_contract_ok__"]
+        & (work["Overall Score"] >= score_threshold)
+    ].copy()
+    # Recompute after filtering.
+    if len(work) > 0:
+        work["Overall Score"] = work[percentile_cols].mean(axis=1).round(0)
+
 work = work.sort_values("Overall Score", ascending=False).reset_index(drop=True)
 work.index += 1
 work.insert(0, "Rank", work.index)
@@ -631,8 +724,16 @@ c2.metric("Metrics", f"{len(metrics)}")
 c3.metric("Top Score", f"{int(work['Overall Score'].max()) if len(work) else 0}")
 
 st.subheader("🏅 Player Ranking")
+player_search = st.text_input("Search player", value="", placeholder="Type a player name")
+
+rank_view_display = rank_view.copy()
+if player_search.strip():
+    rank_view_display = rank_view_display[
+        rank_view_display["Display Name"].astype(str).str.contains(player_search.strip(), case=False, na=False)
+    ].copy()
+
 show_cols = ["Rank", "Display Name", "Display Team", "Display League", "Display Position"]
-for maybe_col in [columns.age, columns.minutes]:
+for maybe_col in [columns.age, columns.minutes, columns.contract_days, columns.contract_date]:
     if maybe_col:
         show_cols.append(maybe_col)
 for optional_col in ["Valuation", "Contract Expiry (days left)"]:
@@ -641,39 +742,38 @@ for optional_col in ["Valuation", "Contract Expiry (days left)"]:
 show_cols.append("Overall Score")
 show_cols.extend(metrics)
 show_cols.append("Transfermarkt Link")
-show_cols = get_show_columns(rank_view, show_cols)
+show_cols = get_show_columns(rank_view_display, show_cols)
 
-# Ranking table selection drives the active player.
-selected_from_table = None
-try:
-    rank_event = st.dataframe(
-        rank_view[show_cols],
-        use_container_width=True,
-        key="rank_table",
-        on_select="rerun",
-        selection_mode="single-row",
-        column_config={
-            "Transfermarkt Link": st.column_config.LinkColumn("Transfermarkt Link"),
-        },
+# Ranking table
+styled_rank = percentile_style_table(rank_view_display, show_cols)
+st.dataframe(
+    styled_rank,
+    use_container_width=True,
+    column_config={
+        "Transfermarkt Link": st.column_config.LinkColumn("Transfermarkt Link"),
+    },
+)
+
+if player_search.strip() and len(rank_view_display) == 0:
+    st.info("No players match that search.")
+
+# Player selection from the ranking area.
+player_options = rank_view["Display Name"].dropna().tolist()
+if player_options:
+    default_player = st.session_state.get("active_player", player_options[0])
+    if default_player not in player_options:
+        default_player = player_options[0]
+
+    active_player = st.selectbox(
+        "Choose player for charts",
+        player_options,
+        index=player_options.index(default_player),
+        key="active_player_selector",
     )
-    if getattr(rank_event, "selection", None) and getattr(rank_event.selection, "rows", None):
-        row_idx = rank_event.selection.rows[0]
-        if 0 <= row_idx < len(rank_view):
-            selected_from_table = rank_view.iloc[row_idx]["Display Name"]
-except Exception:
-    st.dataframe(
-        rank_view[show_cols],
-        use_container_width=True,
-        column_config={
-            "Transfermarkt Link": st.column_config.LinkColumn("Transfermarkt Link"),
-        },
-    )
-
-if selected_from_table:
-    st.session_state["active_player"] = selected_from_table
-    active_player = selected_from_table
-
-st.caption("Click a player row in the ranking table. The Transfermarkt column opens searches by full name.")
+    st.session_state["active_player"] = active_player
+    st.caption("The selected player below drives the pizza chart, comparison, similarity, and role profile tabs.")
+else:
+    st.info("No players available in the current filtered set.")
 
 
 # --------------------------------
@@ -705,7 +805,7 @@ if player_list:
         "Select Player",
         player_list,
         index=player_list.index(selected_player_default) if selected_player_default in player_list else 0,
-        key="active_player_selector",
+        key="active_player_selector_pizza",
     )
     st.session_state["active_player"] = selected_player
     active_player = selected_player
@@ -959,6 +1059,7 @@ csv = export_df.to_csv(index=False).encode("utf-8")
 st.download_button("Download Filtered Data", csv, "recruitment_data.csv", "text/csv")
 
 st.caption("Metric inference, duplicate-column protection, league filtering, and Transfermarkt links are enabled.")
+
 
 
 
