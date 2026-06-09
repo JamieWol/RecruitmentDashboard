@@ -10,10 +10,10 @@ Features:
 - Infer likely football metrics from numeric columns
 - Exclude obvious admin / ID / metadata fields
 - League filter when multiple leagues are uploaded
-- Select a player to drive the rest of the app
+- Selected player drives the charts and tabs
 - Transfermarkt links based on the player's full name
 - Original-style pizza chart when mplsoccer is available
-- White pizza-chart background, as requested
+- White pizza-chart background
 """
 
 from __future__ import annotations
@@ -48,7 +48,15 @@ NAME_CANDIDATES = ["Player", "Name", "player", "name", "Footballer"]
 TEAM_CANDIDATES = ["Team", "Club", "Squad", "team", "club", "Current Team"]
 LEAGUE_CANDIDATES = ["League", "Competition", "competition", "league"]
 POSITION_CANDIDATES = ["Position", "Primary Position", "Role", "position"]
-MINUTES_CANDIDATES = ["Minutes played", "Minutes", "mins", "Min", "minutes played", "Minutes Played", "Minutes (Last 2 years)"]
+MINUTES_CANDIDATES = [
+    "Minutes played",
+    "Minutes",
+    "mins",
+    "Min",
+    "minutes played",
+    "Minutes Played",
+    "Minutes (Last 2 years)",
+]
 AGE_CANDIDATES = ["Age", "age"]
 
 
@@ -160,10 +168,6 @@ def build_rank_view(
     elif "Display Name" in view.columns:
         view["Transfermarkt Link"] = [make_transfermarkt_url(n) for n in view["Display Name"].astype(str)]
 
-    # Optional HTML-like clickable name, useful when you want the name itself to act as a link.
-    if "Display Name" in view.columns:
-        view["Player Link"] = [f"[{n}]({make_transfermarkt_url(n)})" for n in view["Display Name"].astype(str)]
-
     return view.loc[:, ~view.columns.duplicated()].copy()
 
 
@@ -182,7 +186,7 @@ def infer_metric_columns(df: pd.DataFrame) -> list[str]:
         "Match no", "Team no", "Season", "Appearances", "90s Played", "Starting Appearances",
         "__player_name__", "__team__", "__league__", "__position__", "__row_id__",
         "Display Name", "Display Team", "Display League", "Display Position",
-        "Player Link", "Transfermarkt Link",
+        "Transfermarkt Link",
     }
 
     exclude_keywords = [
@@ -634,42 +638,18 @@ for optional_col in ["Valuation", "Contract Expiry (days left)"]:
 show_cols.append("Overall Score")
 show_cols.extend(metrics)
 show_cols.append("Transfermarkt Link")
-show_cols.append("Player Link")
 show_cols = get_show_columns(rank_view, show_cols)
 
-# Row selection is optional. If selection works in the user’s Streamlit version, it updates the active player.
-selected_from_table = None
-try:
-    rank_event = st.dataframe(
-        rank_view[show_cols],
-        use_container_width=True,
-        key="rank_table",
-        on_select="rerun",
-        selection_mode="single-row",
-        column_config={
-            "Transfermarkt Link": st.column_config.LinkColumn("Transfermarkt Link"),
-            "Player Link": st.column_config.LinkColumn("Player Link"),
-        },
-    )
-    if getattr(rank_event, "selection", None) and getattr(rank_event.selection, "rows", None):
-        row_idx = rank_event.selection.rows[0]
-        if 0 <= row_idx < len(rank_view):
-            selected_from_table = rank_view.iloc[row_idx]["Display Name"]
-except Exception:
-    st.dataframe(
-        rank_view[show_cols],
-        use_container_width=True,
-        column_config={
-            "Transfermarkt Link": st.column_config.LinkColumn("Transfermarkt Link"),
-            "Player Link": st.column_config.LinkColumn("Player Link"),
-        },
-    )
+# Table is display-only; the player selector below is the reliable control.
+st.dataframe(
+    rank_view[show_cols],
+    use_container_width=True,
+    column_config={
+        "Transfermarkt Link": st.column_config.LinkColumn("Transfermarkt Link"),
+    },
+)
 
-if selected_from_table:
-    st.session_state["active_player"] = selected_from_table
-    active_player = selected_from_table
-
-st.caption("Use the player selector below to drive the charts. The links columns open Transfermarkt searches by full name.")
+st.caption("Use the player selector below to drive the charts. The Transfermarkt column opens searches by full name.")
 
 
 # --------------------------------
@@ -688,9 +668,9 @@ st.dataframe(pd.DataFrame(top_players), use_container_width=True)
 
 
 # --------------------------------
-# CHARTS
+# PLAYER SELECTOR + CHARTS
 # --------------------------------
-st.subheader("📊 Pizza Chart")
+st.subheader("🎯 Selected Player")
 player_list = work["__player_name__"].tolist()
 selected_player_default = st.session_state.get("active_player", player_list[0] if player_list else None)
 if selected_player_default not in player_list and player_list:
@@ -705,9 +685,12 @@ if player_list:
     )
     st.session_state["active_player"] = selected_player
     active_player = selected_player
-    plot_pizza_like(selected_player, work, metrics, league_avg)
 else:
     st.info("No players available in the current filtered set.")
+
+st.subheader("📊 Pizza Chart")
+if active_player:
+    plot_pizza_like(active_player, work, metrics, league_avg)
 
 st.subheader("📈 Player Comparison")
 p1_default = active_player if active_player in player_list else (player_list[0] if player_list else None)
@@ -929,6 +912,7 @@ csv = export_df.to_csv(index=False).encode("utf-8")
 st.download_button("Download Filtered Data", csv, "recruitment_data.csv", "text/csv")
 
 st.caption("Metric inference, duplicate-column protection, league filtering, and Transfermarkt links are enabled.")
+
 
 
 
