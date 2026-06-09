@@ -149,7 +149,7 @@ def infer_metric_columns(df: pd.DataFrame) -> list[str]:
     include_keywords = [
         "xg", "xa", "shot", "pass", "carry", "dribble", "duel", "tackle",
         "interception", "press", "clearance", "block", "progressive", "touch",
-        "cross", "chance", "key", "goal", "Goal", "p90", "assist", "recover", "foul",
+        "cross", "chance", "key", "goal", "Goal", "p90", "(non-penalty)", "assist", "recover", "foul",
         "save", "action", "possession", "turnover", "expected", "Expected", "build",
         "final third", "penalty", "chance created", "box", "aerial",
     ]
