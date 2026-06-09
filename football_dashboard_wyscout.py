@@ -42,10 +42,10 @@ st.set_page_config(page_title="Football Recruitment Dashboard", layout="wide")
 # COLUMN DETECTION
 # --------------------------------
 NAME_CANDIDATES = ["Player", "Name", "player", "name", "Footballer"]
-TEAM_CANDIDATES = ["Team", "Club", "Squad", "team", "club"]
+TEAM_CANDIDATES = ["Team", "Club", "Squad", "team", "club", "Current Team"]
 LEAGUE_CANDIDATES = ["League", "Competition", "competition", "league"]
 POSITION_CANDIDATES = ["Position", "Primary Position", "Role", "position"]
-MINUTES_CANDIDATES = ["Minutes played", "Minutes", "mins", "Min", "minutes played","Minutes Played"]
+MINUTES_CANDIDATES = ["Minutes played", "Minutes", "mins", "Min", "minutes played","Minutes Played", "Minutes (Last 2 years)"]
 AGE_CANDIDATES = ["Age", "age"]
 
 
@@ -149,8 +149,8 @@ def infer_metric_columns(df: pd.DataFrame) -> list[str]:
     include_keywords = [
         "xg", "xa", "shot", "pass", "carry", "dribble", "duel", "tackle",
         "interception", "press", "clearance", "block", "progressive", "touch",
-        "cross", "chance", "key", "goal", "assist", "recover", "foul",
-        "save", "action", "possession", "turnover", "expected", "build",
+        "cross", "chance", "key", "goal", "Goal", "p90", "assist", "recover", "foul",
+        "save", "action", "possession", "turnover", "expected", "Expected", "build",
         "final third", "penalty", "chance created", "box", "aerial",
     ]
 
