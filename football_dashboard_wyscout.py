@@ -10,7 +10,7 @@ Features:
 - Infer likely football metrics from numeric columns
 - Exclude obvious admin / ID / metadata fields
 - League filter when multiple leagues are uploaded
-- Selected player drives the charts and tabs
+- Selected player from the ranking table drives the charts and tabs
 - Transfermarkt links based on the player's full name
 - Original-style pizza chart when mplsoccer is available
 - White pizza-chart background
@@ -358,6 +358,7 @@ def plot_pizza_like(player: str, df: pd.DataFrame, metrics: list[str], league_av
             kwargs_params=dict(fontsize=9, color="white", fontweight="bold"),
             kwargs_values=dict(
                 fontsize=11,
+                fontweight="bold",
                 color="black",
                 bbox=dict(edgecolor="black", facecolor="#facc15", boxstyle="round,pad=0.25"),
             ),
@@ -369,6 +370,7 @@ def plot_pizza_like(player: str, df: pd.DataFrame, metrics: list[str], league_av
             kwargs_slices=dict(facecolor="#3b82f6", edgecolor="black", linewidth=2, alpha=0.9),
             kwargs_values=dict(
                 fontsize=11,
+                fontweight="bold",
                 color="white",
                 bbox=dict(edgecolor="black", facecolor="#3b82f6", boxstyle="round,pad=0.25"),
             ),
@@ -641,21 +643,7 @@ show_cols.extend(metrics)
 show_cols.append("Transfermarkt Link")
 show_cols = get_show_columns(rank_view, show_cols)
 
-# Ranking controls: a reliable selector plus optional table selection.
-player_options = rank_view["Display Name"].dropna().tolist()
-if player_options:
-    rank_selector_default = st.session_state.get("active_player", player_options[0])
-    if rank_selector_default not in player_options:
-        rank_selector_default = player_options[0]
-    selected_from_selector = st.selectbox(
-        "Selected Player",
-        player_options,
-        index=player_options.index(rank_selector_default),
-        key="rank_player_selector",
-    )
-    st.session_state["active_player"] = selected_from_selector
-    active_player = selected_from_selector
-
+# Ranking table selection drives the active player.
 selected_from_table = None
 try:
     rank_event = st.dataframe(
@@ -685,7 +673,7 @@ if selected_from_table:
     st.session_state["active_player"] = selected_from_table
     active_player = selected_from_table
 
-st.caption("Choose a player from the selector above or click a row in the ranking table. The Transfermarkt column opens searches by full name.")
+st.caption("Click a player row in the ranking table. The Transfermarkt column opens searches by full name.")
 
 
 # --------------------------------
@@ -704,13 +692,14 @@ st.dataframe(pd.DataFrame(top_players), use_container_width=True)
 
 
 # --------------------------------
-# PLAYER SELECTOR + CHARTS
+# CHARTS
 # --------------------------------
 player_list = work["__player_name__"].tolist()
 selected_player_default = st.session_state.get("active_player", player_list[0] if player_list else None)
 if selected_player_default not in player_list and player_list:
     selected_player_default = player_list[0]
 
+st.subheader("📊 Pizza Chart")
 if player_list:
     selected_player = st.selectbox(
         "Select Player",
@@ -720,12 +709,9 @@ if player_list:
     )
     st.session_state["active_player"] = selected_player
     active_player = selected_player
+    plot_pizza_like(active_player, work, metrics, league_avg)
 else:
     st.info("No players available in the current filtered set.")
-
-st.subheader("📊 Pizza Chart")
-if active_player:
-    plot_pizza_like(active_player, work, metrics, league_avg)
 
 st.subheader("📈 Player Comparison")
 p1_default = active_player if active_player in player_list else (player_list[0] if player_list else None)
@@ -785,7 +771,7 @@ if len(two_metrics) == 2:
     ax.set_title("Player Scatter Graph")
     ax.grid(False)
 
-        # Quadrant labels: even closer to the guide lines, centered inside each quadrant.
+    # Quadrant labels: centered, inside the chart, very close to the guide lines.
     def quad_label(x: float, y: float, text: str, color: str) -> None:
         ax.text(
             x,
@@ -973,6 +959,7 @@ csv = export_df.to_csv(index=False).encode("utf-8")
 st.download_button("Download Filtered Data", csv, "recruitment_data.csv", "text/csv")
 
 st.caption("Metric inference, duplicate-column protection, league filtering, and Transfermarkt links are enabled.")
+
 
 
 
