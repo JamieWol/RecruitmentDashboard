@@ -357,7 +357,7 @@ def plot_pizza_like(player: str, df: pd.DataFrame, metrics: list[str], league_av
             kwargs_slices=dict(facecolor="#facc15", edgecolor="black", linewidth=2),
             kwargs_params=dict(fontsize=9, color="white", fontweight="bold"),
             kwargs_values=dict(
-                fontsize=8,
+                fontsize=11,
                 color="black",
                 bbox=dict(edgecolor="black", facecolor="#facc15", boxstyle="round,pad=0.25"),
             ),
@@ -368,7 +368,7 @@ def plot_pizza_like(player: str, df: pd.DataFrame, metrics: list[str], league_av
             ax=ax,
             kwargs_slices=dict(facecolor="#3b82f6", edgecolor="black", linewidth=2, alpha=0.9),
             kwargs_values=dict(
-                fontsize=8,
+                fontsize=11,
                 color="white",
                 bbox=dict(edgecolor="black", facecolor="#3b82f6", boxstyle="round,pad=0.25"),
             ),
@@ -641,7 +641,21 @@ show_cols.extend(metrics)
 show_cols.append("Transfermarkt Link")
 show_cols = get_show_columns(rank_view, show_cols)
 
-# Make the ranking table selectable so the clicked player can drive the rest of the app.
+# Ranking controls: a reliable selector plus optional table selection.
+player_options = rank_view["Display Name"].dropna().tolist()
+if player_options:
+    rank_selector_default = st.session_state.get("active_player", player_options[0])
+    if rank_selector_default not in player_options:
+        rank_selector_default = player_options[0]
+    selected_from_selector = st.selectbox(
+        "Selected Player",
+        player_options,
+        index=player_options.index(rank_selector_default),
+        key="rank_player_selector",
+    )
+    st.session_state["active_player"] = selected_from_selector
+    active_player = selected_from_selector
+
 selected_from_table = None
 try:
     rank_event = st.dataframe(
@@ -671,7 +685,7 @@ if selected_from_table:
     st.session_state["active_player"] = selected_from_table
     active_player = selected_from_table
 
-st.caption("Click a player in the ranking table or choose one below. The Transfermarkt column opens searches by full name.")
+st.caption("Choose a player from the selector above or click a row in the ranking table. The Transfermarkt column opens searches by full name.")
 
 
 # --------------------------------
@@ -959,6 +973,7 @@ csv = export_df.to_csv(index=False).encode("utf-8")
 st.download_button("Download Filtered Data", csv, "recruitment_data.csv", "text/csv")
 
 st.caption("Metric inference, duplicate-column protection, league filtering, and Transfermarkt links are enabled.")
+
 
 
 
