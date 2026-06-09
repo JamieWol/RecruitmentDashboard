@@ -504,13 +504,7 @@ if columns.league and columns.league in work.columns:
         if selected_league != "All leagues":
             work = work[work[columns.league].astype(str) == selected_league].copy()
 
-# Position / team filters to help browsing large uploads.
-if columns.team and columns.team in work.columns:
-    team_values = sorted(work[columns.team].dropna().astype(str).unique().tolist())
-    if len(team_values) > 1:
-        selected_teams = st.sidebar.multiselect("Team", team_values, default=team_values)
-        work = work[work[columns.team].astype(str).isin(selected_teams)].copy()
-
+# Position filter to help browsing large uploads.
 if columns.position and columns.position in work.columns:
     position_values = sorted(work[columns.position].dropna().astype(str).unique().tolist())
     if len(position_values) > 1:
@@ -568,6 +562,13 @@ else:
 if len(metrics) == 0:
     st.warning("Select at least one metric")
     st.stop()
+
+# Team filter sits under the metric selector so the sidebar flows from metrics to browsing filters.
+if columns.team and columns.team in work.columns:
+    team_values = sorted(work[columns.team].dropna().astype(str).unique().tolist())
+    if len(team_values) > 1:
+        selected_teams = st.sidebar.multiselect("Team", team_values, default=team_values)
+        work = work[work[columns.team].astype(str).isin(selected_teams)].copy()
 
 for m in metrics:
     work[m] = safe_numeric(work[m])
@@ -771,12 +772,16 @@ if len(two_metrics) == 2:
     ax.set_title("Player Scatter Graph")
     ax.grid(False)
 
-    # Quadrant labels
-    label_kwargs = dict(fontsize=10, fontweight="bold", color="black", bbox=dict(facecolor="white", alpha=0.7, edgecolor="none", pad=2))
-    ax.text(0.78, 0.93, "Strong In Both", transform=ax.transAxes, ha="center", va="center", **label_kwargs)
-    ax.text(0.78, 0.07, f"Strong in {mY}", transform=ax.transAxes, ha="center", va="center", **label_kwargs)
-    ax.text(0.22, 0.07, "Weak In Both", transform=ax.transAxes, ha="center", va="center", **label_kwargs)
-    ax.text(0.22, 0.93, f"Strong in {mX} Only", transform=ax.transAxes, ha="center", va="center", **label_kwargs)
+        # Quadrant labels (swapped correctly for X and Y axes).
+    common_box = dict(facecolor="white", alpha=0.7, edgecolor="none", pad=2)
+    ax.text(0.80, 0.93, "Strong In Both", transform=ax.transAxes, ha="center", va="center",
+            fontsize=10, fontweight="bold", color="green", bbox=common_box)
+    ax.text(0.20, 0.93, f"Strong in {mY} Only", transform=ax.transAxes, ha="center", va="center",
+            fontsize=10, fontweight="bold", color="#d4a017", bbox=common_box)
+    ax.text(0.80, 0.07, f"Strong in {mX} Only", transform=ax.transAxes, ha="center", va="center",
+            fontsize=10, fontweight="bold", color="#d4a017", bbox=common_box)
+    ax.text(0.20, 0.07, "Weak In Both", transform=ax.transAxes, ha="center", va="center",
+            fontsize=10, fontweight="bold", color="red", bbox=common_box)
 
     st.pyplot(fig)
     plt.close(fig)
@@ -940,6 +945,7 @@ csv = export_df.to_csv(index=False).encode("utf-8")
 st.download_button("Download Filtered Data", csv, "recruitment_data.csv", "text/csv")
 
 st.caption("Metric inference, duplicate-column protection, league filtering, and Transfermarkt links are enabled.")
+
 
 
 
