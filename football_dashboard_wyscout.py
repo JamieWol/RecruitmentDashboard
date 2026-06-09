@@ -723,12 +723,15 @@ c2.metric("Metrics", f"{len(metrics)}")
 c3.metric("Top Score", f"{int(work['Overall Score'].max()) if len(work) else 0}")
 
 st.subheader("🏅 Player Ranking")
-rank_view_display = rank_view.copy()
-if active_player and active_player in rank_view_display["Display Name"].astype(str).tolist():
-    rank_view_display["Selected"] = ""
-    rank_view_display.loc[rank_view_display["Display Name"] == active_player, "Selected"] = "👉"
+player_search = st.text_input("Search player", value="", placeholder="Type a player name")
 
-show_cols = ["Selected", "Rank", "Display Name", "Display Team", "Display League", "Display Position"]
+rank_view_display = rank_view.copy()
+if player_search.strip():
+    rank_view_display = rank_view_display[
+        rank_view_display["Display Name"].astype(str).str.contains(player_search.strip(), case=False, na=False)
+    ].copy()
+
+show_cols = ["Rank", "Display Name", "Display Team", "Display League", "Display Position"]
 for maybe_col in [columns.age, columns.minutes, columns.contract_days, columns.contract_date]:
     if maybe_col:
         show_cols.append(maybe_col)
@@ -1033,6 +1036,7 @@ csv = export_df.to_csv(index=False).encode("utf-8")
 st.download_button("Download Filtered Data", csv, "recruitment_data.csv", "text/csv")
 
 st.caption("Metric inference, duplicate-column protection, league filtering, and Transfermarkt links are enabled.")
+
 
 
 
