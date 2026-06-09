@@ -703,7 +703,7 @@ if player_list:
         "Selected Player",
         player_list,
         index=player_list.index(selected_player_default) if selected_player_default in player_list else 0,
-        key="active_player_selectbox",
+        key="active_player",
     )
     st.session_state["active_player"] = selected_player
     active_player = selected_player
@@ -772,7 +772,7 @@ if len(two_metrics) == 2:
     ax.set_title("Player Scatter Graph")
     ax.grid(False)
 
-        # Quadrant labels: centered within quadrants, close to the guide lines.
+        # Quadrant labels: even closer to the guide lines, centered inside each quadrant.
     def quad_label(x: float, y: float, text: str, color: str) -> None:
         ax.text(
             x,
@@ -789,14 +789,14 @@ if len(two_metrics) == 2:
                 facecolor="white",
                 edgecolor=color,
                 linewidth=2,
-                alpha=0.92,
+                alpha=0.95,
             ),
         )
 
-    quad_label(0.28, 0.88, f"Strong in {mY} Only", "#d4a017")
-    quad_label(0.72, 0.88, "Strong In Both", "green")
-    quad_label(0.28, 0.12, "Weak In Both", "red")
-    quad_label(0.72, 0.12, f"Strong in {mX} Only", "#d4a017")
+    quad_label(0.28, 0.945, f"Strong in {mY} Only", "#d4a017")
+    quad_label(0.72, 0.945, "Strong In Both", "green")
+    quad_label(0.28, 0.055, "Weak In Both", "red")
+    quad_label(0.72, 0.055, f"Strong in {mX} Only", "#d4a017")
 
     st.pyplot(fig)
     plt.close(fig)
@@ -960,6 +960,7 @@ csv = export_df.to_csv(index=False).encode("utf-8")
 st.download_button("Download Filtered Data", csv, "recruitment_data.csv", "text/csv")
 
 st.caption("Metric inference, duplicate-column protection, league filtering, and Transfermarkt links are enabled.")
+
 
 
 
