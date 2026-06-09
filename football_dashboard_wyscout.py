@@ -12,7 +12,7 @@ Features:
 - League filter when multiple leagues are uploaded
 - Team and position filters
 - Market opportunity filter (age < 25, contract expiry < 12 months, top score band)
-- Selected player from the ranking table drives the charts and tabs
+- Selected player from the ranking section drives the charts and tabs
 - Transfermarkt links based on the player's full name
 - Original-style pizza chart when mplsoccer is available
 - White pizza-chart background
@@ -34,7 +34,7 @@ import streamlit as st
 
 try:
     from mplsoccer import PyPizza
-except ImportError:
+except ImportError:  # pragma: no cover
     PyPizza = None
 
 
@@ -93,8 +93,7 @@ class ColumnMap:
 def clean_columns(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df.columns = [str(c).strip() for c in df.columns]
-    df = df.loc[:, ~df.columns.duplicated()].copy()
-    return df
+    return df.loc[:, ~df.columns.duplicated()].copy()
 
 
 @st.cache_data
@@ -154,8 +153,10 @@ def unique_preserve_order(items: list[str]) -> list[str]:
 
 
 def make_transfermarkt_url(player_name: str) -> str:
-    query = player_name.strip()
-    return f"https://www.transfermarkt.com/schnellsuche/ergebnis/schnellsuche?query={quote_plus(query)}"
+    return (
+        "https://www.transfermarkt.com/schnellsuche/ergebnis/schnellsuche?query="
+        + quote_plus(player_name.strip())
+    )
 
 
 def build_rank_view(
@@ -194,8 +195,6 @@ def build_rank_view(
 # METRIC INFERENCE
 # --------------------------------
 def infer_metric_columns(df: pd.DataFrame) -> list[str]:
-    """Infer likely football performance metrics from a dataframe."""
-
     exclude_exact = {
         "Player", "Name", "Team", "Club", "Squad", "League", "Competition",
         "Position", "Primary Position", "Role", "Age",
@@ -607,10 +606,6 @@ if columns.age and columns.age in work.columns and work[columns.age].notna().any
 # Market opportunity filter
 market_mode = st.sidebar.checkbox("Market opportunity filter", value=False)
 if market_mode:
-    age_ok = True
-    contract_ok = True
-    score_ok = True
-
     if columns.age and columns.age in work.columns and work[columns.age].notna().any():
         age_ok = work[columns.age] < 25
     else:
@@ -623,11 +618,9 @@ if market_mode:
     else:
         contract_ok = pd.Series(True, index=work.index)
 
-    # Top 20% by overall score will be applied once ranking exists.
-    # For now, compute a temporary score later after metrics are selected.
     work = work.copy()
-    work["__market_filter_age_ok__"] = age_ok if isinstance(age_ok, pd.Series) else pd.Series(age_ok, index=work.index)
-    work["__market_filter_contract_ok__"] = contract_ok if isinstance(contract_ok, pd.Series) else pd.Series(contract_ok, index=work.index)
+    work["__market_filter_age_ok__"] = age_ok
+    work["__market_filter_contract_ok__"] = contract_ok
 else:
     work["__market_filter_age_ok__"] = True
     work["__market_filter_contract_ok__"] = True
@@ -680,7 +673,7 @@ league_avg = compute_league_average(work, metrics)
 # --------------------------------
 work["Overall Score"] = work[percentile_cols].mean(axis=1).round(0)
 
-# Apply market opportunity filter score threshold if requested.
+# Apply market opportunity filter threshold after score exists.
 if market_mode and len(work) > 0:
     score_threshold = work["Overall Score"].quantile(0.80)
     work = work[
@@ -688,8 +681,8 @@ if market_mode and len(work) > 0:
         & work["__market_filter_contract_ok__"]
         & (work["Overall Score"] >= score_threshold)
     ].copy()
-    # Recompute after filtering.
     if len(work) > 0:
+        # Recompute from the filtered set.
         work["Overall Score"] = work[percentile_cols].mean(axis=1).round(0)
 
 work = work.sort_values("Overall Score", ascending=False).reset_index(drop=True)
@@ -730,15 +723,28 @@ c2.metric("Metrics", f"{len(metrics)}")
 c3.metric("Top Score", f"{int(work['Overall Score'].max()) if len(work) else 0}")
 
 st.subheader("🏅 Player Ranking")
-player_search = st.text_input("Search player", value="", placeholder="Type a player name")
+player_options = rank_view["Display Name"].dropna().tolist()
+if player_options:
+    default_player = st.session_state.get("active_player", player_options[0])
+    if default_player not in player_options:
+        default_player = player_options[0]
+    active_player = st.selectbox(
+        "Search / select player",
+        player_options,
+        index=player_options.index(default_player),
+        key="active_player_top_selector",
+    )
+    st.session_state["active_player"] = active_player
+else:
+    active_player = None
+    st.info("No players available in the current filtered set.")
 
 rank_view_display = rank_view.copy()
-if player_search.strip():
-    rank_view_display = rank_view_display[
-        rank_view_display["Display Name"].astype(str).str.contains(player_search.strip(), case=False, na=False)
-    ].copy()
+if active_player and active_player in rank_view_display["Display Name"].astype(str).tolist():
+    rank_view_display["Selected"] = ""
+    rank_view_display.loc[rank_view_display["Display Name"] == active_player, "Selected"] = "👉"
 
-show_cols = ["Rank", "Display Name", "Display Team", "Display League", "Display Position"]
+show_cols = ["Selected", "Rank", "Display Name", "Display Team", "Display League", "Display Position"]
 for maybe_col in [columns.age, columns.minutes, columns.contract_days, columns.contract_date]:
     if maybe_col:
         show_cols.append(maybe_col)
@@ -750,7 +756,6 @@ show_cols.extend(metrics)
 show_cols.append("Transfermarkt Link")
 show_cols = get_show_columns(rank_view_display, show_cols)
 
-# Ranking table
 styled_rank = percentile_style_table(rank_view_display, show_cols)
 st.dataframe(
     styled_rank,
@@ -760,26 +765,7 @@ st.dataframe(
     },
 )
 
-if player_search.strip() and len(rank_view_display) == 0:
-    st.info("No players match that search.")
-
-# Player selection from the ranking area.
-player_options = rank_view["Display Name"].dropna().tolist()
-if player_options:
-    default_player = st.session_state.get("active_player", player_options[0])
-    if default_player not in player_options:
-        default_player = player_options[0]
-
-    active_player = st.selectbox(
-        "Choose player for charts",
-        player_options,
-        index=player_options.index(default_player),
-        key="active_player_selector",
-    )
-    st.session_state["active_player"] = active_player
-    st.caption("The selected player below drives the pizza chart, comparison, similarity, and role profile tabs.")
-else:
-    st.info("No players available in the current filtered set.")
+st.caption("The selected player drives the pizza chart, comparison, similarity, and role profile tabs.")
 
 
 # --------------------------------
@@ -801,20 +787,9 @@ st.dataframe(pd.DataFrame(top_players), use_container_width=True)
 # CHARTS
 # --------------------------------
 player_list = work["__player_name__"].tolist()
-selected_player_default = st.session_state.get("active_player", player_list[0] if player_list else None)
-if selected_player_default not in player_list and player_list:
-    selected_player_default = player_list[0]
 
 st.subheader("📊 Pizza Chart")
-if player_list:
-    selected_player = st.selectbox(
-        "Select Player",
-        player_list,
-        index=player_list.index(selected_player_default) if selected_player_default in player_list else 0,
-        key="active_player_selector_pizza",
-    )
-    st.session_state["active_player"] = selected_player
-    active_player = selected_player
+if active_player and active_player in player_list:
     plot_pizza_like(active_player, work, metrics, league_avg)
 else:
     st.info("No players available in the current filtered set.")
@@ -877,7 +852,6 @@ if len(two_metrics) == 2:
     ax.set_title("Player Scatter Graph")
     ax.grid(False)
 
-    # Quadrant labels: centered, inside the chart, very close to the guide lines.
     def quad_label(x: float, y: float, text: str, color: str) -> None:
         ax.text(
             x,
@@ -1065,6 +1039,7 @@ csv = export_df.to_csv(index=False).encode("utf-8")
 st.download_button("Download Filtered Data", csv, "recruitment_data.csv", "text/csv")
 
 st.caption("Metric inference, duplicate-column protection, league filtering, and Transfermarkt links are enabled.")
+
 
 
 
