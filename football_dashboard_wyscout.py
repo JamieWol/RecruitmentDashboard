@@ -150,7 +150,7 @@ def infer_metric_columns(df: pd.DataFrame) -> list[str]:
         "xg", "xa", "shot", "pass", "carry", "dribble", "duel", "tackle",
         "interception", "press", "clearance", "block", "progressive", "touch",
         "cross", "chance", "key", "goal", "Goal", "p90", "(non-penalty)", "assist", "recover", "foul",
-        "save", "action", "possession", "turnover", "expected", "Expected", "build",
+        "save", "action", "possession", "turnover", "expected", "Expected Goals p90 (non-penalty)", "build",
         "final third", "penalty", "chance created", "box", "aerial",
     ]
 
