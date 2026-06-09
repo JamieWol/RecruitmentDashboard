@@ -772,16 +772,31 @@ if len(two_metrics) == 2:
     ax.set_title("Player Scatter Graph")
     ax.grid(False)
 
-        # Quadrant labels (swapped correctly for X and Y axes).
-    common_box = dict(facecolor="white", alpha=0.7, edgecolor="none", pad=2)
-    ax.text(0.80, 0.93, "Strong In Both", transform=ax.transAxes, ha="center", va="center",
-            fontsize=10, fontweight="bold", color="green", bbox=common_box)
-    ax.text(0.20, 0.93, f"Strong in {mY} Only", transform=ax.transAxes, ha="center", va="center",
-            fontsize=10, fontweight="bold", color="#d4a017", bbox=common_box)
-    ax.text(0.80, 0.07, f"Strong in {mX} Only", transform=ax.transAxes, ha="center", va="center",
-            fontsize=10, fontweight="bold", color="#d4a017", bbox=common_box)
-    ax.text(0.20, 0.07, "Weak In Both", transform=ax.transAxes, ha="center", va="center",
-            fontsize=10, fontweight="bold", color="red", bbox=common_box)
+        # Quadrant labels: centered within quadrants, close to the guide lines.
+    def quad_label(x: float, y: float, text: str, color: str) -> None:
+        ax.text(
+            x,
+            y,
+            text,
+            transform=ax.transAxes,
+            ha="center",
+            va="center",
+            fontsize=10,
+            fontweight="bold",
+            color=color,
+            bbox=dict(
+                boxstyle="round,pad=0.35",
+                facecolor="white",
+                edgecolor=color,
+                linewidth=2,
+                alpha=0.92,
+            ),
+        )
+
+    quad_label(0.28, 0.88, f"Strong in {mY} Only", "#d4a017")
+    quad_label(0.72, 0.88, "Strong In Both", "green")
+    quad_label(0.28, 0.12, "Weak In Both", "red")
+    quad_label(0.72, 0.12, f"Strong in {mX} Only", "#d4a017")
 
     st.pyplot(fig)
     plt.close(fig)
@@ -945,6 +960,7 @@ csv = export_df.to_csv(index=False).encode("utf-8")
 st.download_button("Download Filtered Data", csv, "recruitment_data.csv", "text/csv")
 
 st.caption("Metric inference, duplicate-column protection, league filtering, and Transfermarkt links are enabled.")
+
 
 
 
