@@ -692,7 +692,6 @@ st.dataframe(pd.DataFrame(top_players), use_container_width=True)
 # --------------------------------
 # PLAYER SELECTOR + CHARTS
 # --------------------------------
-st.subheader("🎯 Selected Player")
 player_list = work["__player_name__"].tolist()
 selected_player_default = st.session_state.get("active_player", player_list[0] if player_list else None)
 if selected_player_default not in player_list and player_list:
@@ -700,7 +699,7 @@ if selected_player_default not in player_list and player_list:
 
 if player_list:
     selected_player = st.selectbox(
-        "Selected Player",
+        "Select Player",
         player_list,
         index=player_list.index(selected_player_default) if selected_player_default in player_list else 0,
         key="active_player",
@@ -960,6 +959,7 @@ csv = export_df.to_csv(index=False).encode("utf-8")
 st.download_button("Download Filtered Data", csv, "recruitment_data.csv", "text/csv")
 
 st.caption("Metric inference, duplicate-column protection, league filtering, and Transfermarkt links are enabled.")
+
 
 
 
