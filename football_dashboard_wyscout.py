@@ -640,16 +640,37 @@ show_cols.extend(metrics)
 show_cols.append("Transfermarkt Link")
 show_cols = get_show_columns(rank_view, show_cols)
 
-# Table is display-only; the player selector below is the reliable control.
-st.dataframe(
-    rank_view[show_cols],
-    use_container_width=True,
-    column_config={
-        "Transfermarkt Link": st.column_config.LinkColumn("Transfermarkt Link"),
-    },
-)
+# Make the ranking table selectable so the clicked player can drive the rest of the app.
+selected_from_table = None
+try:
+    rank_event = st.dataframe(
+        rank_view[show_cols],
+        use_container_width=True,
+        key="rank_table",
+        on_select="rerun",
+        selection_mode="single-row",
+        column_config={
+            "Transfermarkt Link": st.column_config.LinkColumn("Transfermarkt Link"),
+        },
+    )
+    if getattr(rank_event, "selection", None) and getattr(rank_event.selection, "rows", None):
+        row_idx = rank_event.selection.rows[0]
+        if 0 <= row_idx < len(rank_view):
+            selected_from_table = rank_view.iloc[row_idx]["Display Name"]
+except Exception:
+    st.dataframe(
+        rank_view[show_cols],
+        use_container_width=True,
+        column_config={
+            "Transfermarkt Link": st.column_config.LinkColumn("Transfermarkt Link"),
+        },
+    )
 
-st.caption("Use the player selector below to drive the charts. The Transfermarkt column opens searches by full name.")
+if selected_from_table:
+    st.session_state["active_player"] = selected_from_table
+    active_player = selected_from_table
+
+st.caption("Click a player in the ranking table or choose one below. The Transfermarkt column opens searches by full name.")
 
 
 # --------------------------------
@@ -749,6 +770,13 @@ if len(two_metrics) == 2:
     ax.set_ylabel(mY + " Percentile")
     ax.set_title("Player Scatter Graph")
     ax.grid(False)
+
+    # Quadrant labels
+    label_kwargs = dict(fontsize=10, fontweight="bold", color="black", bbox=dict(facecolor="white", alpha=0.7, edgecolor="none", pad=2))
+    ax.text(0.78, 0.93, "Strong In Both", transform=ax.transAxes, ha="center", va="center", **label_kwargs)
+    ax.text(0.78, 0.07, f"Strong in {mY}", transform=ax.transAxes, ha="center", va="center", **label_kwargs)
+    ax.text(0.22, 0.07, "Weak In Both", transform=ax.transAxes, ha="center", va="center", **label_kwargs)
+    ax.text(0.22, 0.93, f"Strong in {mX} Only", transform=ax.transAxes, ha="center", va="center", **label_kwargs)
 
     st.pyplot(fig)
     plt.close(fig)
@@ -912,6 +940,7 @@ csv = export_df.to_csv(index=False).encode("utf-8")
 st.download_button("Download Filtered Data", csv, "recruitment_data.csv", "text/csv")
 
 st.caption("Metric inference, duplicate-column protection, league filtering, and Transfermarkt links are enabled.")
+
 
 
 
