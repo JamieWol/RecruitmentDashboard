@@ -723,22 +723,6 @@ c2.metric("Metrics", f"{len(metrics)}")
 c3.metric("Top Score", f"{int(work['Overall Score'].max()) if len(work) else 0}")
 
 st.subheader("🏅 Player Ranking")
-player_options = rank_view["Display Name"].dropna().tolist()
-if player_options:
-    default_player = st.session_state.get("active_player", player_options[0])
-    if default_player not in player_options:
-        default_player = player_options[0]
-    active_player = st.selectbox(
-        "Search / select player",
-        player_options,
-        index=player_options.index(default_player),
-        key="active_player_top_selector",
-    )
-    st.session_state["active_player"] = active_player
-else:
-    active_player = None
-    st.info("No players available in the current filtered set.")
-
 rank_view_display = rank_view.copy()
 if active_player and active_player in rank_view_display["Display Name"].astype(str).tolist():
     rank_view_display["Selected"] = ""
@@ -760,13 +744,13 @@ styled_rank = percentile_style_table(rank_view_display, show_cols)
 st.dataframe(
     styled_rank,
     use_container_width=True,
+    hide_index=True,
     column_config={
         "Transfermarkt Link": st.column_config.LinkColumn("Transfermarkt Link"),
     },
 )
 
 st.caption("The selected player drives the pizza chart, comparison, similarity, and role profile tabs.")
-
 
 # --------------------------------
 # TOP PERFORMERS
@@ -787,9 +771,19 @@ st.dataframe(pd.DataFrame(top_players), use_container_width=True)
 # CHARTS
 # --------------------------------
 player_list = work["__player_name__"].tolist()
+selected_player_default = st.session_state.get("active_player", player_list[0] if player_list else None)
+if selected_player_default not in player_list and player_list:
+    selected_player_default = player_list[0]
 
 st.subheader("📊 Pizza Chart")
-if active_player and active_player in player_list:
+if player_list:
+    active_player = st.selectbox(
+        "Select Player",
+        player_list,
+        index=player_list.index(selected_player_default) if selected_player_default in player_list else 0,
+        key="active_player_pizza_selector",
+    )
+    st.session_state["active_player"] = active_player
     plot_pizza_like(active_player, work, metrics, league_avg)
 else:
     st.info("No players available in the current filtered set.")
@@ -1039,6 +1033,7 @@ csv = export_df.to_csv(index=False).encode("utf-8")
 st.download_button("Download Filtered Data", csv, "recruitment_data.csv", "text/csv")
 
 st.caption("Metric inference, duplicate-column protection, league filtering, and Transfermarkt links are enabled.")
+
 
 
 
