@@ -195,8 +195,11 @@ def infer_metric_columns(df: pd.DataFrame) -> list[str]:
         "xg", "xa", "shot", "pass", "carry", "dribble", "duel", "tackle",
         "interception", "press", "clearance", "block", "progressive", "touch",
         "cross", "chance", "key", "goal", "assist", "recover", "foul",
-        "save", "action", "possession", "turnover", "expected", "build",
-        "final third", "penalty", "chance created", "box", "aerial", "p90",
+        "save", "action", "possession", "turnover", "turnovers", "dispossess",
+        "miscontrol", "lost possession", "ball lost", "expected", "build",
+        "final third", "penalty", "non-penalty", "non penalty", "np", "np xg",
+        "scoring contribution", "scoring contributions", "goal contribution",
+        "goals+assists", "goals and assists", "chance created", "box", "aerial", "p90",
     ]
 
     metrics: list[str] = []
@@ -219,11 +222,20 @@ def infer_metric_columns(df: pd.DataFrame) -> list[str]:
 # ---------------------------------------------------------------------
 # TRANSFORMS
 # ---------------------------------------------------------------------
+def is_lower_better_metric(metric_name: str) -> bool:
+    text = metric_name.lower()
+    return any(k in text for k in ["turnover", "turnovers", "dispossess", "miscontrol", "ball lost", "lost possession"])
+
+
 def add_percentiles(df: pd.DataFrame, metrics: list[str]) -> pd.DataFrame:
     df = df.copy()
     for m in metrics:
         s = safe_numeric(df[m])
-        df[m + " Percentile"] = s.rank(pct=True, method="max").mul(100).round(0).fillna(0).astype("Int64")
+        if is_lower_better_metric(m):
+            pct = s.rank(pct=True, method="max", ascending=False)
+        else:
+            pct = s.rank(pct=True, method="max", ascending=True)
+        df[m + " Percentile"] = pct.mul(100).round(0).fillna(0).astype("Int64")
     return df
 
 
@@ -350,11 +362,11 @@ def archetype_scores(row: pd.Series, metric_percentile_cols: list[str]) -> dict[
 
     return {
         "Carrier": np.mean([score(["carry", "dribble", "progressive carry", "ball progression"]), score(["take-on", "1v1"])]),
-        "Connector": np.mean([score(["pass", "completion", "completed pass", "short pass", "combination"]), score(["link", "receive", "ball retention"])]),
-        "Creator": np.mean([score(["xa", "xA", "key pass", "chance created", "assist", "through ball", "cross"]), score(["final third", "box", "big chance"])]),
-        "Disruptor": np.mean([score(["tackle", "interception", "pressure", "recover", "duel"]), score(["counterpress", "possession won"])]),
-        "Finisher": np.mean([score(["goal", "xg", "shot", "shot on target", "box touch", "touch in box"]), score(["conversion", "big chance", "penalty"])]),
-        "Progressor": np.mean([score(["progressive pass", "progressive", "final third", "entry", "build"]), score(["carry", "line break"])]),
+        "Connector": np.mean([score(["pass", "completion", "completed pass", "short pass", "combination"]), score(["link", "receive", "ball retention", "turnover", "turnovers", "dispossess", "miscontrol"])]),
+        "Creator": np.mean([score(["xa", "xA", "key pass", "chance created", "assist", "through ball", "cross", "scoring contribution", "scoring contributions", "goal contribution"]), score(["final third", "box", "big chance"])]),
+        "Disruptor": np.mean([score(["tackle", "interception", "pressure", "recover", "duel"]), score(["counterpress", "possession won", "turnover", "turnovers"])]),
+        "Finisher": np.mean([score(["goal", "xg", "non-penalty", "non penalty", "np xg", "shot", "shot on target", "box touch", "touch in box"]), score(["conversion", "big chance", "penalty"])]),
+        "Progressor": np.mean([score(["progressive pass", "progressive", "final third", "entry", "build", "non-penalty"]), score(["carry", "line break"])]),
         "Protector": np.mean([score(["aerial", "clearance", "block", "defensive duel", "shot block"]), score(["defensive", "duel"])]),
     }
 
@@ -940,19 +952,7 @@ with tabs[3]:
     st.subheader("📝 Role Profiles")
     if "Display Position" in filtered_df.columns and filtered_df["Display Position"].notna().any():
         default_position = None
-        if active_player and active_player in filtered_df["Display Name"].dropna().tolist():
-            player_rows = filtered_df[filtered_df["Display Name"] == active_player]
-            if not player_rows.empty:
-                default_position = player_rows.iloc[0]["Display Position"]
-
-        position_choices = sorted(filtered_df["Display Position"].dropna().unique())
-        selected_position_role = st.selectbox(
-            "Select Position to View Role Profile",
-            position_choices,
-            index=position_choices.index(default_position) if default_position in position_choices else 0,
-        )
-        if selected_position_role:
-            role_metrics = position_metrics_map.get(selected_position_role, []) if isinstance(position_metrics_map, dict) else []
+        if active_player and active_player in filtered_df["Display Nam
             role_metrics_present = [m for m in role_metrics if m in filtered_df.columns]
           
 
