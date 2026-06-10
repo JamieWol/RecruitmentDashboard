@@ -726,33 +726,6 @@ if market_mode:
     work["__market_filter_contract_ok__"] = contract_ok
 else:
     work["__market_filter_age_ok__"] = True
-
-if columns.age and columns.age in work.columns and work[columns.age].notna().any():
-    min_age = int(work[columns.age].min())
-    max_age = int(work[columns.age].max())
-    age_range = st.sidebar.slider("Age", min_age, max_age, (min_age, max_age))
-    work = work[work[columns.age].between(age_range[0], age_range[1])].copy()
-
-# Market opportunity filter
-market_mode = st.sidebar.checkbox("Market opportunity filter", value=False)
-if market_mode:
-    if columns.age and columns.age in work.columns and work[columns.age].notna().any():
-        age_ok = work[columns.age] < 25
-    else:
-        age_ok = pd.Series(True, index=work.index)
-
-    if columns.contract_days and columns.contract_days in work.columns and work[columns.contract_days].notna().any():
-        contract_ok = work[columns.contract_days] < 365
-    elif columns.contract_date and columns.contract_date in work.columns:
-        contract_ok = pd.to_datetime(work[columns.contract_date], errors="coerce").notna()
-    else:
-        contract_ok = pd.Series(True, index=work.index)
-
-    work = work.copy()
-    work["__market_filter_age_ok__"] = age_ok
-    work["__market_filter_contract_ok__"] = contract_ok
-else:
-    work["__market_filter_age_ok__"] = True
     work["__market_filter_contract_ok__"] = True
 
 
@@ -790,8 +763,6 @@ for m in metrics:
 # --------------------------------
 work = add_percentiles(work, metrics)
 percentile_cols = [m + " Percentile" for m in metrics]
-
-# Add archetype labels before scoring / display.
 work = assign_archetypes(work, metrics, position_col=columns.position)
 
 
@@ -815,7 +786,6 @@ if market_mode and len(work) > 0:
         & (work["Overall Score"] >= score_threshold)
     ].copy()
     if len(work) > 0:
-        # Recompute from the filtered set.
         work["Overall Score"] = work[percentile_cols].mean(axis=1).round(0)
 
 work = work.sort_values("Overall Score", ascending=False).reset_index(drop=True)
@@ -839,7 +809,7 @@ position_metrics_map = globals().get("position_metrics_map", {})
 rank_view = build_rank_view(work, columns.name, columns.team, columns.league, columns.position)
 rank_view["Transfermarkt Link"] = [make_transfermarkt_url(n) for n in rank_view["Display Name"].astype(str)]
 
-# Use the selected player everywhere.
+# Top-ranked player is the default across the app.
 if "active_player" not in st.session_state and len(rank_view) > 0:
     st.session_state["active_player"] = rank_view.iloc[0]["Display Name"]
 active_player = st.session_state.get("active_player")
@@ -888,6 +858,7 @@ st.dataframe(
 
 st.caption("The selected player drives the pizza chart, comparison, similarity, and role profile tabs.")
 
+
 # --------------------------------
 # TOP PERFORMERS
 # --------------------------------
@@ -898,7 +869,12 @@ for m in metrics:
     if series.notna().any():
         top_idx = series.idxmax()
         top_row = work.loc[top_idx]
-        top_players.append({"Metric": m, "Player": top_row["__player_name
+        top_players.append({
+            "Metric": m,
+            "Player": top_row["__player_name__"],
+            "Archetype": top_row.get("Archetype", "Unclassified"),
+            "Value": top_row[m],
+        })
 
 st.dataframe(pd.DataFrame(top_players), use_container_width=True)
 
@@ -1075,4 +1051,97 @@ with tabs[0]:
 
     csv_buffer = io.StringIO()
     st.session_state.shortlist_log.to_csv(csv_buffer, index=False)
-    st.downlo
+    st.download_button(
+        label="📥 Download Full Shortlist Log CSV",
+        data=csv_buffer.getvalue(),
+        file_name="shortlist_log.csv",
+        mime="text/csv",
+    )
+
+# --- Tab 2: Similar Players ---
+with tabs[1]:
+    st.subheader("🤝 Find Similar Players")
+    if active_player and active_player in filtered_df["Display Name"].dropna().tolist():
+        st.info(f"Similarity is currently centered on: {active_player}")
+    player_choices = filtered_df["Display Name"].dropna().unique().tolist()
+    selected_player_sim = st.selectbox(
+        "Select Player to Find Similar Ones",
+        player_choices,
+        index=player_choices.index(active_player) if active_player in player_choices else 0,
+        key="similarity_player",
+    )
+
+    if selected_player_sim:
+        metrics_for_similarity = [m + " Percentile" for m in pizza_metrics if m + " Percentile" in filtered_df.columns]
+        if metrics_for_similarity:
+            sim_df = compute_similarity_frame(filtered_df, selected_player_sim, metrics_for_similarity, top_n=10)
+            if sim_df.empty:
+                st.info("No similar players could be calculated from the current metric set.")
+            else:
+                sim_cols = [c for c in ["Display Name", "Archetype", "Display Team", "Display League", "Display Position", "Similarity Score"] if c in sim_df.columns]
+                sim_cols = unique_preserve_order(sim_cols)
+                display_table(sim_df, sim_cols)
+        else:
+            st.info("No percentile metrics available for similarity comparison.")
+
+# --- Tab 3: Custom Scoring ---
+with tabs[2]:
+    st.subheader("⚖️ Custom Scoring")
+    st.info("Assign weights to metrics for a custom overall score.")
+
+    weights = {}
+    for m in pizza_metrics:
+        if m + " Percentile" in filtered_df.columns:
+            w = st.slider(f"Weight for {m}", 0.0, 2.0, 1.0, step=0.05)
+            weights[m] = w
+
+    if weights:
+        weighted_cols = [m + " Percentile" for m in weights.keys() if m + " Percentile" in filtered_df.columns]
+        weight_values = np.array(list(weights.values()), dtype=float)
+        if weight_values.sum() > 0 and weighted_cols:
+            filtered_df["Custom Score"] = filtered_df[weighted_cols].values.dot(weight_values) / weight_values.sum()
+            custom_cols = [c for c in ["Display Name", "Archetype", "Display Team", "Display League", "Display Position", "Custom Score"] if c in filtered_df.columns]
+            custom_cols = unique_preserve_order(custom_cols)
+            display_table(filtered_df.sort_values("Custom Score", ascending=False).head(10), custom_cols)
+
+# --- Tab 4: Role Profiles ---
+with tabs[3]:
+    st.subheader("📝 Role Profiles")
+    if "Display Position" in filtered_df.columns and filtered_df["Display Position"].notna().any():
+        default_position = None
+        if active_player and active_player in filtered_df["Display Name"].dropna().tolist():
+            player_rows = filtered_df[filtered_df["Display Name"] == active_player]
+            if not player_rows.empty:
+                default_position = player_rows.iloc[0]["Display Position"]
+
+        position_choices = sorted(filtered_df["Display Position"].dropna().unique())
+        selected_position_role = st.selectbox(
+            "Select Position to View Role Profile",
+            position_choices,
+            index=position_choices.index(default_position) if default_position in position_choices else 0,
+        )
+        if selected_position_role:
+            role_metrics = position_metrics_map.get(selected_position_role, []) if isinstance(position_metrics_map, dict) else []
+            role_metrics_present = [m for m in role_metrics if m in filtered_df.columns]
+            if role_metrics_present:
+                role_avg = filtered_df[role_metrics_present].mean(numeric_only=True)
+                st.write(f"Average metrics for {selected_position_role}:")
+                st.dataframe(role_avg.to_frame("Average").sort_values("Average", ascending=False), use_container_width=True)
+            else:
+                st.info("No position-specific role mapping has been defined yet.")
+    else:
+        st.warning("No position column available.")
+
+
+# --------------------------------
+# EXPORT
+# --------------------------------
+st.subheader("Download Data")
+export_df = filtered_df.copy()
+if "Overall Score" not in export_df.columns and "Overall Score" in work.columns:
+    export_df["Overall Score"] = work["Overall Score"]
+
+csv = export_df.to_csv(index=False).encode("utf-8")
+st.download_button("Download Filtered Data", csv, "recruitment_data.csv", "text/csv")
+
+st.caption("Metric inference, duplicate-column protection, league filtering, market filters, archetype labels, and Transfermarkt links are enabled.")
