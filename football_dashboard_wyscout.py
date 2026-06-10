@@ -12,8 +12,11 @@ Features:
 - League filter when multiple leagues are uploaded
 - Team and position filters
 - Market opportunity filter (age < 25, contract expiry < 12 months, top score band)
-- Selected player from the ranking section drives the charts and tabs
+- Search bar for the ranking table
+- Separate player selector for the pizza chart
+- Top-ranked player is the default across the app
 - Transfermarkt links based on the player's full name
+- Archetype column inferred from the metrics
 - Original-style pizza chart when mplsoccer is available
 - White pizza-chart background
 - Percentile colour coding in the ranking table
@@ -153,10 +156,7 @@ def unique_preserve_order(items: list[str]) -> list[str]:
 
 
 def make_transfermarkt_url(player_name: str) -> str:
-    return (
-        "https://www.transfermarkt.com/schnellsuche/ergebnis/schnellsuche?query="
-        + quote_plus(player_name.strip())
-    )
+    return "https://www.transfermarkt.com/schnellsuche/ergebnis/schnellsuche?query=" + quote_plus(player_name.strip())
 
 
 def build_rank_view(
@@ -204,7 +204,7 @@ def infer_metric_columns(df: pd.DataFrame) -> list[str]:
         "Match no", "Team no", "Season", "Appearances", "90s Played", "Starting Appearances",
         "__player_name__", "__team__", "__league__", "__position__", "__row_id__",
         "Display Name", "Display Team", "Display League", "Display Position",
-        "Transfermarkt Link",
+        "Transfermarkt Link", "Archetype",
     }
 
     exclude_keywords = [
@@ -321,7 +321,7 @@ def compute_similarity_frame(df: pd.DataFrame, player_name: str, metrics: list[s
     if not metrics or "Display Name" not in df.columns:
         return pd.DataFrame()
 
-    working_cols = [c for c in ["Display Name", "Display Team", "Display League", "Display Position"] if c in df.columns]
+    working_cols = [c for c in ["Display Name", "Display Team", "Display League", "Display Position", "Archetype"] if c in df.columns]
     working_cols += [m for m in metrics if m in df.columns]
     working = df[working_cols].copy()
 
@@ -346,6 +346,109 @@ def compute_similarity_frame(df: pd.DataFrame, player_name: str, metrics: list[s
     working["Similarity Score"] = 1 / (1 + distances)
     working = working[working["Display Name"] != player_name].sort_values("Similarity Score", ascending=False)
     return working.head(top_n)
+
+
+def infer_player_archetype(row: pd.Series, metric_percentile_cols: list[str], position_value: str | None = None) -> str:
+    if not metric_percentile_cols:
+        return "Unclassified"
+
+    def value(col: str) -> float:
+        try:
+            if col not in row.index:
+                return 0.0
+            v = row[col]
+            if pd.isna(v):
+                return 0.0
+            return float(v)
+        except Exception:
+            return 0.0
+
+    def score(keys: list[str]) -> float:
+        vals = [value(c) for c in metric_percentile_cols if any(k in c.lower() for k in keys)]
+        return float(np.mean(vals)) if vals else 0.0
+
+    scores: dict[str, float] = {}
+    scores["Ball Playing Defender"] = np.mean([
+        score(["progressive pass", "progressive passes", "pass", "build", "final third"]),
+        score(["carry", "dribble", "ball progression"]),
+    ])
+    scores["Defensive Defender"] = np.mean([
+        score(["tackle", "interception", "clearance", "block", "aerial", "duel", "pressure"]),
+        score(["recover", "won", "defensive action"]),
+    ])
+    scores["Ball-Winning Midfielder"] = np.mean([
+        score(["tackle", "interception", "pressure", "recover", "duel"]),
+        score(["ball recovery", "counterpress", "possession won"]),
+    ])
+    scores["Deep-Lying Playmaker"] = np.mean([
+        score(["pass", "progressive", "switch", "long pass", "xa", "xA", "key pass"]),
+        score(["build", "final third", "chance created"]),
+    ])
+    scores["Box-to-Box Midfielder"] = np.mean([
+        score(["carry", "dribble", "tackle", "interception", "press", "duel"]),
+        score(["pass", "progressive", "recover"]),
+    ])
+    scores["Chance Creator"] = np.mean([
+        score(["xa", "xA", "key pass", "chance created", "assist", "final third", "box"]),
+        score(["cross", "pass", "through ball"]),
+    ])
+    scores["Wide Dribbler / Winger"] = np.mean([
+        score(["dribble", "carry", "cross", "take-on", "1v1"]),
+        score(["xa", "xA", "assist", "chance created", "progressive carry"]),
+    ])
+    scores["Finisher"] = np.mean([
+        score(["goal", "shot", "xg", "shot on target", "box", "touch in box"]),
+        score(["penalty", "conversion", "big chance"]),
+    ])
+    scores["Shot-Stopping Keeper"] = np.mean([
+        score(["save", "saves", "shot stop", "cross claim", "claim"]),
+        score(["save", "post shot", "prevented goal"]),
+    ])
+
+    pos = (position_value or "").lower()
+    if pos:
+        if any(k in pos for k in ["cb", "centre back", "center back", "defender"]):
+            scores["Defensive Defender"] += 5
+            scores["Ball Playing Defender"] += 3
+        elif any(k in pos for k in ["fb", "lb", "rb", "fullback", "wing back", "wb"]):
+            scores["Wide Dribbler / Winger"] += 2
+            scores["Ball Playing Defender"] += 2
+        elif any(k in pos for k in ["dm", "pivot", "6"]):
+            scores["Ball-Winning Midfielder"] += 3
+            scores["Deep-Lying Playmaker"] += 2
+        elif any(k in pos for k in ["cm", "midfield", "8"]):
+            scores["Box-to-Box Midfielder"] += 3
+            scores["Deep-Lying Playmaker"] += 1
+        elif any(k in pos for k in ["am", "10", "attacking mid"]):
+            scores["Chance Creator"] += 4
+            scores["Deep-Lying Playmaker"] += 1
+        elif any(k in pos for k in ["wing", "lw", "rw", "wide"]):
+            scores["Wide Dribbler / Winger"] += 4
+            scores["Chance Creator"] += 1
+        elif any(k in pos for k in ["st", "cf", "striker", "forward"]):
+            scores["Finisher"] += 5
+        elif any(k in pos for k in ["gk", "goalkeeper", "keeper"]):
+            scores["Shot-Stopping Keeper"] += 8
+
+    best_label = max(scores.items(), key=lambda kv: kv[1])[0]
+    return best_label if scores[best_label] > 0 else "Unclassified"
+
+
+def assign_archetypes(df: pd.DataFrame, metrics: list[str], position_col: str | None = None) -> pd.DataFrame:
+    df = df.copy()
+    percentile_cols = [m + " Percentile" for m in metrics if m + " Percentile" in df.columns]
+    if not percentile_cols:
+        df["Archetype"] = "Unclassified"
+        return df
+
+    archetypes: list[str] = []
+    for _, row in df.iterrows():
+        pos_value = row[position_col] if position_col and position_col in row.index else None
+        archetypes.append(
+            infer_player_archetype(row, percentile_cols, str(pos_value) if pos_value is not None else None)
+        )
+    df["Archetype"] = archetypes
+    return df
 
 
 # --------------------------------
@@ -623,6 +726,33 @@ if market_mode:
     work["__market_filter_contract_ok__"] = contract_ok
 else:
     work["__market_filter_age_ok__"] = True
+
+if columns.age and columns.age in work.columns and work[columns.age].notna().any():
+    min_age = int(work[columns.age].min())
+    max_age = int(work[columns.age].max())
+    age_range = st.sidebar.slider("Age", min_age, max_age, (min_age, max_age))
+    work = work[work[columns.age].between(age_range[0], age_range[1])].copy()
+
+# Market opportunity filter
+market_mode = st.sidebar.checkbox("Market opportunity filter", value=False)
+if market_mode:
+    if columns.age and columns.age in work.columns and work[columns.age].notna().any():
+        age_ok = work[columns.age] < 25
+    else:
+        age_ok = pd.Series(True, index=work.index)
+
+    if columns.contract_days and columns.contract_days in work.columns and work[columns.contract_days].notna().any():
+        contract_ok = work[columns.contract_days] < 365
+    elif columns.contract_date and columns.contract_date in work.columns:
+        contract_ok = pd.to_datetime(work[columns.contract_date], errors="coerce").notna()
+    else:
+        contract_ok = pd.Series(True, index=work.index)
+
+    work = work.copy()
+    work["__market_filter_age_ok__"] = age_ok
+    work["__market_filter_contract_ok__"] = contract_ok
+else:
+    work["__market_filter_age_ok__"] = True
     work["__market_filter_contract_ok__"] = True
 
 
@@ -660,6 +790,9 @@ for m in metrics:
 # --------------------------------
 work = add_percentiles(work, metrics)
 percentile_cols = [m + " Percentile" for m in metrics]
+
+# Add archetype labels before scoring / display.
+work = assign_archetypes(work, metrics, position_col=columns.position)
 
 
 # --------------------------------
@@ -731,7 +864,7 @@ if player_search.strip():
         rank_view_display["Display Name"].astype(str).str.contains(player_search.strip(), case=False, na=False)
     ].copy()
 
-show_cols = ["Rank", "Display Name", "Display Team", "Display League", "Display Position"]
+show_cols = ["Rank", "Display Name", "Archetype", "Display Team", "Display League", "Display Position"]
 for maybe_col in [columns.age, columns.minutes, columns.contract_days, columns.contract_date]:
     if maybe_col:
         show_cols.append(maybe_col)
@@ -765,7 +898,7 @@ for m in metrics:
     if series.notna().any():
         top_idx = series.idxmax()
         top_row = work.loc[top_idx]
-        top_players.append({"Metric": m, "Player": top_row["__player_name__"], "Value": top_row[m]})
+        top_players.append({"Metric": m, "Player": top_row["__player_name
 
 st.dataframe(pd.DataFrame(top_players), use_container_width=True)
 
@@ -899,7 +1032,7 @@ with tabs[0]:
     num_shortlist = st.slider("Number of top players to show", 1, 20, 5)
     top_players = filtered_df.head(num_shortlist).copy()
 
-    shortlist_cols = [c for c in ["Display Name", "Display Team", "Display League", "Display Position", "Overall Score"] if c in top_players.columns]
+    shortlist_cols = [c for c in ["Display Name", "Archetype", "Display Team", "Display League", "Display Position", "Overall Score"] if c in top_players.columns]
     shortlist_cols += [m for m in pizza_metrics if m in top_players.columns]
     shortlist_cols = unique_preserve_order(shortlist_cols)
     display_table(top_players, shortlist_cols)
@@ -916,7 +1049,7 @@ with tabs[0]:
     if st.button("➕ Add Selected Players to Shortlist Log"):
         if selected_players:
             players_to_add = filtered_df[filtered_df["Display Name"].isin(selected_players)][
-                [c for c in ["Display Name", "Display Team", "Display League", "Display Position", "Overall Score"] if c in filtered_df.columns]
+                [c for c in ["Display Name", "Archetype", "Display Team", "Display League", "Display Position", "Overall Score"] if c in filtered_df.columns]
             ].copy()
             st.session_state.shortlist_log = pd.concat(
                 [st.session_state.shortlist_log, players_to_add],
@@ -942,120 +1075,4 @@ with tabs[0]:
 
     csv_buffer = io.StringIO()
     st.session_state.shortlist_log.to_csv(csv_buffer, index=False)
-    st.download_button(
-        label="📥 Download Full Shortlist Log CSV",
-        data=csv_buffer.getvalue(),
-        file_name="shortlist_log.csv",
-        mime="text/csv",
-    )
-
-# --- Tab 2: Similar Players ---
-with tabs[1]:
-    st.subheader("🤝 Find Similar Players")
-    if active_player and active_player in filtered_df["Display Name"].dropna().tolist():
-        st.info(f"Similarity is currently centered on: {active_player}")
-    player_choices = filtered_df["Display Name"].dropna().unique().tolist()
-    selected_player_sim = st.selectbox(
-        "Select Player to Find Similar Ones",
-        player_choices,
-        index=player_choices.index(active_player) if active_player in player_choices else 0,
-        key="similarity_player",
-    )
-
-    if selected_player_sim:
-        metrics_for_similarity = [m + " Percentile" for m in pizza_metrics if m + " Percentile" in filtered_df.columns]
-        if metrics_for_similarity:
-            sim_df = compute_similarity_frame(filtered_df, selected_player_sim, metrics_for_similarity, top_n=10)
-            if sim_df.empty:
-                st.info("No similar players could be calculated from the current metric set.")
-            else:
-                sim_cols = [c for c in ["Display Name", "Display Team", "Display League", "Display Position", "Similarity Score"] if c in sim_df.columns]
-                sim_cols = unique_preserve_order(sim_cols)
-                display_table(sim_df, sim_cols)
-        else:
-            st.info("No percentile metrics available for similarity comparison.")
-
-# --- Tab 3: Custom Scoring ---
-with tabs[2]:
-    st.subheader("⚖️ Custom Scoring")
-    st.info("Assign weights to metrics for a custom overall score.")
-
-    weights = {}
-    for m in pizza_metrics:
-        if m + " Percentile" in filtered_df.columns:
-            w = st.slider(f"Weight for {m}", 0.0, 2.0, 1.0, step=0.05)
-            weights[m] = w
-
-    if weights:
-        weighted_cols = [m + " Percentile" for m in weights.keys() if m + " Percentile" in filtered_df.columns]
-        weight_values = np.array(list(weights.values()), dtype=float)
-        if weight_values.sum() > 0 and weighted_cols:
-            filtered_df["Custom Score"] = filtered_df[weighted_cols].values.dot(weight_values) / weight_values.sum()
-            custom_cols = [c for c in ["Display Name", "Display Team", "Display League", "Display Position", "Custom Score"] if c in filtered_df.columns]
-            custom_cols = unique_preserve_order(custom_cols)
-            display_table(filtered_df.sort_values("Custom Score", ascending=False).head(10), custom_cols)
-
-# --- Tab 4: Role Profiles ---
-with tabs[3]:
-    st.subheader("📝 Role Profiles")
-    if "Display Position" in filtered_df.columns and filtered_df["Display Position"].notna().any():
-        default_position = None
-        if active_player and active_player in filtered_df["Display Name"].dropna().tolist():
-            player_rows = filtered_df[filtered_df["Display Name"] == active_player]
-            if not player_rows.empty:
-                default_position = player_rows.iloc[0]["Display Position"]
-
-        position_choices = sorted(filtered_df["Display Position"].dropna().unique())
-        selected_position_role = st.selectbox(
-            "Select Position to View Role Profile",
-            position_choices,
-            index=position_choices.index(default_position) if default_position in position_choices else 0,
-        )
-        if selected_position_role:
-            role_metrics = position_metrics_map.get(selected_position_role, []) if isinstance(position_metrics_map, dict) else []
-            role_metrics_present = [m for m in role_metrics if m in filtered_df.columns]
-            if role_metrics_present:
-                role_avg = filtered_df[role_metrics_present].mean(numeric_only=True)
-                st.write(f"Average metrics for {selected_position_role}:")
-                st.dataframe(role_avg.to_frame("Average").sort_values("Average", ascending=False), use_container_width=True)
-            else:
-                st.info("No position-specific role mapping has been defined yet.")
-    else:
-        st.warning("No position column available.")
-
-
-# --------------------------------
-# EXPORT
-# --------------------------------
-st.subheader("Download Data")
-export_df = filtered_df.copy()
-if "Overall Score" not in export_df.columns and "Overall Score" in work.columns:
-    export_df["Overall Score"] = work["Overall Score"]
-
-csv = export_df.to_csv(index=False).encode("utf-8")
-st.download_button("Download Filtered Data", csv, "recruitment_data.csv", "text/csv")
-
-st.caption("Metric inference, duplicate-column protection, league filtering, and Transfermarkt links are enabled.")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    st.downlo
