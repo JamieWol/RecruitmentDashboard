@@ -97,9 +97,13 @@ def load_data(file):
 
     df = clean_columns(df)
 
+    # Best-effort numeric cleanup for mixed uploads.
     for col in df.columns:
         if df[col].dtype == "object":
-            numeric_guess = pd.to_numeric(df[col].astype(str).str.replace(",", "", regex=False), errors="coerce")
+            numeric_guess = pd.to_numeric(
+                df[col].astype(str).str.replace(",", "", regex=False),
+                errors="coerce",
+            )
             if numeric_guess.notna().sum() >= max(3, int(len(df) * 0.7)):
                 df[col] = numeric_guess
 
@@ -144,7 +148,13 @@ def make_transfermarkt_url(player_name: str) -> str:
     return "https://www.transfermarkt.com/schnellsuche/ergebnis/schnellsuche?query=" + quote_plus(player_name.strip())
 
 
-def build_rank_view(df: pd.DataFrame, name_col: str, team_col: str | None, league_col: str | None, position_col: str | None) -> pd.DataFrame:
+def build_rank_view(
+    df: pd.DataFrame,
+    name_col: str,
+    team_col: str | None,
+    league_col: str | None,
+    position_col: str | None,
+) -> pd.DataFrame:
     view = df.copy()
     if name_col in view.columns:
         view["Display Name"] = view[name_col].astype(str)
@@ -867,7 +877,10 @@ with tabs[0]:
                     ] if c in filtered_df.columns
                 ]
             ].copy()
-            st.session_state.shortlist_log = pd.concat([st.session_state.shortlist_log, players_to_add], ignore_index=True).drop_duplicates(subset=["Display Name"]).reset_index(drop=True)
+            st.session_state.shortlist_log = pd.concat(
+                [st.session_state.shortlist_log, players_to_add],
+                ignore_index=True,
+            ).drop_duplicates(subset=["Display Name"]).reset_index(drop=True)
             st.success(f"{len(players_to_add)} players added to shortlist log.")
         else:
             st.warning("No players selected.")
@@ -886,7 +899,12 @@ with tabs[0]:
 
     csv_buffer = io.StringIO()
     st.session_state.shortlist_log.to_csv(csv_buffer, index=False)
-    st.download_button("📥 Download Full Shortlist Log CSV", data=csv_buffer.getvalue(), file_name="shortlist_log.csv", mime="text/csv")
+    st.download_button(
+        "📥 Download Full Shortlist Log CSV",
+        data=csv_buffer.getvalue(),
+        file_name="shortlist_log.csv",
+        mime="text/csv",
+    )
 
 with tabs[1]:
     st.subheader("🤝 Find Similar Players")
@@ -952,7 +970,38 @@ with tabs[3]:
     st.subheader("📝 Role Profiles")
     if "Display Position" in filtered_df.columns and filtered_df["Display Position"].notna().any():
         default_position = None
-        if active_player and active_player in filtered_df["Display Nam
+        if active_player and active_player in filtered_df["Display Name"].dropna().tolist():
+            player_rows = filtered_df[filtered_df["Display Name"] == active_player]
+            if not player_rows.empty:
+                default_position = player_rows.iloc[0]["Display Position"]
+
+        position_choices = sorted(filtered_df["Display Position"].dropna().unique())
+        selected_position_role = st.selectbox(
+            "Select Position to View Role Profile",
+            position_choices,
+            index=position_choices.index(default_position) if default_position in position_choices else 0,
+        )
+        if selected_position_role:
+            role_metrics = position_metrics_map.get(selected_position_role, []) if isinstance(position_metrics_map, dict) else []
             role_metrics_present = [m for m in role_metrics if m in filtered_df.columns]
+            if role_metrics_present:
+                role_avg = filtered_df[role_metrics_present].mean(numeric_only=True)
+                st.write(f"Average metrics for {selected_position_role}:")
+                st.dataframe(role_avg.to_frame("Average").sort_values("Average", ascending=False), use_container_width=True)
+            else:
+                st.info("No position-specific role mapping has been defined yet.")
+    else:
+        st.warning("No position column available.")
+
+
+st.subheader("Download Data")
+export_df = filtered_df.copy()
+if "Overall Score" not in export_df.columns and "Overall Score" in work.columns:
+    export_df["Overall Score"] = work["Overall Score"]
+
+csv = export_df.to_csv(index=False).encode("utf-8")
+st.download_button("Download Filtered Data", csv, "recruitment_data.csv", "text/csv")
+st.caption("Metric inference, duplicate-column protection, league filtering, market filters, archetype labels, and Transfermarkt links are enabled.")
+
           
 
