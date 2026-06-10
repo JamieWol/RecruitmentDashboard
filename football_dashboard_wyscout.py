@@ -145,7 +145,7 @@ def build_player_labels(df: pd.DataFrame) -> pd.DataFrame:
         league = str(row.get("__league__", "")).strip()
         if counts.get(name, 0) > 1:
             suffix = team or league or f"Row {idx + 1}"
-            label = f"{name} — {suffix}"
+            label = f"{name} ({suffix})"
         else:
             label = name
         if label in labels:
@@ -953,70 +953,7 @@ with tabs[1]:
                 sim_cols = unique_preserve_order(sim_cols)
                 display_table(sim_df, sim_cols)
         else:
-            st.info("No percentile metrics available for similarity comparison.")
-
-with tabs[2]:
-    st.subheader("⚖️ Custom Scoring")
-    st.info("Assign weights to metrics for a custom overall score.")
-    weights = {}
-    for m in pizza_metrics:
-        if m + " Percentile" in filtered_df.columns:
-            weights[m] = st.slider(f"Weight for {m}", 0.0, 2.0, 1.0, step=0.05)
-    if weights:
-        weighted_cols = [m + " Percentile" for m in weights.keys() if m + " Percentile" in filtered_df.columns]
-        weight_values = np.array(list(weights.values()), dtype=float)
-        if weight_values.sum() > 0 and weighted_cols:
-            filtered_df["Custom Score"] = filtered_df[weighted_cols].values.dot(weight_values) / weight_values.sum()
-            custom_cols = [
-                c for c in [
-                    "Player Label",
-                    "Primary Archetype",
-                    "Secondary Archetype",
-                    "Display Team",
-                    "Display League",
-                    "Display Position",
-                    "Custom Score",
-                ] if c in filtered_df.columns
-            ]
-            custom_cols = unique_preserve_order(custom_cols)
-            display_table(filtered_df.sort_values("Custom Score", ascending=False).head(10), custom_cols)
-
-with tabs[3]:
-    st.subheader("📝 Role Profiles")
-    if "Display Position" in filtered_df.columns and filtered_df["Display Position"].notna().any():
-        default_position = None
-        if active_player_label and active_player_label in filtered_df["Player Label"].dropna().tolist():
-            player_rows = filtered_df[filtered_df["Player Label"] == active_player_label]
-            if not player_rows.empty:
-                default_position = player_rows.iloc[0]["Display Position"]
-
-        position_choices = sorted(filtered_df["Display Position"].dropna().unique())
-        selected_position_role = st.selectbox(
-            "Select Position to View Role Profile",
-            position_choices,
-            index=position_choices.index(default_position) if default_position in position_choices else 0,
-        )
-        if selected_position_role:
-            role_metrics = position_metrics_map.get(selected_position_role, []) if isinstance(position_metrics_map, dict) else []
-            role_metrics_present = [m for m in role_metrics if m in filtered_df.columns]
-            if role_metrics_present:
-                role_avg = filtered_df[role_metrics_present].mean(numeric_only=True)
-                st.write(f"Average metrics for {selected_position_role}:")
-                st.dataframe(role_avg.to_frame("Average").sort_values("Average", ascending=False), use_container_width=True)
-            else:
-                st.info("No position-specific role mapping has been defined yet.")
-    else:
-        st.warning("No position column available.")
-
-
-st.subheader("Download Data")
-export_df = filtered_df.copy()
-if "Overall Score" not in export_df.columns and "Overall Score" in work.columns:
-    export_df["Overall Score"] = work["Overall Score"]
-
-csv = export_df.to_csv(index=False).encode("utf-8")
-st.download_button("Download Filtered Data", csv, "recruitment_data.csv", "text/csv")
-st.caption("Metric inference, duplicate-column protection, league filtering, market filters, archetype labels, and Transfermarkt links are enabled.")
+            st.info
 
 
           
