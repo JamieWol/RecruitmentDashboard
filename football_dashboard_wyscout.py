@@ -714,6 +714,7 @@ show_cols = [
     "Secondary Archetype",
     "Display Team",
     "Display League",
+    "Current Team Country (Tier)",
     "Display Position",
 ]
 for maybe_col in [columns.age, columns.minutes, columns.contract_days, columns.contract_date]:
