@@ -53,7 +53,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     };
 
     const getPlayerPhoto = (player) => {
-      // Use CSV / Excel photo column if available
+      // Use CSV photo column if available
       if (player?._photoUrl) return player._photoUrl;
       if (player?.Photo) return player.Photo;
 
@@ -70,81 +70,6 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 
       return `/player-photos/${safeName}.png`;
     };
-
-  const DATE_HINTS = [
-    "date", "dob", "birth", "expiry", "expires", "joined", "created",
-    "updated", "time", "report", "contract"
-  ];
-
-  const isDateHeader = (key) => {
-    const text = String(key || "").toLowerCase();
-    return DATE_HINTS.some((hint) => text.includes(hint));
-  };
-
-  const excelSerialToISO = (serial) => {
-    try {
-      const parsed = XLSX?.SSF?.parse_date_code?.(serial);
-      if (!parsed) return null;
-      const yyyy = String(parsed.y).padStart(4, "0");
-      const mm = String(parsed.m).padStart(2, "0");
-      const dd = String(parsed.d).padStart(2, "0");
-      return `${yyyy}-${mm}-${dd}`;
-    } catch {
-      return null;
-    }
-  };
-
-  const isDateLikeValue = (value) => {
-    if (value instanceof Date && !Number.isNaN(value.getTime())) return true;
-    if (typeof value !== "string") return false;
-    const s = value.trim();
-    if (!s) return false;
-    return (
-      /^\d{4}[-/]\d{1,2}[-/]\d{1,2}(?:[ T].*)?$/.test(s) ||
-      /^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}(?:[ T].*)?$/.test(s) ||
-      /^\w{3,9}\s+\d{1,2},\s+\d{4}$/.test(s)
-    );
-  };
-
-  const normalizeUploadedValue = (key, value) => {
-    if (value === null || value === undefined || value === "") return "";
-
-    if (value instanceof Date && !Number.isNaN(value.getTime())) {
-      return value.toISOString().slice(0, 10);
-    }
-
-    if (typeof value === "number") {
-      if (isDateHeader(key)) {
-        const iso = excelSerialToISO(value);
-        if (iso) return iso;
-      }
-      return value;
-    }
-
-    const raw = String(value).trim();
-    if (!raw) return "";
-
-    if (isDateHeader(key) || isDateLikeValue(raw)) {
-      const parsed = Date.parse(raw);
-      if (!Number.isNaN(parsed)) {
-        return new Date(parsed).toISOString().slice(0, 10);
-      }
-    }
-
-    const numeric = toNumber(raw);
-    return numeric !== null ? numeric : raw;
-  };
-
-  const looksLikeDateColumn = (rows, key) => {
-    if (isDateHeader(key)) return true;
-    const sample = (rows || [])
-      .map((row) => row?.[key])
-      .filter((v) => v !== null && v !== undefined && String(v).trim() !== "");
-    if (sample.length === 0) return false;
-    const sampleSize = Math.min(sample.length, 20);
-    const dateCount = sample.slice(0, sampleSize).filter((v) => isDateLikeValue(v)).length;
-    return dateCount >= Math.max(1, Math.ceil(sampleSize * 0.6));
-  };
 
   const NAME_CANDIDATES = ["Player Name", "Player", "Name", "player", "name", "Footballer"];
   const TEAM_CANDIDATES = ["Team", "Club", "Squad", "team", "club", "Current Team"];
@@ -168,7 +93,6 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     "Valuation", "Contract Expiry (days left)", "Woman player no", "Player no",
     "Match no", "Team no", "Season", "Appearances", "90s Played", "Starting Appearances",
     "Photo", "_photoUrl", "playerPhoto", "Image", "Photo URL",
-    "Date", "DOB", "Birth Date", "Date of Birth", "Contract Date", "Report Date", "Joined Date",
     "__player_name__", "__team__", "__league__", "__position__", "__age__",
     "__minutes__","__contract_days__", "__contract_date__", "__row_id__",
     "Display Name", "Display Team", "Display League", "Display Position",
@@ -179,7 +103,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
   const META_KEYWORDS = [
     "id", "name", "team", "club", "squad", "player", "match", "season",
     "league", "competition", "birth", "height", "weight", "passport",
-    "country", "foot", "shirt", "age", "position", "role", "minute", "photo", "date", "dob", "birth", "expiry", "expires", "created", "updated", "time",
+    "country", "foot", "shirt", "age", "position", "role", "minute", "photo",
   ];
 
   const toNumber = (value) => {
@@ -212,57 +136,59 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
   };
 
   const normalizeRows = (rows) => {
-    const normalized = (rows || []).map((row, idx) => {
-      const normalizedRow = {};
-      Object.keys(row || {}).forEach((key) => {
-        normalizedRow[key] = normalizeUploadedValue(key, row[key]);
-      });
+    const normalized = rows.map((row, idx) => {
+      const out = { ...row };
 
-      const out = { ...normalizedRow };
+      const nameCol = findFirstExisting(row, NAME_CANDIDATES) || "Player Name";
+      const teamCol = findFirstExisting(row, TEAM_CANDIDATES) || "Team";
+      const leagueCol = findFirstExisting(row, LEAGUE_CANDIDATES) || "Competition Name";
+      const competitionTierCol = findFirstExisting(row, COMPETITION_TIER_CANDIDATES) || "Current Team Country (Tier)";
+      const positionCol = findFirstExisting(row, POSITION_CANDIDATES) || "Primary Position";
+      const minutesCol = findFirstExisting(row, MINUTES_CANDIDATES) || "Minutes Played";
+      const ageCol = findFirstExisting(row, AGE_CANDIDATES) || "Age";
+      const contractDaysCol = findFirstExisting(row, CONTRACT_DAYS_CANDIDATES) || "Contract Expiry (days left)";
+      const contractDateCol = findFirstExisting(row, CONTRACT_DATE_CANDIDATES) || "Contract expires";
+      const photoCol = findFirstExisting(row, PHOTO_CANDIDATES) || "Photo";
 
-      const nameCol = findFirstExisting(normalizedRow, NAME_CANDIDATES) || "Player Name";
-      const teamCol = findFirstExisting(normalizedRow, TEAM_CANDIDATES) || "Team";
-      const leagueCol = findFirstExisting(normalizedRow, LEAGUE_CANDIDATES) || "Competition Name";
-      const positionCol = findFirstExisting(normalizedRow, POSITION_CANDIDATES) || "Primary Position";
-      const minutesCol = findFirstExisting(normalizedRow, MINUTES_CANDIDATES) || "Minutes Played";
-      const ageCol = findFirstExisting(normalizedRow, AGE_CANDIDATES) || "Age";
-      const contractDaysCol = findFirstExisting(normalizedRow, CONTRACT_DAYS_CANDIDATES) || "Contract Expiry (days left)";
-      const contractDateCol = findFirstExisting(normalizedRow, CONTRACT_DATE_CANDIDATES) || "Contract expires";
-      const photoCol = findFirstExisting(normalizedRow, PHOTO_CANDIDATES) || "Photo";
+      const playerName = String(row[nameCol] ?? row["Player Name"] ?? row["Name"] ?? row["Player"] ?? `Player ${idx + 1}`).trim() || `Player ${idx + 1}`;
 
-      const playerName = String(normalizedRow[nameCol] ?? normalizedRow["Player Name"] ?? normalizedRow["Name"] ?? normalizedRow["Player"] ?? `Player ${idx + 1}`).trim() || `Player ${idx + 1}`;
+      const competitionName = String(row[leagueCol] ?? row["Competition Name"] ?? row["League"] ?? row["Competition"] ?? "").trim();
+      const competitionTier = String(row[competitionTierCol] ?? row["Current Team Country (Tier)"] ?? row["Country (Tier)"] ?? row["Competition Tier"] ?? "").trim();
+      const combinedCompetition = [competitionName, competitionTier].filter(Boolean).join(" - ").trim();
 
       out["Player Name"] = playerName;
       out["Display Name"] = playerName;
 
-      out["Team"] = String(normalizedRow[teamCol] ?? normalizedRow["Team"] ?? normalizedRow["Club"] ?? normalizedRow["Squad"] ?? "").trim();
+      out["Team"] = String(row[teamCol] ?? row["Team"] ?? row["Club"] ?? row["Squad"] ?? "").trim();
       out["Display Team"] = out["Team"];
 
-      out["Competition Name"] = String(normalizedRow[leagueCol] ?? normalizedRow["Competition Name"] ?? normalizedRow["League"] ?? normalizedRow["Competition"] ?? "").trim();
+      out["Competition Name"] = combinedCompetition || competitionName || competitionTier;
       out["Display League"] = out["Competition Name"];
+      out["Current Team Country (Tier)"] = competitionTier;
 
-      out["Primary Position"] = String(normalizedRow[positionCol] ?? normalizedRow["Primary Position"] ?? normalizedRow["Position"] ?? normalizedRow["Role"] ?? "").trim();
+      out["Primary Position"] = String(row[positionCol] ?? row["Primary Position"] ?? row["Position"] ?? row["Role"] ?? "").trim();
       out["Display Position"] = out["Primary Position"];
 
-      const ageValue = toNumber(normalizedRow[ageCol] ?? normalizedRow["Age"]);
+      const ageValue = toNumber(row[ageCol] ?? row["Age"]);
       if (ageValue !== null) out["Age"] = ageValue;
 
-      const minutesValue = toNumber(normalizedRow[minutesCol] ?? normalizedRow["Minutes Played"]);
+      const minutesValue = toNumber(row[minutesCol] ?? row["Minutes Played"]);
       if (minutesValue !== null) out["Minutes Played"] = minutesValue;
 
-      const contractDaysValue = toNumber(normalizedRow[contractDaysCol] ?? normalizedRow["Contract Expiry (days left)"]);
+      const contractDaysValue = toNumber(row[contractDaysCol] ?? row["Contract Expiry (days left)"]);
       if (contractDaysValue !== null) out["Contract Expiry (days left)"] = contractDaysValue;
 
-      const contractDateValue = normalizedRow[contractDateCol] ?? normalizedRow["Contract expires"];
+      const contractDateValue = row[contractDateCol] ?? row["Contract expires"];
       if (contractDateValue) out["Contract expires"] = contractDateValue;
 
-      const photoValue = normalizedRow[photoCol] ?? normalizedRow["Photo"] ?? normalizedRow["_photoUrl"];
+      const photoValue = row[photoCol] ?? row["Photo"] ?? row["_photoUrl"];
       if (photoValue) out["_photoUrl"] = photoValue;
 
       out["Player Label"] = playerName;
       out["__player_name__"] = playerName;
       out["__team__"] = out["Team"];
       out["__league__"] = out["Competition Name"];
+      out["__competition_tier__"] = competitionTier;
       out["__position__"] = out["Primary Position"];
       out["__age__"] = ageValue;
       out["__minutes__"] = minutesValue;
@@ -285,7 +211,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
       const name = String(row["Player Name"] || "").trim();
       let label = name;
       if (counts[name] > 1) {
-        const suffix = row["Team"] || row["Competition Name"] || `Row ${idx + 1}`;
+        const suffix = row["Team"] || row["Competition Name"] || row["Current Team Country (Tier)"] || `Row ${idx + 1}`;
         label = `${name} (${suffix})`;
       }
       if (labelCounts[label]) {
@@ -296,7 +222,33 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     });
   };
 
-  const inferMetricColumns = (rows) => {
+
+  const isDateLikeValue = (value) => {
+    if (value instanceof Date && !Number.isNaN(value.getTime())) return true;
+    if (typeof value !== "string") return false;
+    const s = value.trim();
+    if (!s) return false;
+    return (
+      /^\d{4}[-/]\d{1,2}[-/]\d{1,2}(?:[ T].*)?$/.test(s) ||
+      /^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}(?:[ T].*)?$/.test(s) ||
+      /^\w{3,9}\s+\d{1,2},\s+\d{4}$/.test(s)
+    );
+  };
+
+  const looksLikeDateColumn = (rows, key) => {
+    if (String(key || "").toLowerCase().includes("date")) return true;
+    if (String(key || "").toLowerCase().includes("birth")) return true;
+    if (String(key || "").toLowerCase().includes("expiry")) return true;
+    const sample = (rows || [])
+      .map((row) => row?.[key])
+      .filter((v) => v !== null && v !== undefined && String(v).trim() !== "");
+    if (sample.length === 0) return false;
+    const sampleSize = Math.min(sample.length, 20);
+    const dateCount = sample.slice(0, sampleSize).filter((v) => isDateLikeValue(v)).length;
+    return dateCount >= Math.max(1, Math.ceil(sampleSize * 0.6));
+  };
+
+  const inferMetricColumns  const inferMetricColumns = (rows) => {
     const metrics = [];
     if (!rows || rows.length === 0) return metrics;
 
@@ -321,7 +273,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     return uniquePreserveOrder(metrics);
   };
 
-  const sortRowsByScore = (rows, metricNames) => {
+  const sortRowsByScore  const sortRowsByScore = (rows, metricNames) => {
     if (!rows || rows.length === 0 || !metricNames || metricNames.length === 0) return rows || [];
     return [...rows].sort((a, b) => {
       const aScore = Number(averageRating(a, rows, metricNames)) || 0;
@@ -350,7 +302,11 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     setMetrics(detected);
     setScatterMetrics({ x: detected[0] || "", y: detected[1] || "" });
 
-    const comps = uniquePreserveOrder(ranked.map((p) => p["Competition Name"]).filter(Boolean));
+    const comps = uniquePreserveOrder(
+      ranked
+        .map((p) => p["Competition Name"] || p["Current Team Country (Tier)"])
+        .filter(Boolean)
+    );
     setCompetitions(["All", ...comps]);
 
     setSelectedPlayer(ranked[0] || null);
@@ -367,7 +323,6 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
       const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
       const sheetName = workbook.SheetNames?.[0];
       const sheet = sheetName ? workbook.Sheets[sheetName] : null;
-
       if (!sheet) return;
 
       const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: true });
@@ -384,7 +339,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     });
   };
 
-  const applyFilters = () => {
+  const applyFilters  const applyFilters = () => {
     const f = players.filter((p) =>
       (filters.minMinutes === 0 || (p["Minutes Played"] ?? 0) >= filters.minMinutes) &&
       (filters.maxMinutes === 99999 || (p["Minutes Played"] ?? 0) <= filters.maxMinutes) &&
@@ -531,6 +486,33 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 
   const uniquePositions = Array.from(new Set(filteredPlayers.map((p) => p["Primary Position"]).filter(Boolean)));
 
+    const controlStyle = {
+      width: "100%",
+      maxWidth: "100%",
+      boxSizing: "border-box",
+      minHeight: 34,
+      borderRadius: 4,
+      border: "1px solid #9aa0a6",
+      padding: "4px 8px",
+      background: "#fff",
+    };
+
+    const selectStyle = {
+      ...controlStyle,
+      fontSize: 14,
+    };
+
+    const multiSelectStyle = {
+      ...controlStyle,
+      minHeight: 110,
+      resize: "vertical",
+    };
+
+    const inputStyle = {
+      ...controlStyle,
+      fontSize: 14,
+    };
+
     const generateScoutSummaryData = (player) => {
       if (!player) return { strengths: [], weaknesses: [], clipsLink: "#" };
 
@@ -555,31 +537,31 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
       <input type="file" accept=".csv,.xlsx,.xls" onChange={handleUpload} style={{ marginTop: 10 }} />
 
       {/* Filters + Right Column */}
-      <div style={{ marginTop: 20, display:"grid", gridTemplateColumns:"260px 1fr", gap:24, maxWidth:1400, margin:"auto" }}>
+      <div style={{ marginTop: 20, display:"grid", gridTemplateColumns:"minmax(280px, 300px) minmax(0, 1fr)", gap:24, maxWidth:1400, margin:"auto", alignItems:"start" }}>
         {/* Filter Panel */}
         <div style={{ background:"rgba(255,255,255,0.95)", padding:16, borderRadius:12, boxShadow:"0 4px 12px rgba(0,0,0,0.08)", height:"fit-content" }}>
           <h3 style={{ marginTop:0, marginBottom:12, color:"#1f77b4" }}>Filters</h3>
           <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-            <div><label style={{ fontSize:12, fontWeight:600 }}>Min Minutes</label><input type="number" onChange={e => setFilters({...filters, minMinutes:Number(e.target.value)})} /></div>
-            <div><label style={{ fontSize:12, fontWeight:600 }}>Max Minutes</label><input type="number" onChange={e => setFilters({...filters, maxMinutes:Number(e.target.value)})} /></div>
-            <div><label style={{ fontSize:12, fontWeight:600 }}>Competition</label>
-              <select onChange={e=>setFilters({...filters, competition:e.target.value})}>
+            <div><label style={{ fontSize:12, fontWeight:600, display:"block", marginBottom:4 }}>Min Minutes</label><input type="number" onChange={e => setFilters({...filters, minMinutes:Number(e.target.value)})} style={inputStyle} /></div>
+            <div><label style={{ fontSize:12, fontWeight:600, display:"block", marginBottom:4 }}>Max Minutes</label><input type="number" onChange={e => setFilters({...filters, maxMinutes:Number(e.target.value)})} style={inputStyle} /></div>
+            <div><label style={{ fontSize:12, fontWeight:600, display:"block", marginBottom:4 }}>Competition</label>
+              <select onChange={e=>setFilters({...filters, competition:e.target.value})} style={selectStyle}>
                 {competitions.map(c=><option key={c}>{c}</option>)}
               </select>
             </div>
-            <div><label style={{ fontSize:12, fontWeight:600 }}>Position</label>
-              <select multiple style={{height:80}} onChange={e=>setFilters({...filters, positions:Array.from(e.target.selectedOptions, o=>o.value)})}>
+            <div><label style={{ fontSize:12, fontWeight:600, display:"block", marginBottom:4 }}>Position</label>
+              <select multiple onChange={e=>setFilters({...filters, positions:Array.from(e.target.selectedOptions, o=>o.value)})} style={multiSelectStyle}>
                 {uniquePositions.map(pos=><option key={pos}>{pos}</option>)}
               </select>
             </div>
             <hr style={{ opacity:0.2 }} />
-            <div><label style={{ fontSize:12, fontWeight:600 }}>Scatter X</label>
-              <select value={scatterMetrics.x} onChange={e=>setScatterMetrics({...scatterMetrics, x:e.target.value})}>
+            <div><label style={{ fontSize:12, fontWeight:600, display:"block", marginBottom:4 }}>Scatter X</label>
+              <select value={scatterMetrics.x} onChange={e=>setScatterMetrics({...scatterMetrics, x:e.target.value})} style={selectStyle}>
                 {metrics.map(m=><option key={m}>{m}</option>)}
               </select>
             </div>
-            <div><label style={{ fontSize:12, fontWeight:600 }}>Scatter Y</label>
-              <select value={scatterMetrics.y} onChange={e=>setScatterMetrics({...scatterMetrics, y:e.target.value})}>
+            <div><label style={{ fontSize:12, fontWeight:600, display:"block", marginBottom:4 }}>Scatter Y</label>
+              <select value={scatterMetrics.y} onChange={e=>setScatterMetrics({...scatterMetrics, y:e.target.value})} style={selectStyle}>
                 {metrics.map(m=><option key={m}>{m}</option>)}
               </select>
             </div>
@@ -1214,6 +1196,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 }
 
 export default ScoutReportPage;
+
 
 
 
