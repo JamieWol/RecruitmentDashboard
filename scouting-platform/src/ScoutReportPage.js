@@ -1,5 +1,6 @@
 import React, { useState, useRef } from "react";
 import Papa from "papaparse";
+import * as XLSX from "xlsx";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { POSITION_MAP } from "./POSITION_MAP";
@@ -84,6 +85,72 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
   const CONTRACT_DATE_CANDIDATES = ["Contract expires", "Contract Expiry", "Contract end", "Expiry"];
   const PHOTO_CANDIDATES = ["Photo", "_photoUrl", "playerPhoto", "Image", "Photo URL"];
 
+  const DATE_KEYWORDS = ["date", "dob", "birth", "expiry", "expires", "created", "updated", "time", "joined"];
+
+  const isDateHeader = (key) =>
+    DATE_KEYWORDS.some((hint) => String(key || "").toLowerCase().includes(hint));
+
+  const excelSerialToISO = (serial) => {
+    try {
+      const parsed = XLSX.SSF.parse_date_code(serial);
+      if (!parsed) return null;
+      const yyyy = String(parsed.y).padStart(4, "0");
+      const mm = String(parsed.m).padStart(2, "0");
+      const dd = String(parsed.d).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    } catch {
+      return null;
+    }
+  };
+
+  const isDateLikeValue = (value) => {
+    if (value instanceof Date && !Number.isNaN(value.getTime())) return true;
+    if (typeof value !== "string") return false;
+    const s = value.trim();
+    if (!s) return false;
+    return /^\d{4}[-/]\d{1,2}[-/]\d{1,2}(?:[ T].*)?$/.test(s) || /^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}(?:[ T].*)?$/.test(s);
+  };
+
+  const normalizeUploadedValue = (key, value) => {
+    if (value === null || value === undefined || value === "") return "";
+
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+      return value.toISOString().slice(0, 10);
+    }
+
+    if (typeof value === "number") {
+      if (isDateHeader(key)) {
+        const asDate = excelSerialToISO(value);
+        if (asDate) return asDate;
+      }
+      return value;
+    }
+
+    const raw = String(value).trim();
+    if (!raw) return "";
+
+    if (isDateHeader(key)) {
+      const parsed = Date.parse(raw);
+      if (!Number.isNaN(parsed)) {
+        return new Date(parsed).toISOString().slice(0, 10);
+      }
+    }
+
+    const numeric = toNumber(raw);
+    return numeric !== null ? numeric : raw;
+  };
+
+  const looksLikeDateColumn = (rows, key) => {
+    if (isDateHeader(key)) return true;
+    const sample = rows
+      .map((row) => row?.[key])
+      .filter((v) => v !== null && v !== undefined && String(v).trim() !== "");
+    if (sample.length === 0) return false;
+    const sampleSize = Math.min(sample.length, 20);
+    const dateCount = sample.slice(0, sampleSize).filter((v) => isDateLikeValue(v)).length;
+    return dateCount >= Math.max(1, Math.ceil(sampleSize * 0.6));
+  };
+
   const META_EXACT = new Set([
     "Player", "Name", "Team", "Club", "Squad", "League", "Competition",
     "Competition Name", "Position", "Primary Position", "Role", "Age",
@@ -92,6 +159,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     "Valuation", "Contract Expiry (days left)", "Woman player no", "Player no",
     "Match no", "Team no", "Season", "Appearances", "90s Played", "Starting Appearances",
     "Photo", "_photoUrl", "playerPhoto", "Image", "Photo URL",
+    "Date", "DOB", "Birth Date", "Date of Birth", "Contract Date", "Report Date",
     "__player_name__", "__team__", "__league__", "__position__", "__age__",
     "__minutes__","__contract_days__", "__contract_date__", "__row_id__",
     "Display Name", "Display Team", "Display League", "Display Position",
@@ -102,7 +170,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
   const META_KEYWORDS = [
     "id", "name", "team", "club", "squad", "player", "match", "season",
     "league", "competition", "birth", "height", "weight", "passport",
-    "country", "foot", "shirt", "age", "position", "role", "minute", "photo",
+    "country", "foot", "shirt", "age", "position", "role", "minute", "photo", "date", "dob", "birth", "expiry", "expires", "created", "updated", "time",
   ];
 
   const toNumber = (value) => {
@@ -223,6 +291,8 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
       if (META_EXACT.has(col)) return;
       const lower = String(col).toLowerCase();
       if (META_KEYWORDS.some((k) => lower.includes(k))) return;
+      if (looksLikeDateColumn(rows, col)) return;
+
       const numericValues = rows
         .map((r) => toNumber(r[col]))
         .filter((v) => v !== null && v !== undefined);
@@ -247,34 +317,57 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
   };
 
 
-  const handleUpload = (e) => {
-    Papa.parse(e.target.files[0], {
+  const processRows = (rows) => {
+    const parsed = rows.map((p) => {
+      const obj = {};
+      Object.keys(p || {}).forEach((k) => {
+        obj[k] = normalizeUploadedValue(k, p[k]);
+      });
+      return obj;
+    });
+
+    const normalized = normalizeRows(parsed);
+    const detected = inferMetricColumns(normalized);
+
+    const ranked = sortRowsByScore(normalized, detected);
+
+    setPlayers(normalized);
+    setFilteredPlayers(ranked);
+    setMetrics(detected);
+    setScatterMetrics({ x: detected[0] || "", y: detected[1] || "" });
+
+    const comps = uniquePreserveOrder(ranked.map((p) => p["Competition Name"]).filter(Boolean));
+    setCompetitions(["All", ...comps]);
+
+    setSelectedPlayer(ranked[0] || null);
+  };
+
+  const handleUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const fileName = file.name.toLowerCase();
+
+    if (fileName.endsWith(".xlsx") || fileName.endsWith(".xls")) {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
+      const sheetName = workbook.SheetNames?.[0];
+      const sheet = sheetName ? workbook.Sheets[sheetName] : null;
+
+      if (!sheet) {
+        return;
+      }
+
+      const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: true });
+      processRows(rawRows);
+      return;
+    }
+
+    Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
       complete: (res) => {
-        const parsed = res.data.map((p) => {
-          const obj = {};
-          Object.keys(p).forEach((k) => {
-            const numeric = toNumber(p[k]);
-            obj[k] = numeric !== null ? numeric : p[k];
-          });
-          return obj;
-        });
-
-        const normalized = normalizeRows(parsed);
-        const detected = inferMetricColumns(normalized);
-
-        const ranked = sortRowsByScore(normalized, detected);
-
-        setPlayers(normalized);
-        setFilteredPlayers(ranked);
-        setMetrics(detected);
-        setScatterMetrics({ x: detected[0] || "", y: detected[1] || "" });
-
-        const comps = uniquePreserveOrder(ranked.map((p) => p["Competition Name"]).filter(Boolean));
-        setCompetitions(["All", ...comps]);
-
-        setSelectedPlayer(ranked[0] || null);
+        processRows(res.data);
       },
     });
   };
@@ -447,7 +540,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
       minHeight: "100vh"
     }}>
       <h1 style={{ color: "#1f77b4", textAlign:"center" }}>Create Scouting & Analysis Reports</h1>
-      <input type="file" accept=".csv" onChange={handleUpload} style={{ marginTop: 10 }} />
+      <input type="file" accept=".csv,.xlsx,.xls" onChange={handleUpload} style={{ marginTop: 10 }} />
 
       {/* Filters + Right Column */}
       <div style={{ marginTop: 20, display:"grid", gridTemplateColumns:"260px 1fr", gap:24, maxWidth:1400, margin:"auto" }}>
