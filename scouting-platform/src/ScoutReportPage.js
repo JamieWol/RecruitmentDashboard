@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import Papa from "papaparse";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
@@ -23,7 +23,6 @@ import {
 
 function ScoutReportPage({ shadowSquad, setShadowSquad }) {
   const [players, setPlayers] = useState([]);
-  const [isExporting, setIsExporting] = useState(false);
   const exportRef = useRef(null);
   const [clipsLink, setClipsLink] = useState("");
   const [filteredPlayers, setFilteredPlayers] = useState([]);
@@ -257,64 +256,11 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
           league: p.leagueAvg
         }))
       : [];
-    const renderRadarLabel = ({ x, y, payload, type }) => {
-      if (!payload) return null;
-
-      const rawValue = type === "player" ? payload.player : payload.league;
-      const value = `${Math.round(rawValue)}%`;
-
-      const boxWidth = 34;
-      const boxHeight = 18;
-
-      const fillColor = type === "player" ? "#1a78cf" : "#ffd700";
-      const textColor = type === "player" ? "#fff" : "#000";
-
-      return (
-        <g transform={`translate(${x - boxWidth / 2}, ${y - 26})`}>
-          <rect
-            width={boxWidth}
-            height={boxHeight}
-            fill={fillColor}
-            stroke="#000"
-            strokeWidth={2} // black border
-            rx={3}
-            ry={3}
-          />
-          <text
-            x={boxWidth / 2}
-            y={boxHeight / 2 + 5}
-            textAnchor="middle"
-            fill={textColor}
-            fontSize={10}
-            fontWeight={700}
-          >
-            {value}
-          </text>
-        </g>
-      );
-    };
-
-
-
-
-
+    
 
   const uniquePositions = Array.from(new Set(players.map(p => p["Primary Position"]).filter(Boolean)));
 
-  const RadarTooltip = ({ active, payload }) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div style={{ background:"#fff", padding:10, border:"1px solid #ccc", borderRadius:6 }}>
-          <div><strong>{data.metric}</strong></div>
-          <div>Player: {data.value}</div>
-          <div>League Avg: {data.avg}</div>
-        </div>
-      );
-    }
-    return null;
-  };
-
+  
     const generateScoutSummaryData = (player) => {
       if (!player) return { strengths: [], weaknesses: [], clipsLink: "#" };
 
@@ -1013,4 +959,5 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 }
 
 export default ScoutReportPage;
+
 
