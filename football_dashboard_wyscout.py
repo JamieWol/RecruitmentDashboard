@@ -553,6 +553,26 @@ def plot_pizza_like(player_label: str, df: pd.DataFrame, metrics: list[str], lea
 st.sidebar.header("Upload Data")
 uploaded_file = st.sidebar.file_uploader("Upload CSV or Excel", type=["csv", "xlsx", "xls"])
 
+# ---------------------------------------------------------------------
+# TOP BANNER
+# ---------------------------------------------------------------------
+st.markdown("""
+<div style="background:#1f77b4;padding:18px;border-radius:10px;margin-bottom:20px;">
+<h1 style="color:white;margin:0;">⚽ Football Recruitment Platform</h1>
+<p style="color:white;margin:6px 0 12px 0;">Recruitment Dashboard & Scout Reports</p>
+</div>
+""", unsafe_allow_html=True)
+
+tab_dashboard, tab_reports = st.tabs(["📊 Recruitment Dashboard", "📄 Scout Reports"])
+
+with tab_reports:
+    st.markdown("## 📄 Scout Reports")
+    st.write("Open the live Scout Reports application below.")
+    st.link_button(
+        "Open Scout Reports",
+        "https://recruitment-dashboard-kohl.vercel.app"
+    )
+
 if not uploaded_file:
     st.title("⚽ Football Recruitment Dashboard")
     st.info("Upload a CSV or Excel file to begin.")
