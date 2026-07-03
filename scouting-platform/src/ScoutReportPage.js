@@ -68,11 +68,6 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
       return `/player-photos/${safeName}.png`;
     };
 
-
-
-
-
-
   const excludedColumns = [
     "Account","Default Radar Template","Name","Team","Competition",
     "Competition Type","Competition Rank","Season","Nationality",
@@ -111,7 +106,6 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 
             return obj;
           });
-
 
         const detected = detectMetrics(parsed);
 
@@ -152,7 +146,6 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
       let avgPct = (values.filter(v => v <= avgValue).length / values.length) * 100;
       if (lowerIsBetterMetrics.includes(m)) avgPct = 100 - avgPct;
         
-
 
       return {
         metric: m,
@@ -256,11 +249,9 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
           league: p.leagueAvg
         }))
       : [];
-    
 
   const uniquePositions = Array.from(new Set(players.map(p => p["Primary Position"]).filter(Boolean)));
 
-  
     const generateScoutSummaryData = (player) => {
       if (!player) return { strengths: [], weaknesses: [], clipsLink: "#" };
 
@@ -273,8 +264,6 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 
       return { strengths, weaknesses, clipsLink };
     };
-
-
 
   return (
     <div style={{
@@ -438,10 +427,6 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
           >
             ➕ Add to Shadow Squad
           </button>
-
-
-
-
 
       {/* Player Report */}
       {selectedPlayer && <div ref={exportRef}>
@@ -785,11 +770,6 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
             </ResponsiveContainer>
           </div>
 
-
-
-
-
-
           <div
             style={{
               background: "rgba(255,255,255,0.95)",
@@ -910,8 +890,6 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                                       </div>
                                     )}
 
-
-
                                 {/* Clips */}
                                 <div
                                   style={{
@@ -947,8 +925,6 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                         </div>
                       </div>
 
-
-
       </div>}
 
       <style>
@@ -959,5 +935,6 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 }
 
 export default ScoutReportPage;
+
 
 
