@@ -146,6 +146,16 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     return dateCount >= Math.max(1, Math.ceil(sampleSize * 0.6));
   };
 
+  const getCompetitionValue = (row) =>
+    String(
+      row?.["Current Team Country (Tier)"] ||
+      row?.["Competition Name"] ||
+      row?.["Competition"] ||
+      ""
+    ).trim();
+
+  const normalizeCompetitionValue = (value) => String(value || "").trim().toLowerCase();
+
   const NAME_CANDIDATES = ["Player Name", "Player", "Name", "player", "name", "Footballer"];
   const TEAM_CANDIDATES = ["Team", "Club", "Squad", "team", "club", "Current Team"];
   const LEAGUE_CANDIDATES = ["League", "Competition", "competition", "league", "Competition Name"];
@@ -352,7 +362,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 
     const comps = uniquePreserveOrder(
       ranked
-        .map((p) => p["Current Team Country (Tier)"] || p["Competition Name"] || p["Competition"])
+        .map((p) => getCompetitionValue(p))
         .filter(Boolean)
     );
     setCompetitions(["All", ...comps]);
@@ -392,7 +402,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     const f = players.filter((p) =>
       (filters.minMinutes === 0 || (p["Minutes Played"] ?? 0) >= filters.minMinutes) &&
       (filters.maxMinutes === 99999 || (p["Minutes Played"] ?? 0) <= filters.maxMinutes) &&
-      (filters.competition === "All" ? true : String(p["Competition Name"] ?? "") === filters.competition) &&
+      (filters.competition === "All" ? true : normalizeCompetitionValue(getCompetitionValue(p)) === normalizeCompetitionValue(filters.competition)) &&
       (filters.positions.length === 0 ? true : filters.positions.includes(String(p["Primary Position"] ?? "")))
     );
 
@@ -778,7 +788,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
           
               <div>Team: <strong>{selectedPlayer.Team}</strong></div>
               <div>Position: <strong>{selectedPlayer["Primary Position"]}</strong></div>
-              <div>Competition: <strong>{selectedPlayer["Current Team Country (Tier)"] || selectedPlayer["Competition Name"] || selectedPlayer["Competition"]}</strong></div>
+              <div>Competition: <strong>{getCompetitionValue(selectedPlayer)}</strong></div>
               <div>Age: <strong>{selectedPlayer.Age}</strong></div>
               <div>Nationality: <strong>{selectedPlayer.Nationality}</strong></div>
               <div>Games Played: <strong>{selectedPlayer["Appearances"]}</strong></div>
@@ -1221,6 +1231,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 }
 
 export default ScoutReportPage;
+
 
 
 
