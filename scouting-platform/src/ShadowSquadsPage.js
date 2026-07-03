@@ -83,7 +83,7 @@ export default function ShadowSquadsPage({ shadowSquad, setShadowSquad }) {
 
         return next;
       });
-    }, [shadowSquad, formation]);
+    }, [shadowSquad, formation, positions]);
 
 
   /* ---------------- HELPERS ---------------- */
