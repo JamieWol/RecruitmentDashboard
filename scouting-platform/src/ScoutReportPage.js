@@ -778,7 +778,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
           
               <div>Team: <strong>{selectedPlayer.Team}</strong></div>
               <div>Position: <strong>{selectedPlayer["Primary Position"]}</strong></div>
-              <div>Competition: <strong>{selectedPlayer["Competition Name"]}</strong></div>
+              <div>Competition: <strong>{selectedPlayer["Current Team Country (Tier)"] || selectedPlayer["Competition Name"] || selectedPlayer["Competition"]}</strong></div>
               <div>Age: <strong>{selectedPlayer.Age}</strong></div>
               <div>Nationality: <strong>{selectedPlayer.Nationality}</strong></div>
               <div>Games Played: <strong>{selectedPlayer["Appearances"]}</strong></div>
@@ -1221,6 +1221,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 }
 
 export default ScoutReportPage;
+
 
 
 
