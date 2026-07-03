@@ -54,7 +54,7 @@ function Header() {
           </span>
         ))}
         <a
-          href="https://recruitmentdashboard-ggsphhjonkwlx7mqpefpaq.streamlit.app/"
+          href="https://recruitmentdashboard-iffxqqyyyuvoe2xamnaldh.streamlit.app/"
           target="_blank"
           rel="noopener noreferrer"
           className="nav-link"
