@@ -53,7 +53,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     };
 
     const getPlayerPhoto = (player) => {
-      // Use CSV photo column if available
+      // Use CSV / Excel photo column if available
       if (player?._photoUrl) return player._photoUrl;
       if (player?.Photo) return player.Photo;
 
@@ -71,28 +71,19 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
       return `/player-photos/${safeName}.png`;
     };
 
-  const NAME_CANDIDATES = ["Player Name", "Player", "Name", "player", "name", "Footballer"];
-  const TEAM_CANDIDATES = ["Team", "Club", "Squad", "team", "club", "Current Team"];
-  const LEAGUE_CANDIDATES = ["League", "Competition", "competition", "league", "Competition Name"];
-  const POSITION_CANDIDATES = ["Position", "Primary Position", "Role", "position"];
-  const MINUTES_CANDIDATES = [
-    "Minutes played", "Minutes", "mins", "Min", "minutes played", "Minutes Played", "Minutes (Last 2 years)",
+  const DATE_HINTS = [
+    "date", "dob", "birth", "expiry", "expires", "joined", "created",
+    "updated", "time", "report", "contract"
   ];
-  const AGE_CANDIDATES = ["Age", "age"];
-  const CONTRACT_DAYS_CANDIDATES = [
-    "Contract Expiry (days left)", "Contract expiry (days left)", "Contract days left", "Days left on contract",
-  ];
-  const CONTRACT_DATE_CANDIDATES = ["Contract expires", "Contract Expiry", "Contract end", "Expiry"];
-  const PHOTO_CANDIDATES = ["Photo", "_photoUrl", "playerPhoto", "Image", "Photo URL"];
 
-  const DATE_KEYWORDS = ["date", "dob", "birth", "expiry", "expires", "created", "updated", "time", "joined"];
-
-  const isDateHeader = (key) =>
-    DATE_KEYWORDS.some((hint) => String(key || "").toLowerCase().includes(hint));
+  const isDateHeader = (key) => {
+    const text = String(key || "").toLowerCase();
+    return DATE_HINTS.some((hint) => text.includes(hint));
+  };
 
   const excelSerialToISO = (serial) => {
     try {
-      const parsed = XLSX.SSF.parse_date_code(serial);
+      const parsed = XLSX?.SSF?.parse_date_code?.(serial);
       if (!parsed) return null;
       const yyyy = String(parsed.y).padStart(4, "0");
       const mm = String(parsed.m).padStart(2, "0");
@@ -108,7 +99,11 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     if (typeof value !== "string") return false;
     const s = value.trim();
     if (!s) return false;
-    return /^\d{4}[-/]\d{1,2}[-/]\d{1,2}(?:[ T].*)?$/.test(s) || /^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}(?:[ T].*)?$/.test(s);
+    return (
+      /^\d{4}[-/]\d{1,2}[-/]\d{1,2}(?:[ T].*)?$/.test(s) ||
+      /^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}(?:[ T].*)?$/.test(s) ||
+      /^\w{3,9}\s+\d{1,2},\s+\d{4}$/.test(s)
+    );
   };
 
   const normalizeUploadedValue = (key, value) => {
@@ -120,8 +115,8 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 
     if (typeof value === "number") {
       if (isDateHeader(key)) {
-        const asDate = excelSerialToISO(value);
-        if (asDate) return asDate;
+        const iso = excelSerialToISO(value);
+        if (iso) return iso;
       }
       return value;
     }
@@ -129,7 +124,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     const raw = String(value).trim();
     if (!raw) return "";
 
-    if (isDateHeader(key)) {
+    if (isDateHeader(key) || isDateLikeValue(raw)) {
       const parsed = Date.parse(raw);
       if (!Number.isNaN(parsed)) {
         return new Date(parsed).toISOString().slice(0, 10);
@@ -142,7 +137,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 
   const looksLikeDateColumn = (rows, key) => {
     if (isDateHeader(key)) return true;
-    const sample = rows
+    const sample = (rows || [])
       .map((row) => row?.[key])
       .filter((v) => v !== null && v !== undefined && String(v).trim() !== "");
     if (sample.length === 0) return false;
@@ -150,6 +145,20 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     const dateCount = sample.slice(0, sampleSize).filter((v) => isDateLikeValue(v)).length;
     return dateCount >= Math.max(1, Math.ceil(sampleSize * 0.6));
   };
+
+  const NAME_CANDIDATES = ["Player Name", "Player", "Name", "player", "name", "Footballer"];
+  const TEAM_CANDIDATES = ["Team", "Club", "Squad", "team", "club", "Current Team"];
+  const LEAGUE_CANDIDATES = ["League", "Competition", "competition", "league", "Competition Name"];
+  const POSITION_CANDIDATES = ["Position", "Primary Position", "Role", "position"];
+  const MINUTES_CANDIDATES = [
+    "Minutes played", "Minutes", "mins", "Min", "minutes played", "Minutes Played", "Minutes (Last 2 years)",
+  ];
+  const AGE_CANDIDATES = ["Age", "age"];
+  const CONTRACT_DAYS_CANDIDATES = [
+    "Contract Expiry (days left)", "Contract expiry (days left)", "Contract days left", "Days left on contract",
+  ];
+  const CONTRACT_DATE_CANDIDATES = ["Contract expires", "Contract Expiry", "Contract end", "Expiry"];
+  const PHOTO_CANDIDATES = ["Photo", "_photoUrl", "playerPhoto", "Image", "Photo URL"];
 
   const META_EXACT = new Set([
     "Player", "Name", "Team", "Club", "Squad", "League", "Competition",
@@ -159,7 +168,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     "Valuation", "Contract Expiry (days left)", "Woman player no", "Player no",
     "Match no", "Team no", "Season", "Appearances", "90s Played", "Starting Appearances",
     "Photo", "_photoUrl", "playerPhoto", "Image", "Photo URL",
-    "Date", "DOB", "Birth Date", "Date of Birth", "Contract Date", "Report Date",
+    "Date", "DOB", "Birth Date", "Date of Birth", "Contract Date", "Report Date", "Joined Date",
     "__player_name__", "__team__", "__league__", "__position__", "__age__",
     "__minutes__","__contract_days__", "__contract_date__", "__row_id__",
     "Display Name", "Display Team", "Display League", "Display Position",
@@ -203,46 +212,51 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
   };
 
   const normalizeRows = (rows) => {
-    const normalized = rows.map((row, idx) => {
-      const out = { ...row };
+    const normalized = (rows || []).map((row, idx) => {
+      const normalizedRow = {};
+      Object.keys(row || {}).forEach((key) => {
+        normalizedRow[key] = normalizeUploadedValue(key, row[key]);
+      });
 
-      const nameCol = findFirstExisting(row, NAME_CANDIDATES) || "Player Name";
-      const teamCol = findFirstExisting(row, TEAM_CANDIDATES) || "Team";
-      const leagueCol = findFirstExisting(row, LEAGUE_CANDIDATES) || "Competition Name";
-      const positionCol = findFirstExisting(row, POSITION_CANDIDATES) || "Primary Position";
-      const minutesCol = findFirstExisting(row, MINUTES_CANDIDATES) || "Minutes Played";
-      const ageCol = findFirstExisting(row, AGE_CANDIDATES) || "Age";
-      const contractDaysCol = findFirstExisting(row, CONTRACT_DAYS_CANDIDATES) || "Contract Expiry (days left)";
-      const contractDateCol = findFirstExisting(row, CONTRACT_DATE_CANDIDATES) || "Contract expires";
-      const photoCol = findFirstExisting(row, PHOTO_CANDIDATES) || "Photo";
+      const out = { ...normalizedRow };
 
-      const playerName = String(row[nameCol] ?? row["Player Name"] ?? row["Name"] ?? row["Player"] ?? `Player ${idx + 1}`).trim() || `Player ${idx + 1}`;
+      const nameCol = findFirstExisting(normalizedRow, NAME_CANDIDATES) || "Player Name";
+      const teamCol = findFirstExisting(normalizedRow, TEAM_CANDIDATES) || "Team";
+      const leagueCol = findFirstExisting(normalizedRow, LEAGUE_CANDIDATES) || "Competition Name";
+      const positionCol = findFirstExisting(normalizedRow, POSITION_CANDIDATES) || "Primary Position";
+      const minutesCol = findFirstExisting(normalizedRow, MINUTES_CANDIDATES) || "Minutes Played";
+      const ageCol = findFirstExisting(normalizedRow, AGE_CANDIDATES) || "Age";
+      const contractDaysCol = findFirstExisting(normalizedRow, CONTRACT_DAYS_CANDIDATES) || "Contract Expiry (days left)";
+      const contractDateCol = findFirstExisting(normalizedRow, CONTRACT_DATE_CANDIDATES) || "Contract expires";
+      const photoCol = findFirstExisting(normalizedRow, PHOTO_CANDIDATES) || "Photo";
+
+      const playerName = String(normalizedRow[nameCol] ?? normalizedRow["Player Name"] ?? normalizedRow["Name"] ?? normalizedRow["Player"] ?? `Player ${idx + 1}`).trim() || `Player ${idx + 1}`;
 
       out["Player Name"] = playerName;
       out["Display Name"] = playerName;
 
-      out["Team"] = String(row[teamCol] ?? row["Team"] ?? row["Club"] ?? row["Squad"] ?? "").trim();
+      out["Team"] = String(normalizedRow[teamCol] ?? normalizedRow["Team"] ?? normalizedRow["Club"] ?? normalizedRow["Squad"] ?? "").trim();
       out["Display Team"] = out["Team"];
 
-      out["Competition Name"] = String(row[leagueCol] ?? row["Competition Name"] ?? row["League"] ?? row["Competition"] ?? "").trim();
+      out["Competition Name"] = String(normalizedRow[leagueCol] ?? normalizedRow["Competition Name"] ?? normalizedRow["League"] ?? normalizedRow["Competition"] ?? "").trim();
       out["Display League"] = out["Competition Name"];
 
-      out["Primary Position"] = String(row[positionCol] ?? row["Primary Position"] ?? row["Position"] ?? row["Role"] ?? "").trim();
+      out["Primary Position"] = String(normalizedRow[positionCol] ?? normalizedRow["Primary Position"] ?? normalizedRow["Position"] ?? normalizedRow["Role"] ?? "").trim();
       out["Display Position"] = out["Primary Position"];
 
-      const ageValue = toNumber(row[ageCol] ?? row["Age"]);
+      const ageValue = toNumber(normalizedRow[ageCol] ?? normalizedRow["Age"]);
       if (ageValue !== null) out["Age"] = ageValue;
 
-      const minutesValue = toNumber(row[minutesCol] ?? row["Minutes Played"]);
+      const minutesValue = toNumber(normalizedRow[minutesCol] ?? normalizedRow["Minutes Played"]);
       if (minutesValue !== null) out["Minutes Played"] = minutesValue;
 
-      const contractDaysValue = toNumber(row[contractDaysCol] ?? row["Contract Expiry (days left)"]);
+      const contractDaysValue = toNumber(normalizedRow[contractDaysCol] ?? normalizedRow["Contract Expiry (days left)"]);
       if (contractDaysValue !== null) out["Contract Expiry (days left)"] = contractDaysValue;
 
-      const contractDateValue = row[contractDateCol] ?? row["Contract expires"];
+      const contractDateValue = normalizedRow[contractDateCol] ?? normalizedRow["Contract expires"];
       if (contractDateValue) out["Contract expires"] = contractDateValue;
 
-      const photoValue = row[photoCol] ?? row["Photo"] ?? row["_photoUrl"];
+      const photoValue = normalizedRow[photoCol] ?? normalizedRow["Photo"] ?? normalizedRow["_photoUrl"];
       if (photoValue) out["_photoUrl"] = photoValue;
 
       out["Player Label"] = playerName;
@@ -318,7 +332,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 
 
   const processRows = (rows) => {
-    const parsed = rows.map((p) => {
+    const parsed = (rows || []).map((p) => {
       const obj = {};
       Object.keys(p || {}).forEach((k) => {
         obj[k] = normalizeUploadedValue(k, p[k]);
@@ -354,9 +368,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
       const sheetName = workbook.SheetNames?.[0];
       const sheet = sheetName ? workbook.Sheets[sheetName] : null;
 
-      if (!sheet) {
-        return;
-      }
+      if (!sheet) return;
 
       const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: true });
       processRows(rawRows);
@@ -1202,6 +1214,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 }
 
 export default ScoutReportPage;
+
 
 
 
