@@ -54,12 +54,14 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     const getPlayerPhoto = (player) => {
       // Use CSV photo column if available
       if (player?._photoUrl) return player._photoUrl;
+      if (player?.Photo) return player.Photo;
 
-      if (!player || !player["Player Name"]) {
+      const name = player?.["Player Name"] || player?.["Display Name"] || player?.["Player"] || "";
+      if (!name) {
         return "/placeholder.png";
       }
 
-      const safeName = player["Player Name"]
+      const safeName = String(name)
         .toLowerCase()
         .trim()
         .replace(/\s+/g, "_")
@@ -68,104 +70,275 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
       return `/player-photos/${safeName}.png`;
     };
 
-  const excludedColumns = [
-    "Account","Default Radar Template","Name","Team","Competition",
-    "Competition Type","Competition Rank","Season","Nationality",
-    "Country Code","Date of Birth","Age","Woman Player?",
-    "Team Color 1","Team Color 2","Player Id","Player Name",
-    "First Name","Last Name","Nickname","Weight","Height",
-    "Birth Date","Country Id","Country","Team Id",
-    "Team Color 1st","Team Color 2nd","Competition Id",
-    "Competition Name","Season Id","Seasons",
-    "Primary Position","Secondary Position","Most Recent Match",
-    "Player SBData Id",
-    "90s Played","Appearances","Minutes Played","Starting Appearances"
+  const NAME_CANDIDATES = ["Player Name", "Player", "Name", "player", "name", "Footballer"];
+  const TEAM_CANDIDATES = ["Team", "Club", "Squad", "team", "club", "Current Team"];
+  const LEAGUE_CANDIDATES = ["League", "Competition", "competition", "league", "Competition Name"];
+  const POSITION_CANDIDATES = ["Position", "Primary Position", "Role", "position"];
+  const MINUTES_CANDIDATES = [
+    "Minutes played", "Minutes", "mins", "Min", "minutes played", "Minutes Played", "Minutes (Last 2 years)",
+  ];
+  const AGE_CANDIDATES = ["Age", "age"];
+  const CONTRACT_DAYS_CANDIDATES = [
+    "Contract Expiry (days left)", "Contract expiry (days left)", "Contract days left", "Days left on contract",
+  ];
+  const CONTRACT_DATE_CANDIDATES = ["Contract expires", "Contract Expiry", "Contract end", "Expiry"];
+  const PHOTO_CANDIDATES = ["Photo", "_photoUrl", "playerPhoto", "Image", "Photo URL"];
+
+  const META_EXACT = new Set([
+    "Player", "Name", "Team", "Club", "Squad", "League", "Competition",
+    "Competition Name", "Position", "Primary Position", "Role", "Age",
+    "Minutes played", "Minutes", "mins", "Min", "Minutes Played",
+    "Contract expires", "Passport country", "Foot", "Height", "Weight",
+    "Valuation", "Contract Expiry (days left)", "Woman player no", "Player no",
+    "Match no", "Team no", "Season", "Appearances", "90s Played", "Starting Appearances",
+    "Photo", "_photoUrl", "playerPhoto", "Image", "Photo URL",
+    "__player_name__", "__team__", "__league__", "__position__", "__age__",
+    "__minutes__","__contract_days__", "__contract_date__", "__row_id__",
+    "Display Name", "Display Team", "Display League", "Display Position",
+    "Transfermarkt Link", "Primary Archetype", "Secondary Archetype", "Player Label",
+    "Overall Score"
+  ]);
+
+  const META_KEYWORDS = [
+    "id", "name", "team", "club", "squad", "player", "match", "season",
+    "league", "competition", "birth", "height", "weight", "passport",
+    "country", "foot", "shirt", "age", "position", "role", "minute", "photo",
   ];
 
-  const lowerIsBetterMetrics = ["Turnovers", "Fouls", "Positioning Error"];
+  const toNumber = (value) => {
+    if (value === null || value === undefined) return null;
+    const raw = String(value).trim();
+    if (!raw) return null;
+    const cleaned = raw.replace(/,/g, "");
+    const num = Number(cleaned);
+    return Number.isFinite(num) ? num : null;
+  };
 
-  const detectMetrics = (data) =>
-    Object.keys(data[0] || {}).filter(
-      k =>
-        !excludedColumns.includes(k) &&
-        data.every(p => !isNaN(Number(p[k])))
-    );
+  const uniquePreserveOrder = (items) => {
+    const seen = new Set();
+    const out = [];
+    items.forEach((item) => {
+      if (item !== null && item !== undefined && String(item).trim() !== "" && !seen.has(item)) {
+        seen.add(item);
+        out.push(item);
+      }
+    });
+    return out;
+  };
+
+  const findFirstExisting = (row, candidates) =>
+    candidates.find((c) => row && Object.prototype.hasOwnProperty.call(row, c) && row[c] !== null && row[c] !== "");
+
+  const isLowerBetterMetric = (metricName) => {
+    const text = String(metricName).toLowerCase();
+    return ["turnover", "turnovers", "dispossess", "miscontrol", "ball lost", "lost possession", "foul", "error"].some((k) => text.includes(k));
+  };
+
+  const normalizeRows = (rows) => {
+    const normalized = rows.map((row, idx) => {
+      const out = { ...row };
+
+      const nameCol = findFirstExisting(row, NAME_CANDIDATES) || "Player Name";
+      const teamCol = findFirstExisting(row, TEAM_CANDIDATES) || "Team";
+      const leagueCol = findFirstExisting(row, LEAGUE_CANDIDATES) || "Competition Name";
+      const positionCol = findFirstExisting(row, POSITION_CANDIDATES) || "Primary Position";
+      const minutesCol = findFirstExisting(row, MINUTES_CANDIDATES) || "Minutes Played";
+      const ageCol = findFirstExisting(row, AGE_CANDIDATES) || "Age";
+      const contractDaysCol = findFirstExisting(row, CONTRACT_DAYS_CANDIDATES) || "Contract Expiry (days left)";
+      const contractDateCol = findFirstExisting(row, CONTRACT_DATE_CANDIDATES) || "Contract expires";
+      const photoCol = findFirstExisting(row, PHOTO_CANDIDATES) || "Photo";
+
+      const playerName = String(row[nameCol] ?? row["Player Name"] ?? row["Name"] ?? row["Player"] ?? `Player ${idx + 1}`).trim() || `Player ${idx + 1}`;
+
+      out["Player Name"] = playerName;
+      out["Display Name"] = playerName;
+
+      out["Team"] = String(row[teamCol] ?? row["Team"] ?? row["Club"] ?? row["Squad"] ?? "").trim();
+      out["Display Team"] = out["Team"];
+
+      out["Competition Name"] = String(row[leagueCol] ?? row["Competition Name"] ?? row["League"] ?? row["Competition"] ?? "").trim();
+      out["Display League"] = out["Competition Name"];
+
+      out["Primary Position"] = String(row[positionCol] ?? row["Primary Position"] ?? row["Position"] ?? row["Role"] ?? "").trim();
+      out["Display Position"] = out["Primary Position"];
+
+      const ageValue = toNumber(row[ageCol] ?? row["Age"]);
+      if (ageValue !== null) out["Age"] = ageValue;
+
+      const minutesValue = toNumber(row[minutesCol] ?? row["Minutes Played"]);
+      if (minutesValue !== null) out["Minutes Played"] = minutesValue;
+
+      const contractDaysValue = toNumber(row[contractDaysCol] ?? row["Contract Expiry (days left)"]);
+      if (contractDaysValue !== null) out["Contract Expiry (days left)"] = contractDaysValue;
+
+      const contractDateValue = row[contractDateCol] ?? row["Contract expires"];
+      if (contractDateValue) out["Contract expires"] = contractDateValue;
+
+      const photoValue = row[photoCol] ?? row["Photo"] ?? row["_photoUrl"];
+      if (photoValue) out["_photoUrl"] = photoValue;
+
+      out["Player Label"] = playerName;
+      out["__player_name__"] = playerName;
+      out["__team__"] = out["Team"];
+      out["__league__"] = out["Competition Name"];
+      out["__position__"] = out["Primary Position"];
+      out["__age__"] = ageValue;
+      out["__minutes__"] = minutesValue;
+      out["__contract_days__"] = contractDaysValue;
+      out["__contract_date__"] = contractDateValue;
+      out["__row_id__"] = idx;
+
+      return out;
+    });
+
+    const counts = normalized.reduce((acc, row) => {
+      const key = row["Player Name"] || "";
+      if (!key) return acc;
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+
+    const labelCounts = {};
+    return normalized.map((row, idx) => {
+      const name = String(row["Player Name"] || "").trim();
+      let label = name;
+      if (counts[name] > 1) {
+        const suffix = row["Team"] || row["Competition Name"] || `Row ${idx + 1}`;
+        label = `${name} (${suffix})`;
+      }
+      if (labelCounts[label]) {
+        label = `${label} #${idx + 1}`;
+      }
+      labelCounts[label] = true;
+      return { ...row, "Player Label": label };
+    });
+  };
+
+  const inferMetricColumns = (rows) => {
+    const metrics = [];
+    if (!rows || rows.length === 0) return metrics;
+
+    const firstRow = rows[0];
+    Object.keys(firstRow).forEach((col) => {
+      if (META_EXACT.has(col)) return;
+      const lower = String(col).toLowerCase();
+      if (META_KEYWORDS.some((k) => lower.includes(k))) return;
+      const numericValues = rows
+        .map((r) => toNumber(r[col]))
+        .filter((v) => v !== null && v !== undefined);
+
+      if (numericValues.length < Math.max(3, Math.floor(rows.length * 0.7))) return;
+      if (numericValues.length === 0) return;
+
+      const distinctCount = new Set(numericValues).size;
+      if (distinctCount >= 5) metrics.push(col);
+    });
+
+    return uniquePreserveOrder(metrics);
+  };
+
+  const sortRowsByScore = (rows, metricNames) => {
+    if (!rows || rows.length === 0 || !metricNames || metricNames.length === 0) return rows || [];
+    return [...rows].sort((a, b) => {
+      const aScore = Number(averageRating(a, rows, metricNames)) || 0;
+      const bScore = Number(averageRating(b, rows, metricNames)) || 0;
+      return bScore - aScore;
+    });
+  };
+
 
   const handleUpload = (e) => {
     Papa.parse(e.target.files[0], {
       header: true,
       skipEmptyLines: true,
       complete: (res) => {
-          const parsed = res.data.map(p => {
-            const obj = {};
-            Object.keys(p).forEach(k => {
-              obj[k] = isNaN(p[k]) ? p[k] : Number(p[k]);
-            });
-
-            obj._photoUrl = p["Photo"]; // ⬅️ EXACT column name from CSV
-
-            return obj;
+        const parsed = res.data.map((p) => {
+          const obj = {};
+          Object.keys(p).forEach((k) => {
+            const numeric = toNumber(p[k]);
+            obj[k] = numeric !== null ? numeric : p[k];
           });
+          return obj;
+        });
 
-        const detected = detectMetrics(parsed);
+        const normalized = normalizeRows(parsed);
+        const detected = inferMetricColumns(normalized);
 
-        setPlayers(parsed);
-        setFilteredPlayers(parsed);
+        const ranked = sortRowsByScore(normalized, detected);
+
+        setPlayers(normalized);
+        setFilteredPlayers(ranked);
         setMetrics(detected);
         setScatterMetrics({ x: detected[0] || "", y: detected[1] || "" });
 
-        const comps = Array.from(new Set(parsed.map(p => p["Competition Name"]))).filter(Boolean);
+        const comps = uniquePreserveOrder(ranked.map((p) => p["Competition Name"]).filter(Boolean));
         setCompetitions(["All", ...comps]);
-      }
+
+        setSelectedPlayer(ranked[0] || null);
+      },
     });
   };
 
   const applyFilters = () => {
-    const f = players.filter(p =>
-      p["Minutes Played"] >= filters.minMinutes &&
-      p["Minutes Played"] <= filters.maxMinutes &&
-      (filters.competition === "All" ? true : p["Competition Name"] === filters.competition) &&
-      (filters.positions.length === 0 ? true : filters.positions.includes(p["Primary Position"]))
+    const f = players.filter((p) =>
+      (filters.minMinutes === 0 || (p["Minutes Played"] ?? 0) >= filters.minMinutes) &&
+      (filters.maxMinutes === 99999 || (p["Minutes Played"] ?? 0) <= filters.maxMinutes) &&
+      (filters.competition === "All" ? true : String(p["Competition Name"] ?? "") === filters.competition) &&
+      (filters.positions.length === 0 ? true : filters.positions.includes(String(p["Primary Position"] ?? "")))
     );
 
-    setFilteredPlayers(f);
-    if (selectedPlayer && !f.includes(selectedPlayer)) {
-      setSelectedPlayer(null);
+    const ranked = sortRowsByScore(f, metrics);
+    setFilteredPlayers(ranked);
+    if (selectedPlayer && !ranked.includes(selectedPlayer)) {
+      setSelectedPlayer(ranked[0] || null);
+    } else if (!selectedPlayer && ranked.length > 0) {
+      setSelectedPlayer(ranked[0]);
     }
   };
-    
 
-    
-  const percentilesForPlayer = (player) =>
-    metrics.map(m => {
-      const values = filteredPlayers.map(p => p[m]);
-      let pct = (values.filter(v => v <= player[m]).length / values.length) * 100;
-      if (lowerIsBetterMetrics.includes(m)) pct = 100 - pct;
+  const percentilesForPlayer = (player, rows = filteredPlayers, metricList = metrics) =>
+    metricList.map((m) => {
+      const values = rows
+        .map((p) => toNumber(p[m]))
+        .filter((v) => v !== null && v !== undefined);
 
-      const avgValue = values.reduce((a,b)=>a+b,0)/values.length;
-      let avgPct = (values.filter(v => v <= avgValue).length / values.length) * 100;
-      if (lowerIsBetterMetrics.includes(m)) avgPct = 100 - avgPct;
-        
+      if (values.length === 0 || player[m] === undefined || player[m] === null || player[m] === "") {
+        return {
+          metric: m,
+          value: 0,
+          raw: player[m] ?? "",
+          leagueAvg: 0,
+        };
+      }
+
+      let pct = (values.filter((v) => v <= Number(player[m])).length / values.length) * 100;
+      if (isLowerBetterMetric(m)) pct = 100 - pct;
+
+      const avgValue = values.reduce((a, b) => a + b, 0) / values.length;
+      let avgPct = (values.filter((v) => v <= avgValue).length / values.length) * 100;
+      if (isLowerBetterMetric(m)) avgPct = 100 - avgPct;
 
       return {
         metric: m,
         value: Math.round(pct),
         raw: Number(player[m]).toFixed(2),
-        leagueAvg: Math.round(avgPct)
+        leagueAvg: Math.round(avgPct),
       };
     });
 
-  const averageRating = (player) => {
-    const pcts = percentilesForPlayer(player).map(p => p.value);
+  const averageRating = (player, rows = filteredPlayers, metricList = metrics) => {
+    if (!metricList || metricList.length === 0) return 0;
+    const pcts = percentilesForPlayer(player, rows, metricList).map((p) => p.value);
+    if (!pcts.length) return 0;
     return (pcts.reduce((a, b) => a + b, 0) / pcts.length).toFixed(1);
   };
 
-  const overallRank = (player) => {
-    const ranked = [...filteredPlayers]
-      .map(p => ({ player: p, rating: Number(averageRating(p)) }))
+  const overallRank = (player, rows = filteredPlayers, metricList = metrics) => {
+    const ranked = [...rows]
+      .map((p) => ({ player: p, rating: Number(averageRating(p, rows, metricList)) }))
       .sort((a, b) => b.rating - a.rating);
 
-    return ranked.findIndex(r => r.player === player) + 1;
+    return ranked.findIndex((r) => r.player === player) + 1;
   };
 
   const CustomScatterTooltip = ({ active, payload }) => {
@@ -198,18 +371,19 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     Passing: metrics.filter(m => /pass|distribution/i.test(m))
   };
 
-  const categoryScore = (player, categoryMetrics) => {
-    const existingMetrics = categoryMetrics.filter(m => metrics.includes(m));
+  const categoryScore = (player, categoryMetrics, rows = filteredPlayers) => {
+    const existingMetrics = categoryMetrics.filter((m) => metrics.includes(m));
     if (existingMetrics.length === 0) return 0;
 
-    const scores = existingMetrics.map(m => {
-      const values = filteredPlayers.map(p => p[m]);
-      let pct = (values.filter(v => v <= player[m]).length / values.length) * 100;
-      if (lowerIsBetterMetrics.includes(m)) pct = 100 - pct;
+    const scores = existingMetrics.map((m) => {
+      const values = rows.map((p) => toNumber(p[m])).filter((v) => v !== null && v !== undefined);
+      if (values.length === 0 || player[m] === undefined || player[m] === null || player[m] === "") return 0;
+      let pct = (values.filter((v) => v <= Number(player[m])).length / values.length) * 100;
+      if (isLowerBetterMetric(m)) pct = 100 - pct;
       return pct;
     });
 
-    return Math.round(scores.reduce((a,b) => a+b,0)/scores.length);
+    return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
   };
 
   const renderCategoryPie = (label, score, color) => (
@@ -250,7 +424,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
         }))
       : [];
 
-  const uniquePositions = Array.from(new Set(players.map(p => p["Primary Position"]).filter(Boolean)));
+  const uniquePositions = Array.from(new Set(filteredPlayers.map((p) => p["Primary Position"]).filter(Boolean)));
 
     const generateScoutSummaryData = (player) => {
       if (!player) return { strengths: [], weaknesses: [], clipsLink: "#" };
@@ -935,6 +1109,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 }
 
 export default ScoutReportPage;
+
 
 
 
