@@ -17,7 +17,7 @@ const FORMATIONS = {
     { id: "L10", label: "L10", base: "10", side: "L", x: 28, y: 28 },
     { id: "CF",  label: "CF",  base: "CF", side: "C", x: 50, y: 22 },
     { id: "R10", label: "R10", base: "10", side: "R", x: 72, y: 28 },
-  ],
+  , positions],
 };
 
 
