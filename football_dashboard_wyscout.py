@@ -564,7 +564,6 @@ st.markdown("""
 tab_dashboard, tab_reports = st.tabs(["📊 Recruitment Dashboard", "📄 Scout Reports"])
 
 with tab_reports:
-    st.markdown("## 📄 Scout Reports")
     st.link_button(
         "Open Scout Reports",
         "https://recruitment-dashboard-kohl.vercel.app"
