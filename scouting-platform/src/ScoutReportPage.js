@@ -350,7 +350,11 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     setMetrics(detected);
     setScatterMetrics({ x: detected[0] || "", y: detected[1] || "" });
 
-    const comps = uniquePreserveOrder(ranked.map((p) => p["Competition Name"]).filter(Boolean));
+    const comps = uniquePreserveOrder(
+      ranked
+        .map((p) => p["Current Team Country (Tier)"] || p["Competition Name"] || p["Competition"])
+        .filter(Boolean)
+    );
     setCompetitions(["All", ...comps]);
 
     setSelectedPlayer(ranked[0] || null);
@@ -563,23 +567,26 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
             <div><label style={{ fontSize:12, fontWeight:600 }}>Min Minutes</label><input type="number" onChange={e => setFilters({...filters, minMinutes:Number(e.target.value)})} /></div>
             <div><label style={{ fontSize:12, fontWeight:600 }}>Max Minutes</label><input type="number" onChange={e => setFilters({...filters, maxMinutes:Number(e.target.value)})} /></div>
             <div><label style={{ fontSize:12, fontWeight:600 }}>Competition</label>
-              <select onChange={e=>setFilters({...filters, competition:e.target.value})}>
+              <select onChange={e=>setFilters({...filters, competition:e.target.value})} style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }}>
+
                 {competitions.map(c=><option key={c}>{c}</option>)}
               </select>
             </div>
             <div><label style={{ fontSize:12, fontWeight:600 }}>Position</label>
-              <select multiple style={{height:80}} onChange={e=>setFilters({...filters, positions:Array.from(e.target.selectedOptions, o=>o.value)})}>
+              <select multiple style={{height:80, width: "100%", maxWidth: "100%", boxSizing: "border-box" }} onChange={e=>setFilters({...filters, positions:Array.from(e.target.selectedOptions, o=>o.value)})}>
                 {uniquePositions.map(pos=><option key={pos}>{pos}</option>)}
               </select>
             </div>
             <hr style={{ opacity:0.2 }} />
             <div><label style={{ fontSize:12, fontWeight:600 }}>Scatter X</label>
-              <select value={scatterMetrics.x} onChange={e=>setScatterMetrics({...scatterMetrics, x:e.target.value})}>
+              <select value={scatterMetrics.x} onChange={e=>setScatterMetrics({...scatterMetrics, x:e.target.value})} style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }}>
+
                 {metrics.map(m=><option key={m}>{m}</option>)}
               </select>
             </div>
             <div><label style={{ fontSize:12, fontWeight:600 }}>Scatter Y</label>
-              <select value={scatterMetrics.y} onChange={e=>setScatterMetrics({...scatterMetrics, y:e.target.value})}>
+              <select value={scatterMetrics.y} onChange={e=>setScatterMetrics({...scatterMetrics, y:e.target.value})} style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }}>
+
                 {metrics.map(m=><option key={m}>{m}</option>)}
               </select>
             </div>
@@ -1214,6 +1221,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 }
 
 export default ScoutReportPage;
+
 
 
 
