@@ -1,0 +1,28 @@
+export const POSITION_MAP = {
+  Goalkeeper: "GK",
+  "Centre Back": "CB",
+  "Left Centre Back": "LCB",
+  "Right Centre Back": "RCB",
+  "Left Back": "LB",
+  "Right Back": "RB",
+  "Left Wing Back": "LB",
+  "Right Wing Back": "RB",
+  "Defensive Midfield": "CM",
+  "Right Defensive Midfield": "CM",
+  "Left Defensive Midfield": "CM",
+  "Central Midfield": "CM",
+  "Right Central Midfield": "CM",
+  "Left Central Midfield": "CM",
+  "Attacking Midfield": "CAM",
+  "Left Midfield": "LM",
+  "Right Midfield": "RM",
+  "Left Winger": "LW",
+  "Right Winger": "RW",
+  "Left Attacking Midfielder": "LW",
+  "Right Attacking Midfielder": "RW",
+  "Centre Forward": "ST",
+  "Left Centre Forward": "ST",
+  "Right Centre Forward": "ST",
+};
+
+ 
