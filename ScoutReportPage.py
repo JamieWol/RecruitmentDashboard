@@ -677,197 +677,30 @@ with squad_tab:
     taken = {p["slot"]: p for p in st.session_state.shadow_squad if p.get("slot") and p.get("slot") != "Bench"}
     for slot in FORMATION_SLOTS[formation]:
         occ = taken.get(slot["id"])
+        slot_rows.append({"Slot": slot["label"], "Player": occ["label"] if occ else "", "Team": occ["team"] if occ else "", "Archetype": occ["primary"] if occ else ""})
+    st.markdown("### Formation slots")
+    st.dataframe(pd.DataFrame(slot_rows), use_container_width=True, hide_index=True)
 
-if columns.position and columns.position in work.columns:
-    position_values = sorted(work[columns.position].dropna().astype(str).unique().tolist())
-    if len(position_values) > 1:
-        selected_positions = st.sidebar.multiselect("Position", position_values, default=position_values)
-        work = work[work[columns.position].astype(str).isin(selected_positions)].copy()
+with data_tab:
+    st.subheader("📂 Data Explorer")
+    st.write(f"Source file: **{filename}**")
+    if SHEET_COL in work.columns:
+        st.write("Loaded from multiple sheets.")
 
-if columns.minutes and columns.minutes in work.columns:
-    work[columns.minutes] = safe_numeric(work[columns.minutes])
-    if work[columns.minutes].notna().any():
-        mn, mx = int(work[columns.minutes].min()), int(work[columns.minutes].max())
-        min_range = st.sidebar.slider("Minutes Played", mn, mx, (mn, mx))
-        work = work[work[columns.minutes].between(min_range[0], min_range[1])].copy()
+    st.markdown("### Column summary")
+    summary = pd.DataFrame({
+        "Column": list(work.columns),
+        "Dtype": [str(work[c].dtype) for c in work.columns],
+        "Non-null": [int(work[c].notna().sum()) for c in work.columns],
+        "Example": [str(work[c].dropna().iloc[0]) if len(work[c].dropna()) else "" for c in work.columns],
+    })
+    st.dataframe(summary, use_container_width=True, hide_index=True)
 
-if columns.age and columns.age in work.columns:
-    work[columns.age] = safe_numeric(work[columns.age])
-    if work[columns.age].notna().any():
-        mn, mx = int(work[columns.age].min()), int(work[columns.age].max())
-        age_range = st.sidebar.slider("Age", mn, mx, (mn, mx))
-        work = work[work[columns.age].between(age_range[0], age_range[1])].copy()
+    st.markdown("### Raw preview")
+    st.dataframe(work.head(50), use_container_width=True)
 
-if columns.contract_days and columns.contract_days in work.columns:
-    work[columns.contract_days] = safe_numeric(work[columns.contract_days])
-if columns.contract_date and columns.contract_date in work.columns:
-    work[columns.contract_date] = work[columns.contract_date].astype(str)
+    csv = work.to_csv(index=False).encode("utf-8")
+    st.download_button("Download filtered data", csv, "filtered_football_data.csv", "text/csv")
 
-market_mode = st.sidebar.checkbox("Market opportunity filter", value=False)
-
-# Metric selection
-all_metrics = infer_metric_columns(work)
-if not all_metrics:
-    st.error("No usable numeric performance metrics were found in the uploaded file.")
-    st.stop()
-
-st.sidebar.subheader("Metrics")
-auto_mode = st.sidebar.checkbox("Auto-detect metrics", value=True)
-if auto_mode:
-    default_metrics = all_metrics[: min(10, len(all_metrics))]
-    metrics = st.sidebar.multiselect("Select Metrics", all_metrics, default=default_metrics)
-else:
-    numeric_cols = [c for c in work.columns if pd.api.types.is_numeric_dtype(work[c])]
-    default_metrics = numeric_cols[: min(10, len(numeric_cols))]
-    metrics = st.sidebar.multiselect("Select Metrics", numeric_cols, default=default_metrics)
-if not metrics:
-    st.warning("Select at least one metric")
-    st.stop()
-
-for m in metrics:
-    work[m] = safe_numeric(work[m])
-
-# Apply market filter after metrics are in place.
-if market_mode:
-    age_ok = (
-        work[columns.age] < 25
-        if columns.age and columns.age in work.columns and work[columns.age].notna().any()
-        else pd.Series(True, index=work.index)
-    )
-    if columns.contract_days and columns.contract_days in work.columns and work[columns.contract_days].notna().any():
-        contract_ok = work[columns.contract_days] < 365
-    elif columns.contract_date and columns.contract_date in work.columns:
-        contract_ok = pd.to_datetime(work[columns.contract_date], errors="coerce").notna()
-    else:
-        contract_ok = pd.Series(True, index=work.index)
-    work = work[age_ok & contract_ok].copy()
-
-work = add_percentiles(work, metrics)
-work = assign_archetypes(work, metrics, position_col=columns.position)
-league_avg = compute_league_average(work, metrics)
-percentile_cols = [m + " Percentile" for m in metrics]
-work["Overall Score"] = work[percentile_cols].mean(axis=1).round(0)
-work = work.sort_values("Overall Score", ascending=False).reset_index(drop=True)
-work.index += 1
-work.insert(0, "Rank", work.index)
-
-# Shared display table
-rank_view = build_rank_view(work, columns.name, columns.team, columns.league, columns.position)
-rank_view["Player Label"] = work["Player Label"].values
-rank_view["Transfermarkt Link"] = [make_transfermarkt_url(n) for n in rank_view["Display Name"].astype(str)]
-
-if "active_player_label" not in st.session_state and len(rank_view) > 0:
-    st.session_state["active_player_label"] = rank_view.iloc[0]["Player Label"]
-active_player_label = st.session_state.get("active_player_label")
-
-# ---------------------------------------------------------------------
-# MAIN HEADER
-# ---------------------------------------------------------------------
-st.title("⚽ Generic Football Dashboard")
-
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("Rows", f"{len(work)}")
-c2.metric("Metrics", f"{len(metrics)}")
-c3.metric("Sheets", f"{len(sheet_options) if sheet_options else 1}")
-c4.metric("Top Score", f"{int(work['Overall Score'].max()) if len(work) else 0}")
-
-# Tabs
-rank_tab, report_tab, squad_tab, data_tab = st.tabs(["Rankings", "Scout Report", "Shadow Squad", "Data Explorer"])
-
-# ---------------------------------------------------------------------
-# TAB 1: RANKINGS
-# ---------------------------------------------------------------------
-with rank_tab:
-    st.subheader("🏅 Player Rankings")
-    search_text = st.text_input("Search player", value="", placeholder="Type a player name")
-
-    rank_view_display = rank_view.copy()
-    if search_text.strip():
-        q = search_text.strip()
-        rank_view_display = rank_view_display[
-            rank_view_display["Display Name"].astype(str).str.contains(q, case=False, na=False)
-            | rank_view_display["Player Label"].astype(str).str.contains(q, case=False, na=False)
-            | rank_view_display["Display Team"].astype(str).str.contains(q, case=False, na=False)
-        ].copy()
-
-    show_cols = [
-        "Rank",
-        "Player Label",
-        "Primary Archetype",
-        "Secondary Archetype",
-        "Display Team",
-        "Display League",
-        "Display Position",
-        "Overall Score",
-    ]
-    if columns.minutes:
-        show_cols.append(columns.minutes)
-    if columns.age:
-        show_cols.append(columns.age)
-    if columns.contract_days:
-        show_cols.append(columns.contract_days)
-    if columns.contract_date:
-        show_cols.append(columns.contract_date)
-    show_cols += metrics
-    show_cols.append("Transfermarkt Link")
-    show_cols = get_show_columns(rank_view_display, show_cols)
-
-    st.dataframe(
-        percentile_style_table(rank_view_display, show_cols),
-        use_container_width=True,
-        hide_index=True,
-        column_config={"Transfermarkt Link": st.column_config.LinkColumn("Transfermarkt Link")},
-    )
-
-    st.caption("Duplicate names appear as Name (Team/Sheet).")
-
-# ---------------------------------------------------------------------
-# TAB 2: SCOUT REPORT
-# ---------------------------------------------------------------------
-with report_tab:
-    st.subheader("📝 Scout Report")
-    player_labels = work["Player Label"].tolist()
-    if not player_labels:
-        st.info("No players available.")
-    else:
-        selected_player_label = st.selectbox(
-            "Select a player",
-            player_labels,
-            index=player_labels.index(active_player_label) if active_player_label in player_labels else 0,
-            key="scout_player_select",
-        )
-        st.session_state["active_player_label"] = selected_player_label
-
-        player_row = work[work["Player Label"] == selected_player_label].iloc[0]
-        summary_cols = st.columns(4)
-        summary_cols[0].metric("Overall Score", f"{int(player_row['Overall Score'])}")
-        summary_cols[1].metric("Primary", str(player_row.get("Primary Archetype", "-")))
-        summary_cols[2].metric("Secondary", str(player_row.get("Secondary Archetype", "-")))
-        summary_cols[3].metric("Transfermarkt", "Open link in rankings")
-
-        left, right = st.columns([1, 1])
-        with left:
-            if columns.team and columns.team in player_row.index:
-                st.write(f"**Team:** {player_row.get('Display Team', '')}")
-            if columns.league and columns.league in player_row.index:
-                st.write(f"**League:** {player_row.get('Display League', '')}")
-            if columns.position and columns.position in player_row.index:
-                st.write(f"**Position:** {player_row.get('Display Position', '')}")
-            if columns.age and columns.age in player_row.index:
-                st.write(f"**Age:** {player_row.get(columns.age, '')}")
-            if columns.minutes and columns.minutes in player_row.index:
-                st.write(f"**Minutes:** {player_row.get(columns.minutes, '')}")
-
-            st.markdown("### Strengths / Weaknesses")
-            pcts = [
-                (m, int(player_row[m + " Percentile"]))
-                for m in metrics
-                if m + " Percentile" in player_row.index and pd.notna(player_row[m + " Percentile"])
-            ]
-            strengths = [m for m, v in pcts if v >= 75]
-            weaknesses = [m for m, v in pcts if v <= 35]
-            st.write(f"**Strengths:** {', '.join(strengths) if strengths else 'None highlighted'}")
-            st.write(f"**Weaknesses:** {', '.join(weaknesses) if weaknesses else 'None highlighted'}")
-
-            if "Transfermarkt Link" in rank_v
+st.caption("Supports CSV, TSV, TXT, Excel, JSON, Parquet, and Feather. Excel workbooks can be combined or filtered by sheet.")
 
