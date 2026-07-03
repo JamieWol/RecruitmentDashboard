@@ -4,15 +4,16 @@ Generic Football Dashboard (Streamlit)
 Run locally with:
     streamlit run app.py
 
-What this app does:
-- Upload CSV, TSV, TXT, Excel, JSON, Parquet, or Feather files
-- For Excel workbooks, pick one sheet or combine all sheets
-- Auto-detect player/team/league/position/minutes/age/contract columns
-- Auto-detect numeric performance metrics
-- Build primary/secondary archetypes from position and metrics
-- Rank players, build a player report, and manage a simple shadow squad
-- Show duplicate player names as Name (Team/Sheet)
-- Keep the dashboard modular with top tabs
+Supported uploads:
+- CSV / TSV / TXT
+- Excel (.xlsx, .xls) with sheet picker or combine-all-sheets option
+- JSON, Parquet, Feather
+
+Tabs:
+- Rankings
+- Scout Report
+- Shadow Squad
+- Data Explorer
 """
 
 from __future__ import annotations
@@ -33,10 +34,13 @@ try:
 except ImportError:  # pragma: no cover
     PyPizza = None
 
-st.set_page_config(page_title="Generic Football Dashboard", layout="wide")
 
+st.set_page_config(page_title="Generic Football Dashboard", layout="wide")
 SHEET_COL = "__sheet__"
 
+# ---------------------------------------------------------------------
+# Column detection
+# ---------------------------------------------------------------------
 NAME_CANDIDATES = ["Player", "Name", "player", "name", "Footballer", "Player Name"]
 TEAM_CANDIDATES = ["Team", "Club", "Squad", "team", "club", "Current Team", "Team Name"]
 LEAGUE_CANDIDATES = ["League", "Competition", "competition", "league", "Competition Name"]
@@ -59,6 +63,9 @@ class ColumnMap:
     contract_date: Optional[str] = None
 
 
+# ---------------------------------------------------------------------
+# File loading
+# ---------------------------------------------------------------------
 def clean_columns(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df.columns = [str(c).strip() for c in df.columns]
@@ -107,8 +114,7 @@ def load_dataset(file_bytes: bytes, filename: str, sheet_choice: str | None) -> 
 
 
 def get_sheet_names(file_bytes: bytes, filename: str) -> list[str]:
-    ext = file_extension(filename)
-    if ext not in {"xlsx", "xls"}:
+    if file_extension(filename) not in {"xlsx", "xls"}:
         return []
     return pd.ExcelFile(io.BytesIO(file_bytes)).sheet_names
 
@@ -133,13 +139,16 @@ def detect_columns(df: pd.DataFrame) -> ColumnMap:
     )
 
 
+# ---------------------------------------------------------------------
+# Data transforms
+# ---------------------------------------------------------------------
 def safe_numeric(series: pd.Series) -> pd.Series:
     return pd.to_numeric(series, errors="coerce")
 
 
 def unique_preserve_order(items: list[str]) -> list[str]:
     seen = set()
-    out = []
+    out: list[str] = []
     for item in items:
         if item not in seen:
             seen.add(item)
@@ -151,6 +160,23 @@ def make_transfermarkt_url(player_name: str) -> str:
     return "https://www.transfermarkt.com/schnellsuche/ergebnis/schnellsuche?query=" + quote_plus(player_name.strip())
 
 
+def is_lower_better_metric(metric_name: str) -> bool:
+    text = metric_name.lower()
+    return any(k in text for k in ["turnover", "turnovers", "dispossess", "miscontrol", "ball lost", "lost possession"])
+
+
+def add_percentiles(df: pd.DataFrame, metrics: list[str]) -> pd.DataFrame:
+    df = df.copy()
+    for m in metrics:
+        s = safe_numeric(df[m])
+        pct = s.rank(pct=True, method="max", ascending=not is_lower_better_metric(m))
+        df[m + " Percentile"] = pct.mul(100).round(0).fillna(0).astype("Int64")
+    return df
+
+
+# ---------------------------------------------------------------------
+# Metric inference
+# ---------------------------------------------------------------------
 def infer_metric_columns(df: pd.DataFrame) -> list[str]:
     exclude_exact = {
         "Player", "Name", "Team", "Club", "Squad", "League", "Competition",
@@ -169,7 +195,10 @@ def infer_metric_columns(df: pd.DataFrame) -> list[str]:
         "league", "competition", "birth", "height", "weight", "passport", "country",
         "foot", "shirt", "age", "position", "role", "minute",
     ]
-    include_exact = {"Turnovers", "Non-Penalty Goals", "Scoring Contribution", "Goal Conversion%", "xG", "xG/Shot", "Aerial Win%", "PAdj Pressures", "Pressure Regains", "Touches In Box", "OBV", "Key Passes"}
+    include_exact = {
+        "Turnovers", "Non-Penalty Goals", "Scoring Contribution", "Goal Conversion%", "xG", "xG/Shot",
+        "Aerial Win%", "PAdj Pressures", "Pressure Regains", "Touches In Box", "OBV", "Key Passes",
+    }
     include_keywords = [
         "xg", "xa", "shot", "pass", "carry", "dribble", "duel", "tackle", "interception",
         "press", "clearance", "block", "progressive", "touch", "cross", "chance", "key",
@@ -198,24 +227,10 @@ def infer_metric_columns(df: pd.DataFrame) -> list[str]:
     return unique_preserve_order(metrics)
 
 
-def is_lower_better_metric(metric_name: str) -> bool:
-    text = metric_name.lower()
-    return any(k in text for k in ["turnover", "turnovers", "dispossess", "miscontrol", "ball lost", "lost possession"])
-
-
-def add_percentiles(df: pd.DataFrame, metrics: list[str]) -> pd.DataFrame:
-    df = df.copy()
-    for m in metrics:
-        s = safe_numeric(df[m])
-        pct = s.rank(pct=True, method="max", ascending=not is_lower_better_metric(m))
-        df[m + " Percentile"] = pct.mul(100).round(0).fillna(0).astype("Int64")
-    return df
-
-
 def build_player_labels(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     counts = df["__player_name__"].astype(str).value_counts(dropna=False)
-    labels = []
+    labels: list[str] = []
     for idx, row in df.iterrows():
         name = str(row.get("__player_name__", "")).strip()
         team = str(row.get("__team__", "")).strip()
@@ -232,6 +247,9 @@ def build_player_labels(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+# ---------------------------------------------------------------------
+# Archetypes
+# ---------------------------------------------------------------------
 def infer_position_group(position_value: str | None) -> str:
     text = (position_value or "").lower().strip()
     nums = set(re.findall(r"\d+", text))
@@ -250,18 +268,29 @@ def infer_position_group(position_value: str | None) -> str:
     return "UNKNOWN"
 
 
+POSITION_ARCHETYPE_MAP = {
+    "AM": ["Carrier", "Connector", "Creator", "Disruptor", "Finisher", "Progressor"],
+    "CM": ["Carrier", "Connector", "Disruptor", "Progressor", "Protector"],
+    "CB": ["Disruptor", "Progressor", "Protector"],
+    "FB": ["Carrier", "Connector", "Disruptor", "Progressor", "Protector"],
+    "ST": ["Carrier", "Connector", "Creator", "Disruptor", "Finisher"],
+    "WINGER": ["Carrier", "Connector", "Creator", "Disruptor", "Finisher", "Progressor"],
+    "UNKNOWN": ["Carrier", "Connector", "Creator", "Disruptor", "Finisher", "Progressor", "Protector"],
+}
+
+
 def archetype_scores(row: pd.Series, metric_percentile_cols: list[str]) -> dict[str, float]:
-    def v(col: str) -> float:
+    def value(col: str) -> float:
         try:
             if col not in row.index:
                 return 0.0
-            val = row[col]
-            return 0.0 if pd.isna(val) else float(val)
+            v = row[col]
+            return 0.0 if pd.isna(v) else float(v)
         except Exception:
             return 0.0
 
     def score(keys: list[str]) -> float:
-        vals = [v(c) for c in metric_percentile_cols if any(k in c.lower() for k in keys)]
+        vals = [value(c) for c in metric_percentile_cols if any(k in c.lower() for k in keys)]
         return float(np.mean(vals)) if vals else 0.0
 
     return {
@@ -275,17 +304,6 @@ def archetype_scores(row: pd.Series, metric_percentile_cols: list[str]) -> dict[
     }
 
 
-POSITION_ARCHETYPE_MAP = {
-    "AM": ["Carrier", "Connector", "Creator", "Disruptor", "Finisher", "Progressor"],
-    "CM": ["Carrier", "Connector", "Disruptor", "Progressor", "Protector"],
-    "CB": ["Disruptor", "Progressor", "Protector"],
-    "FB": ["Carrier", "Connector", "Disruptor", "Progressor", "Protector"],
-    "ST": ["Carrier", "Connector", "Creator", "Disruptor", "Finisher"],
-    "WINGER": ["Carrier", "Connector", "Creator", "Disruptor", "Finisher", "Progressor"],
-    "UNKNOWN": ["Carrier", "Connector", "Creator", "Disruptor", "Finisher", "Progressor", "Protector"],
-}
-
-
 def assign_archetypes(df: pd.DataFrame, metrics: list[str], position_col: str | None = None) -> pd.DataFrame:
     df = df.copy()
     pct_cols = [m + " Percentile" for m in metrics if m + " Percentile" in df.columns]
@@ -294,7 +312,8 @@ def assign_archetypes(df: pd.DataFrame, metrics: list[str], position_col: str | 
         df["Secondary Archetype"] = "Unclassified"
         return df
 
-    primary, secondary = [], []
+    primary: list[str] = []
+    secondary: list[str] = []
     for _, row in df.iterrows():
         pos_value = row[position_col] if position_col and position_col in row.index else None
         group = infer_position_group(str(pos_value) if pos_value is not None else "")
@@ -309,49 +328,9 @@ def assign_archetypes(df: pd.DataFrame, metrics: list[str], position_col: str | 
     return df
 
 
-def make_transfermarkt_url(player_name: str) -> str:
-    return "https://www.transfermarkt.com/schnellsuche/ergebnis/schnellsuche?query=" + quote_plus(player_name.strip())
-
-
-def display_table(df: pd.DataFrame, cols: list[str]) -> None:
-    cols = unique_preserve_order([c for c in cols if c in df.columns])
-    if not cols:
-        st.info("No columns to display.")
-        return
-    st.dataframe(df.loc[:, ~df.columns.duplicated()][cols], use_container_width=True, hide_index=True)
-
-
-def score_table_style(df: pd.DataFrame, cols: list[str]) -> pd.io.formats.style.Styler:
-    def color(v):
-        try:
-            if pd.isna(v):
-                return ""
-            v = float(v)
-        except Exception:
-            return ""
-        if v >= 90:
-            return "background-color: #d1fae5;"
-        if v >= 70:
-            return "background-color: #dcfce7;"
-        if v >= 50:
-            return "background-color: #fef08a;"
-        if v >= 30:
-            return "background-color: #fdba74;"
-        return "background-color: #fecaca;"
-
-    styled = df[cols].style
-    pct_cols = [c for c in cols if c.endswith(" Percentile") or c == "Overall Score"]
-    if pct_cols:
-        try:
-            if hasattr(styled, "map"):
-                styled = styled.map(color, subset=pct_cols)
-            else:
-                styled = styled.applymap(color, subset=pct_cols)
-        except Exception:
-            pass
-    return styled
-
-
+# ---------------------------------------------------------------------
+# Utility helpers
+# ---------------------------------------------------------------------
 def compute_similarity_frame(df: pd.DataFrame, player_label: str, metrics: list[str], top_n: int = 10) -> pd.DataFrame:
     if not metrics or "Player Label" not in df.columns:
         return pd.DataFrame()
@@ -373,6 +352,57 @@ def compute_similarity_frame(df: pd.DataFrame, player_label: str, metrics: list[
     return work[work["Player Label"] != player_label].sort_values("Similarity Score", ascending=False).head(top_n)
 
 
+def build_rank_view(df: pd.DataFrame, name_col: str, team_col: str | None, league_col: str | None, position_col: str | None) -> pd.DataFrame:
+    view = df.copy()
+    if name_col in view.columns:
+        view["Display Name"] = view[name_col].astype(str)
+    if team_col and team_col in view.columns:
+        view["Display Team"] = view[team_col].astype(str)
+    if league_col and league_col in view.columns:
+        view["Display League"] = view[league_col].astype(str)
+    if position_col and position_col in view.columns:
+        view["Display Position"] = view[position_col].astype(str)
+
+    tm_url_col = next((c for c in ["Transfermarkt URL", "Transfermarkt", "TM URL", "tm_url", "Transfermarkt Link"] if c in view.columns), None)
+    if tm_url_col:
+        view["Transfermarkt Link"] = view[tm_url_col].astype(str)
+    elif "Display Name" in view.columns:
+        view["Transfermarkt Link"] = [make_transfermarkt_url(n) for n in view["Display Name"].astype(str)]
+
+    return view.loc[:, ~view.columns.duplicated()].copy()
+
+
+def style_score_table(df: pd.DataFrame, cols: list[str]):
+    def color(v):
+        try:
+            if pd.isna(v):
+                return ""
+            v = float(v)
+        except Exception:
+            return ""
+        if v >= 90:
+            return "background-color: #d1fae5;"
+        if v >= 70:
+            return "background-color: #dcfce7;"
+        if v >= 50:
+            return "background-color: #fef08a;"
+        if v >= 30:
+            return "background-color: #fdba74;"
+        return "background-color: #fecaca;"
+
+    styler = df[cols].style
+    pct_cols = [c for c in cols if c.endswith(" Percentile") or c == "Overall Score"]
+    if pct_cols:
+        try:
+            if hasattr(styler, "map"):
+                styler = styler.map(color, subset=pct_cols)
+            else:
+                styler = styler.applymap(color, subset=pct_cols)
+        except Exception:
+            pass
+    return styler
+
+
 def plot_player_chart(player_label: str, df: pd.DataFrame, metrics: list[str], league_avg: list[int]) -> None:
     pct_cols = [m + " Percentile" for m in metrics]
     row = df.loc[df["Player Label"] == player_label, pct_cols]
@@ -380,6 +410,7 @@ def plot_player_chart(player_label: str, df: pd.DataFrame, metrics: list[str], l
         st.warning("Player not found for chart.")
         return
     player_values = row.values.flatten().tolist()
+
     if PyPizza is not None:
         pizza = PyPizza(
             params=metrics,
@@ -394,7 +425,7 @@ def plot_player_chart(player_label: str, df: pd.DataFrame, metrics: list[str], l
         )
         fig, ax = pizza.make_pizza(
             league_avg,
-            figsize=(11, 11),
+            figsize=(10, 10),
             kwargs_slices=dict(facecolor="#facc15", edgecolor="black", linewidth=2),
             kwargs_params=dict(fontsize=9, color="white", fontweight="bold"),
             kwargs_values=dict(fontsize=11, fontweight="bold", color="black", bbox=dict(edgecolor="black", facecolor="#facc15", boxstyle="round,pad=0.25")),
@@ -407,36 +438,91 @@ def plot_player_chart(player_label: str, df: pd.DataFrame, metrics: list[str], l
         )
         st.pyplot(fig)
         plt.close(fig)
-    else:
-        angles = np.linspace(0, 2 * np.pi, len(metrics), endpoint=False).tolist()
-        angles += angles[:1]
-        fig, ax = plt.subplots(figsize=(11, 11), subplot_kw=dict(polar=True))
-        ax.set_theta_offset(np.pi / 2)
-        ax.set_theta_direction(-1)
-        ax.set_xticks(angles[:-1])
-        ax.set_xticklabels(metrics, fontsize=9)
-        ax.set_ylim(0, 100)
-        ax.set_yticklabels([])
-        league = league_avg + league_avg[:1]
-        player = player_values + player_values[:1]
-        ax.plot(angles, league, linewidth=2, label="League Average")
-        ax.fill(angles, league, alpha=0.18)
-        ax.plot(angles, player, linewidth=2, label=player_label)
-        ax.fill(angles, player, alpha=0.22)
-        ax.legend(loc="upper right", bbox_to_anchor=(1.1, 1.1))
-        st.pyplot(fig)
-        plt.close(fig)
+        return
+
+    angles = np.linspace(0, 2 * np.pi, len(metrics), endpoint=False).tolist()
+    angles += angles[:1]
+    fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(polar=True))
+    ax.set_theta_offset(np.pi / 2)
+    ax.set_theta_direction(-1)
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(metrics, fontsize=9)
+    ax.set_ylim(0, 100)
+    ax.set_yticklabels([])
+    league = league_avg + league_avg[:1]
+    player = player_values + player_values[:1]
+    ax.plot(angles, league, linewidth=2, label="League Average")
+    ax.fill(angles, league, alpha=0.18)
+    ax.plot(angles, player, linewidth=2, label=player_label)
+    ax.fill(angles, player, alpha=0.22)
+    ax.legend(loc="upper right", bbox_to_anchor=(1.1, 1.1))
+    st.pyplot(fig)
+    plt.close(fig)
 
 
+# ---------------------------------------------------------------------
+# Shadow squad helpers
+# ---------------------------------------------------------------------
+FORMATION_SLOTS = {
+    "3-4-3": [
+        {"id": "GK", "label": "GK", "base": "GK", "side": "C"},
+        {"id": "LCB", "label": "LCB", "base": "CB", "side": "L"},
+        {"id": "CB", "label": "CB", "base": "CB", "side": "C"},
+        {"id": "RCB", "label": "RCB", "base": "CB", "side": "R"},
+        {"id": "LWB", "label": "LWB", "base": "FB", "side": "L"},
+        {"id": "LCM", "label": "LCM", "base": "CM", "side": "L"},
+        {"id": "RCM", "label": "RCM", "base": "CM", "side": "R"},
+        {"id": "RWB", "label": "RWB", "base": "FB", "side": "R"},
+        {"id": "L10", "label": "L10", "base": "AM", "side": "L"},
+        {"id": "R10", "label": "R10", "base": "AM", "side": "R"},
+        {"id": "CF", "label": "CF", "base": "ST", "side": "C"},
+    ]
+}
+
+
+def infer_shadow_role(position_text: str) -> tuple[str, str]:
+    group = infer_position_group(position_text)
+    if group == "CB":
+        return "CB", "C"
+    if group == "FB":
+        return "FB", "L"
+    if group == "CM":
+        return "CM", "C"
+    if group == "AM":
+        return "AM", "C"
+    if group == "WINGER":
+        return "AM", "L"
+    if group == "ST":
+        return "ST", "C"
+    return "ST", "C"
+
+
+def auto_assign_shadow_slot(player_row: pd.Series, current_assignments: dict[str, str], formation_name: str) -> Optional[str]:
+    slots = FORMATION_SLOTS.get(formation_name, [])
+    taken = set(current_assignments.values())
+    role, side = infer_shadow_role(str(player_row.get("Display Position", "") or player_row.get("__position__", "")))
+    for pred in [
+        lambda s: s["base"] == role and s["side"] == side,
+        lambda s: s["base"] == role and s["side"] == "C",
+        lambda s: s["base"] == role,
+    ]:
+        for s in slots:
+            if s["id"] not in taken and pred(s):
+                return s["id"]
+    return None
+
+
+# ---------------------------------------------------------------------
+# Sidebar / upload
+# ---------------------------------------------------------------------
 if "shadow_squad" not in st.session_state:
     st.session_state.shadow_squad = []
 
-
-# ---------------------------------------------------------------------
-# LOAD DATA
-# ---------------------------------------------------------------------
 st.sidebar.header("Upload Data")
-uploaded_file = st.sidebar.file_uploader("Upload a file", type=["csv", "tsv", "txt", "xlsx", "xls", "json", "parquet", "feather"])
+uploaded_file = st.sidebar.file_uploader(
+    "Upload a file",
+    type=["csv", "tsv", "txt", "xlsx", "xls", "json", "parquet", "feather"],
+)
 
 if not uploaded_file:
     st.title("⚽ Generic Football Dashboard")
@@ -472,7 +558,7 @@ if not columns.name:
     st.stop()
 
 # ---------------------------------------------------------------------
-# STANDARDISE DATA
+# Standardise data
 # ---------------------------------------------------------------------
 work = df.copy()
 work["__row_id__"] = np.arange(len(work))
@@ -483,6 +569,7 @@ work["__position__"] = work[columns.position].astype(str) if columns.position el
 work = work[work["__player_name__"].notna() & (work["__player_name__"].str.strip() != "")].copy()
 work = build_player_labels(work)
 
+# Filters
 st.sidebar.subheader("Filters")
 if columns.league and columns.league in work.columns:
     vals = sorted(work[columns.league].dropna().astype(str).unique().tolist())
@@ -555,17 +642,18 @@ if "active_player_label" not in st.session_state and len(rank_view) > 0:
     st.session_state["active_player_label"] = rank_view.iloc[0]["Player Label"]
 
 # ---------------------------------------------------------------------
-# DASHBOARD
+# Main dashboard
 # ---------------------------------------------------------------------
 st.title("⚽ Generic Football Dashboard")
-cols = st.columns(4)
-cols[0].metric("Rows", f"{len(work)}")
-cols[1].metric("Metrics", f"{len(metrics)}")
-cols[2].metric("Sheets", f"{len(sheet_options) if sheet_options else 1}")
-cols[3].metric("Top Score", f"{int(work['Overall Score'].max()) if len(work) else 0}")
+metric_cols = st.columns(4)
+metric_cols[0].metric("Rows", f"{len(work)}")
+metric_cols[1].metric("Metrics", f"{len(metrics)}")
+metric_cols[2].metric("Sheets", f"{len(sheet_options) if sheet_options else 1}")
+metric_cols[3].metric("Top Score", f"{int(work['Overall Score'].max()) if len(work) else 0}")
 
 rank_tab, report_tab, squad_tab, data_tab = st.tabs(["Rankings", "Scout Report", "Shadow Squad", "Data Explorer"])
 
+# Rankings
 with rank_tab:
     st.subheader("🏅 Player Rankings")
     search_text = st.text_input("Search player", value="", placeholder="Type a player name")
@@ -589,13 +677,16 @@ with rank_tab:
         show_cols.append(columns.contract_date)
     show_cols += metrics + ["Transfermarkt Link"]
     show_cols = unique_preserve_order([c for c in show_cols if c in rank_view_display.columns])
+
     st.dataframe(
-        score_table_style(rank_view_display, show_cols),
+        style_score_table(rank_view_display, show_cols),
         use_container_width=True,
         hide_index=True,
         column_config={"Transfermarkt Link": st.column_config.LinkColumn("Transfermarkt Link")},
     )
+    st.caption("Duplicate names appear as Name (Team/Sheet).")
 
+# Scout report
 with report_tab:
     st.subheader("📝 Scout Report")
     player_labels = work["Player Label"].tolist()
@@ -608,11 +699,12 @@ with report_tab:
         )
         st.session_state["active_player_label"] = selected_player_label
         player_row = work[work["Player Label"] == selected_player_label].iloc[0]
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Overall Score", f"{int(player_row['Overall Score'])}")
-        m2.metric("Primary", str(player_row.get("Primary Archetype", "-")))
-        m3.metric("Secondary", str(player_row.get("Secondary Archetype", "-")))
-        m4.metric("Transfermarkt", "See rankings")
+
+        a, b, c, d = st.columns(4)
+        a.metric("Overall Score", f"{int(player_row['Overall Score'])}")
+        b.metric("Primary", str(player_row.get("Primary Archetype", "-")))
+        c.metric("Secondary", str(player_row.get("Secondary Archetype", "-")))
+        d.metric("Transfermarkt", "See rankings")
 
         left, right = st.columns([1, 1])
         with left:
@@ -634,42 +726,51 @@ with report_tab:
 
         with right:
             st.markdown("### Player Chart")
-            plot_pizza_or_radar(selected_player_label, work, metrics, league_avg)
+            plot_player_chart(selected_player_label, work, metrics, league_avg)
             st.markdown("### Metric Percentiles")
             if metric_pcts:
                 st.dataframe(pd.DataFrame(metric_pcts, columns=["Metric", "Percentile"]), use_container_width=True, hide_index=True)
+    else:
+        st.info("No players available.")
 
+# Shadow squad
 with squad_tab:
     st.subheader("🟩 Shadow Squad")
     formation = st.selectbox("Formation", list(FORMATION_SLOTS.keys()), index=0)
     player_choices = work["Player Label"].tolist()
-    chosen_players = st.multiselect("Pick players to add", player_choices, default=[st.session_state.get("active_player_label", player_choices[0])] if player_choices else [])
+    chosen_players = st.multiselect(
+        "Pick players to add",
+        player_choices,
+        default=[st.session_state.get("active_player_label", player_choices[0])] if player_choices else [],
+    )
 
     if st.button("Add selected players"):
         existing_labels = {p["label"] for p in st.session_state.shadow_squad}
-        taken_slots = {p["slot"]: p for p in st.session_state.shadow_squad if p.get("slot") and p.get("slot") != "Bench"}
         for label in chosen_players:
             if label in existing_labels:
                 continue
             row = work[work["Player Label"] == label].iloc[0]
             slot = auto_assign_shadow_slot(row, {p["label"]: p.get("slot", "") for p in st.session_state.shadow_squad}, formation)
-            st.session_state.shadow_squad.append({
-                "id": str(row.get("__row_id__", label)),
-                "label": label,
-                "name": str(row.get("__player_name__", label)),
-                "team": str(row.get("Display Team", row.get("__team__", ""))),
-                "slot": slot or "Bench",
-                "primary": str(row.get("Primary Archetype", "-")),
-                "secondary": str(row.get("Secondary Archetype", "-")),
-                "sheet": str(row.get(SHEET_COL, "")),
-            })
+            st.session_state.shadow_squad.append(
+                {
+                    "id": str(row.get("__row_id__", label)),
+                    "label": label,
+                    "name": str(row.get("__player_name__", label)),
+                    "team": str(row.get("Display Team", row.get("__team__", ""))),
+                    "slot": slot or "Bench",
+                    "primary": str(row.get("Primary Archetype", "-")),
+                    "secondary": str(row.get("Secondary Archetype", "-")),
+                    "sheet": str(row.get(SHEET_COL, "")),
+                }
+            )
         st.success("Selected players added to the shadow squad.")
 
     if st.button("Clear shadow squad"):
         st.session_state.shadow_squad = []
 
     if st.session_state.shadow_squad:
-        st.dataframe(pd.DataFrame(st.session_state.shadow_squad)[["label", "team", "slot", "primary", "secondary", "sheet"]], use_container_width=True, hide_index=True)
+        squad_df = pd.DataFrame(st.session_state.shadow_squad)
+        st.dataframe(squad_df[["label", "team", "slot", "primary", "secondary", "sheet"]], use_container_width=True, hide_index=True)
     else:
         st.info("No players in the shadow squad yet.")
 
@@ -677,10 +778,16 @@ with squad_tab:
     taken = {p["slot"]: p for p in st.session_state.shadow_squad if p.get("slot") and p.get("slot") != "Bench"}
     for slot in FORMATION_SLOTS[formation]:
         occ = taken.get(slot["id"])
-        slot_rows.append({"Slot": slot["label"], "Player": occ["label"] if occ else "", "Team": occ["team"] if occ else "", "Archetype": occ["primary"] if occ else ""})
+        slot_rows.append({
+            "Slot": slot["label"],
+            "Player": occ["label"] if occ else "",
+            "Team": occ["team"] if occ else "",
+            "Archetype": occ["primary"] if occ else "",
+        })
     st.markdown("### Formation slots")
     st.dataframe(pd.DataFrame(slot_rows), use_container_width=True, hide_index=True)
 
+# Data explorer
 with data_tab:
     st.subheader("📂 Data Explorer")
     st.write(f"Source file: **{filename}**")
@@ -688,19 +795,24 @@ with data_tab:
         st.write("Loaded from multiple sheets.")
 
     st.markdown("### Column summary")
-    summary = pd.DataFrame({
-        "Column": list(work.columns),
-        "Dtype": [str(work[c].dtype) for c in work.columns],
-        "Non-null": [int(work[c].notna().sum()) for c in work.columns],
-        "Example": [str(work[c].dropna().iloc[0]) if len(work[c].dropna()) else "" for c in work.columns],
-    })
-    st.dataframe(summary, use_container_width=True, hide_index=True)
+    summary_rows = []
+    for c in work.columns:
+        series = work[c]
+        example = ""
+        non_null = int(series.notna().sum())
+        if non_null:
+            try:
+                example = str(series.dropna().iloc[0])
+            except Exception:
+                example = ""
+        summary_rows.append({"Column": c, "Dtype": str(series.dtype), "Non-null": non_null, "Example": example})
+    st.dataframe(pd.DataFrame(summary_rows), use_container_width=True, hide_index=True)
 
     st.markdown("### Raw preview")
     st.dataframe(work.head(50), use_container_width=True)
 
-    csv = work.to_csv(index=False).encode("utf-8")
-    st.download_button("Download filtered data", csv, "filtered_football_data.csv", "text/csv")
+    st.download_button("Download filtered data", work.to_csv(index=False).encode("utf-8"), "filtered_football_data.csv", "text/csv")
 
 st.caption("Supports CSV, TSV, TXT, Excel, JSON, Parquet, and Feather. Excel workbooks can be combined or filtered by sheet.")
+
 
