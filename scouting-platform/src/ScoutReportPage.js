@@ -102,7 +102,7 @@ const getPlayerPhoto = (player) => {
 
   const filename = `${slugify(playerName)}.png`;
 
-  return `https://syjsmvvsvvprxibqoizw.supabase.co/storage/v1/object/public/player-photos/${filename}`;
+  return `https://syjsmvvsvvprxibqoizw.supabase.co/storage/v1/object/public/player-photos/player-photos/${filename}`;
 };
   
   const DATE_HINTS = [
