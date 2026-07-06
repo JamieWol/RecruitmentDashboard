@@ -52,25 +52,59 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
       pdf.save(`${selectedPlayer["Player Name"]}_Report.pdf`);
     };
 
-    const getPlayerPhoto = (player) => {
-      // Use CSV / Excel photo column if available
-      if (player?._photoUrl) return player._photoUrl;
-      if (player?.Photo) return player.Photo;
+const slugify = (text) => {
+  const charMap = {
+    "ł": "l",
+    "Ł": "l",
+    "đ": "d",
+    "Đ": "d",
+    "ð": "d",
+    "Ð": "d",
+    "þ": "th",
+    "Þ": "th",
+    "æ": "ae",
+    "Æ": "ae",
+    "œ": "oe",
+    "Œ": "oe",
+    "ø": "o",
+    "Ø": "o",
+    "ı": "i",
+    "İ": "i",
+    "ß": "ss",
+  };
 
-      const name = player?.["Player Name"] || player?.["Display Name"] || player?.["Player"] || "";
-      if (!name) {
-        return "/placeholder.png";
-      }
+  return String(text || "")
+    .split("")
+    .map((ch) => charMap[ch] || ch)
+    .join("")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+};
 
-      const safeName = String(name)
-        .toLowerCase()
-        .trim()
-        .replace(/\s+/g, "_")
-        .replace(/[^a-z0-9_]/g, "");
+const getPlayerPhoto = (player) => {
+  // If the uploaded spreadsheet already contains a photo URL, use it.
+  if (player?._photoUrl) return player._photoUrl;
+  if (player?.Photo) return player.Photo;
 
-      return `/player-photos/${safeName}.png`;
-    };
+  const playerName =
+    player?.["Player Name"] ||
+    player?.["Display Name"] ||
+    player?.Player ||
+    "";
 
+  if (!playerName) {
+    return "/placeholder-player.png";
+  }
+
+  const filename = `${slugify(playerName)}.png`;
+
+  return `https://syjsmvvsvvprxibqoizw.supabase.co/storage/v1/object/public/player-photos/${filename}`;
+};
+  
   const DATE_HINTS = [
     "date", "dob", "birth", "expiry", "expires", "joined", "created",
     "updated", "time", "report", "contract"
