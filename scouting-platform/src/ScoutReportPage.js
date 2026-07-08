@@ -22,6 +22,99 @@ import {
   Legend
 } from "recharts";
 
+
+const uniquePreserveOrder = (items) => {
+  const seen = new Set();
+  const out = [];
+  items.forEach((item) => {
+    if (item !== null && item !== undefined && String(item).trim() !== "" && !seen.has(item)) {
+      seen.add(item);
+      out.push(item);
+    }
+  });
+  return out;
+};
+
+
+const slugifyLegacy = (text) =>
+  String(text || "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "_")
+    .replace(/[^a-z0-9_]/g, "");
+
+const slugify = (text) => {
+  const charMap = {
+    "ł": "l",
+    "Ł": "l",
+    "đ": "d",
+    "Đ": "d",
+    "ð": "d",
+    "Ð": "d",
+    "þ": "th",
+    "Þ": "th",
+    "æ": "ae",
+    "Æ": "ae",
+    "œ": "oe",
+    "Œ": "oe",
+    "ø": "o",
+    "Ø": "o",
+    "ı": "i",
+    "İ": "i",
+    "ß": "ss",
+  };
+
+  return String(text || "")
+    .split("")
+    .map((ch) => charMap[ch] || ch)
+    .join("")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+};
+
+const getDisplayName = (fullName) => {
+  const cleaned = String(fullName || "").replace(/\s+/g, " ").trim();
+  if (!cleaned) return "";
+  const parts = cleaned.split(" ").filter(Boolean);
+  if (parts.length <= 2) return cleaned;
+  return `${parts[0]} ${parts[parts.length - 1]}`;
+};
+
+const buildPhotoCandidatesGlobal = (player) => {
+  const fullName =
+    player?.["Full Player Name"] ||
+    player?.["Player Name"] ||
+    player?.["Display Name"] ||
+    player?.Player ||
+    "";
+
+  const displayName = getDisplayName(fullName || player?.["Player Name"] || "");
+  const rawCandidates = uniquePreserveOrder([
+    fullName,
+    displayName,
+    player?.["Player Name"],
+    player?.["Display Name"],
+  ].filter(Boolean));
+
+  const bases = uniquePreserveOrder([
+    ...rawCandidates.map(slugify),
+    ...rawCandidates.map(slugifyLegacy),
+  ].filter(Boolean));
+
+  const variants = uniquePreserveOrder(
+    bases.flatMap((base) => [base, `_${base}`, `__${base}`])
+  );
+
+  return variants.map(
+    (filename) =>
+      `https://syjsmvvsvvprxibqoizw.supabase.co/storage/v1/object/public/player-photos/player-photos/${filename}.png`
+  );
+};
+
 function ScoutReportPage({ shadowSquad, setShadowSquad }) {
   const [players, setPlayers] = useState([]);
   const exportRef = useRef(null);
@@ -113,42 +206,11 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
       return `${parts[0]} ${parts[parts.length - 1]}`;
     };
 
-    const buildPhotoCandidates = (player) => {
-      const fullName =
-        player?.["Full Player Name"] ||
-        player?.["Player Name"] ||
-        player?.["Display Name"] ||
-        player?.Player ||
-        "";
-
-      const displayName = getDisplayName(fullName || player?.["Player Name"] || "");
-      const rawCandidates = uniquePreserveOrder([
-        fullName,
-        displayName,
-        player?.["Player Name"],
-        player?.["Display Name"],
-      ].filter(Boolean));
-
-      const bases = uniquePreserveOrder([
-        ...rawCandidates.map(slugify),
-        ...rawCandidates.map(slugifyLegacy),
-      ].filter(Boolean));
-
-      const variants = uniquePreserveOrder(
-        bases.flatMap((base) => [base, `_${base}`, `__${base}`])
-      );
-
-      return variants.map(
-        (filename) =>
-          `https://syjsmvvsvvprxibqoizw.supabase.co/storage/v1/object/public/player-photos/player-photos/${filename}.png`
-      );
-    };
-
     const getPlayerPhoto = (player) => {
       if (player?._photoUrl) return player._photoUrl;
       if (player?.Photo) return player.Photo;
 
-      const candidates = buildPhotoCandidates(player);
+      const candidates = buildPhotoCandidatesGlobal(player);
       return candidates[0] || "/placeholder-player.png";
     };
 
@@ -159,7 +221,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     }
 
     let cancelled = false;
-    const candidates = buildPhotoCandidates(selectedPlayer);
+    const candidates = buildPhotoCandidatesGlobal(selectedPlayer);
 
     const loadPhoto = async () => {
       for (const url of candidates) {
@@ -403,18 +465,6 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     const cleaned = raw.replace(/,/g, "");
     const num = Number(cleaned);
     return Number.isFinite(num) ? num : null;
-  };
-
-  const uniquePreserveOrder = (items) => {
-    const seen = new Set();
-    const out = [];
-    items.forEach((item) => {
-      if (item !== null && item !== undefined && String(item).trim() !== "" && !seen.has(item)) {
-        seen.add(item);
-        out.push(item);
-      }
-    });
-    return out;
   };
 
   const findFirstExisting = (row, candidates) =>
@@ -1500,6 +1550,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 }
 
 export default ScoutReportPage;
+
 
 
 
