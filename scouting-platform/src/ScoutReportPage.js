@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import html2canvas from "html2canvas";
@@ -22,23 +22,132 @@ import {
   Legend
 } from "recharts";
 
-
-const uniquePreserveOrder = (items) => {
-  const seen = new Set();
-  const out = [];
-  items.forEach((item) => {
-    if (item !== null && item !== undefined && String(item).trim() !== "" && !seen.has(item)) {
-      seen.add(item);
-      out.push(item);
-    }
+function ScoutReportPage({ shadowSquad, setShadowSquad }) {
+  const [players, setPlayers] = useState([]);
+  const exportRef = useRef(null);
+  const [clipsLink, setClipsLink] = useState("");
+  const [filteredPlayers, setFilteredPlayers] = useState([]);
+  const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const [photoDataUrl, setPhotoDataUrl] = useState("");
+  const [photoFile, setPhotoFile] = useState(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoStatus, setPhotoStatus] = useState("");
+  const [metrics, setMetrics] = useState([]);
+  const [scatterMetrics, setScatterMetrics] = useState({ x: "", y: "" });
+  const [competitions, setCompetitions] = useState([]);
+  const [filters, setFilters] = useState({
+    minMinutes: 0,
+    maxMinutes: 99999,
+    competition: "All",
+    positions: []
   });
-  return out;
-};
+    const exportPDF = async () => {
+      if (!exportRef.current || !selectedPlayer) return;
+
+      const images = Array.from(exportRef.current.querySelectorAll("img"));
+      await Promise.all(
+        images.map(
+          (img) =>
+            new Promise((resolve) => {
+              if (img.complete) return resolve();
+              img.onload = resolve;
+              img.onerror = resolve;
+            })
+        )
+      );
+
+      const canvas = await html2canvas(exportRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: "#ffffff",
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      pdf.addImage(imgData, "PNG", 0, 10, pdfWidth, pdfHeight);
+      pdf.save(`${selectedPlayer["Player Name"]}_Report.pdf`);
+    };
+
+    const slugifyLegacy = (text) =>
+      String(text || "")
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "");
+
+    const slugify = (text) => {
+      const charMap = {
+        "ł": "l", "Ł": "l",
+        "đ": "d", "Đ": "d",
+        "ð": "d", "Ð": "d",
+        "þ": "th", "Þ": "th",
+        "æ": "ae", "Æ": "ae",
+        "œ": "oe", "Œ": "oe",
+        "ø": "o", "Ø": "o",
+        "ı": "i", "İ": "i",
+        "ß": "ss",
+      };
+
+      return String(text || "")
+        .split("")
+        .map((ch) => charMap[ch] || ch)
+        .join("")
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "");
+    };
+
+    const getDisplayName = (fullName) => {
+      const cleaned = String(fullName || "").replace(/\s+/g, " ").trim();
+      if (!cleaned) return "";
+      const parts = cleaned.split(" ").filter(Boolean);
+      if (parts.length <= 2) return cleaned;
+      return `${parts[0]} ${parts[parts.length - 1]}`;
+    };
+    const buildPhotoCandidates = useCallback((player) => {
+      const fullName =
+        player?.["Full Player Name"] ||
+        player?.["Player Name"] ||
+        player?.["Display Name"] ||
+        player?.Player ||
+        "";
+
+      const displayName = getDisplayName(fullName || player?.["Player Name"] || "");
+      const rawCandidates = uniquePreserveOrder([
+        fullName,
+        displayName,
+        player?.["Player Name"],
+        player?.["Display Name"],
+      ].filter(Boolean));
+
+      const bases = uniquePreserveOrder([
+        ...rawCandidates.map(slugify),
+        ...rawCandidates.map(slugifyLegacy),
+      ].filter(Boolean));
+
+      const variants = uniquePreserveOrder(
+        bases.flatMap((base) => [base, `_${base}`, `__${base}`])
+      );
+
+      return variants.map(
+        (filename) =>
+          `https://syjsmvvsvvprxibqoizw.supabase.co/storage/v1/object/public/player-photos/player-photos/${filename}.png`
+      );
+    }, []);
+
     const getPlayerPhoto = (player) => {
       if (player?._photoUrl) return player._photoUrl;
       if (player?.Photo) return player.Photo;
 
-      const candidates = buildPhotoCandidatesGlobal(player);
+      const candidates = buildPhotoCandidates(player);
       return candidates[0] || "/placeholder-player.png";
     };
 
@@ -49,7 +158,7 @@ const uniquePreserveOrder = (items) => {
     }
 
     let cancelled = false;
-    const candidates = buildPhotoCandidatesGlobal(selectedPlayer);
+    const candidates = buildPhotoCandidates(selectedPlayer);
 
     const loadPhoto = async () => {
       for (const url of candidates) {
@@ -80,7 +189,7 @@ const uniquePreserveOrder = (items) => {
     return () => {
       cancelled = true;
     };
-  }, [selectedPlayer]);
+  }, [selectedPlayer, buildPhotoCandidates]);
 
   const DATE_HINTS = [
     "date", "dob", "birth", "expiry", "expires", "joined", "created",
@@ -293,6 +402,18 @@ const uniquePreserveOrder = (items) => {
     const cleaned = raw.replace(/,/g, "");
     const num = Number(cleaned);
     return Number.isFinite(num) ? num : null;
+  };
+
+  const uniquePreserveOrder = (items) => {
+    const seen = new Set();
+    const out = [];
+    items.forEach((item) => {
+      if (item !== null && item !== undefined && String(item).trim() !== "" && !seen.has(item)) {
+        seen.add(item);
+        out.push(item);
+      }
+    });
+    return out;
   };
 
   const findFirstExisting = (row, candidates) =>
