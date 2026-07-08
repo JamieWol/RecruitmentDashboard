@@ -38,19 +38,41 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     positions: []
   });
 
-    const exportPDF = async () => {
-      if (!exportRef.current || !selectedPlayer) return;
+const exportPDF = async () => {
+  if (!exportRef.current || !selectedPlayer) return;
 
-      const canvas = await html2canvas(exportRef.current, { scale: 2 });
-      const imgData = canvas.toDataURL("image/png");
+  // Wait for all images to finish loading
+  const images = Array.from(exportRef.current.querySelectorAll("img"));
 
-      const pdf = new jsPDF("p", "mm", "a4");
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+  await Promise.all(
+    images.map(
+      (img) =>
+        new Promise((resolve) => {
+          if (img.complete) return resolve();
+          img.onload = resolve;
+          img.onerror = resolve;
+        })
+    )
+  );
 
-      pdf.addImage(imgData, "PNG", 0, 10, pdfWidth, pdfHeight);
-      pdf.save(`${selectedPlayer["Player Name"]}_Report.pdf`);
-    };
+  const canvas = await html2canvas(exportRef.current, {
+    scale: 2,
+    useCORS: true,
+    allowTaint: false,
+    backgroundColor: "#ffffff",
+  });
+
+  const imgData = canvas.toDataURL("image/png");
+
+  const pdf = new jsPDF("p", "mm", "a4");
+
+  const pdfWidth = pdf.internal.pageSize.getWidth();
+  const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+  pdf.addImage(imgData, "PNG", 0, 10, pdfWidth, pdfHeight);
+
+  pdf.save(`${selectedPlayer["Player Name"]}_Report.pdf`);
+};
 
 const slugify = (text) => {
   const charMap = {
@@ -788,6 +810,7 @@ const getPlayerPhoto = (player) => {
              <img
                src={getPlayerPhoto(selectedPlayer)}
                alt={selectedPlayer["Player Name"]}
+               crossOrigin="anonymous"
                style={{
                  width: "100%",
                  height: "100%",
