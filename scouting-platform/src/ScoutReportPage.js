@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import html2canvas from "html2canvas";
@@ -28,6 +28,10 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
   const [clipsLink, setClipsLink] = useState("");
   const [filteredPlayers, setFilteredPlayers] = useState([]);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const [photoDataUrl, setPhotoDataUrl] = useState("");
+  const [photoFile, setPhotoFile] = useState(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoStatus, setPhotoStatus] = useState("");
   const [metrics, setMetrics] = useState([]);
   const [scatterMetrics, setScatterMetrics] = useState({ x: "", y: "" });
   const [competitions, setCompetitions] = useState([]);
@@ -37,96 +41,157 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     competition: "All",
     positions: []
   });
+    const exportPDF = async () => {
+      if (!exportRef.current || !selectedPlayer) return;
 
-const exportPDF = async () => {
-  if (!exportRef.current || !selectedPlayer) return;
+      const images = Array.from(exportRef.current.querySelectorAll("img"));
+      await Promise.all(
+        images.map(
+          (img) =>
+            new Promise((resolve) => {
+              if (img.complete) return resolve();
+              img.onload = resolve;
+              img.onerror = resolve;
+            })
+        )
+      );
 
-  // Wait for all images to finish loading
-  const images = Array.from(exportRef.current.querySelectorAll("img"));
+      const canvas = await html2canvas(exportRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: "#ffffff",
+      });
 
-  await Promise.all(
-    images.map(
-      (img) =>
-        new Promise((resolve) => {
-          if (img.complete) return resolve();
-          img.onload = resolve;
-          img.onerror = resolve;
-        })
-    )
-  );
+      const imgData = canvas.toDataURL("image/png");
 
-  const canvas = await html2canvas(exportRef.current, {
-    scale: 2,
-    useCORS: true,
-    allowTaint: false,
-    backgroundColor: "#ffffff",
-  });
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
-  const imgData = canvas.toDataURL("image/png");
+      pdf.addImage(imgData, "PNG", 0, 10, pdfWidth, pdfHeight);
+      pdf.save(`${selectedPlayer["Player Name"]}_Report.pdf`);
+    };
 
-  const pdf = new jsPDF("p", "mm", "a4");
+    const slugifyLegacy = (text) =>
+      String(text || "")
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "");
 
-  const pdfWidth = pdf.internal.pageSize.getWidth();
-  const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+    const slugify = (text) => {
+      const charMap = {
+        "ł": "l", "Ł": "l",
+        "đ": "d", "Đ": "d",
+        "ð": "d", "Ð": "d",
+        "þ": "th", "Þ": "th",
+        "æ": "ae", "Æ": "ae",
+        "œ": "oe", "Œ": "oe",
+        "ø": "o", "Ø": "o",
+        "ı": "i", "İ": "i",
+        "ß": "ss",
+      };
 
-  pdf.addImage(imgData, "PNG", 0, 10, pdfWidth, pdfHeight);
+      return String(text || "")
+        .split("")
+        .map((ch) => charMap[ch] || ch)
+        .join("")
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "");
+    };
 
-  pdf.save(`${selectedPlayer["Player Name"]}_Report.pdf`);
-};
+    const getDisplayName = (fullName) => {
+      const cleaned = String(fullName || "").replace(/\s+/g, " ").trim();
+      if (!cleaned) return "";
+      const parts = cleaned.split(" ").filter(Boolean);
+      if (parts.length <= 2) return cleaned;
+      return `${parts[0]} ${parts[parts.length - 1]}`;
+    };
 
-const slugify = (text) => {
-  const charMap = {
-    "ł": "l",
-    "Ł": "l",
-    "đ": "d",
-    "Đ": "d",
-    "ð": "d",
-    "Ð": "d",
-    "þ": "th",
-    "Þ": "th",
-    "æ": "ae",
-    "Æ": "ae",
-    "œ": "oe",
-    "Œ": "oe",
-    "ø": "o",
-    "Ø": "o",
-    "ı": "i",
-    "İ": "i",
-    "ß": "ss",
-  };
+    const buildPhotoCandidates = (player) => {
+      const fullName =
+        player?.["Full Player Name"] ||
+        player?.["Player Name"] ||
+        player?.["Display Name"] ||
+        player?.Player ||
+        "";
 
-  return String(text || "")
-    .split("")
-    .map((ch) => charMap[ch] || ch)
-    .join("")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
-};
+      const displayName = getDisplayName(fullName || player?.["Player Name"] || "");
+      const rawCandidates = uniquePreserveOrder([
+        fullName,
+        displayName,
+        player?.["Player Name"],
+        player?.["Display Name"],
+      ].filter(Boolean));
 
-const getPlayerPhoto = (player) => {
-  // If the uploaded spreadsheet already contains a photo URL, use it.
-  if (player?._photoUrl) return player._photoUrl;
-  if (player?.Photo) return player.Photo;
+      const bases = uniquePreserveOrder([
+        ...rawCandidates.map(slugify),
+        ...rawCandidates.map(slugifyLegacy),
+      ].filter(Boolean));
 
-  const playerName =
-    player?.["Player Name"] ||
-    player?.["Display Name"] ||
-    player?.Player ||
-    "";
+      const variants = uniquePreserveOrder(
+        bases.flatMap((base) => [base, `_${base}`, `__${base}`])
+      );
 
-  if (!playerName) {
-    return "/placeholder-player.png";
-  }
+      return variants.map(
+        (filename) =>
+          `https://syjsmvvsvvprxibqoizw.supabase.co/storage/v1/object/public/player-photos/player-photos/${filename}.png`
+      );
+    };
 
-  const filename = `${slugify(playerName)}.png`;
+    const getPlayerPhoto = (player) => {
+      if (player?._photoUrl) return player._photoUrl;
+      if (player?.Photo) return player.Photo;
 
-  return `https://syjsmvvsvvprxibqoizw.supabase.co/storage/v1/object/public/player-photos/player-photos/${filename}`;
-};
-  
+      const candidates = buildPhotoCandidates(player);
+      return candidates[0] || "/placeholder-player.png";
+    };
+
+  useEffect(() => {
+    if (!selectedPlayer) {
+      setPhotoDataUrl("");
+      return;
+    }
+
+    let cancelled = false;
+    const candidates = buildPhotoCandidates(selectedPlayer);
+
+    const loadPhoto = async () => {
+      for (const url of candidates) {
+        try {
+          const response = await fetch(url, { mode: "cors" });
+          if (!response.ok) continue;
+
+          const blob = await response.blob();
+          const dataUrl = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(String(reader.result || ""));
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+
+          if (!cancelled) setPhotoDataUrl(dataUrl);
+          return;
+        } catch {
+          // try next candidate
+        }
+      }
+
+      if (!cancelled) setPhotoDataUrl("");
+    };
+
+    loadPhoto();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedPlayer]);
+
   const DATE_HINTS = [
     "date", "dob", "birth", "expiry", "expires", "joined", "created",
     "updated", "time", "report", "contract"
@@ -212,6 +277,89 @@ const getPlayerPhoto = (player) => {
 
   const normalizeCompetitionValue = (value) => String(value || "").trim().toLowerCase();
 
+
+  const getPlayerBackground = (player) => {
+    if (!player) return "";
+
+    const name = player["Player Name"] || player["Full Player Name"] || "The player";
+    const team = player["Team"] || player["Display Team"] || "their club";
+    const position = player["Primary Position"] || player["Display Position"] || "player";
+    const competition = getCompetitionValue(player);
+    const age = player["Age"] ? `${player["Age"]}-year-old ` : "";
+    const nationality = player["Nationality"] ? `${player["Nationality"]} ` : "";
+    const minutes = player["Minutes Played"] ? `${player["Minutes Played"]} minutes` : "limited minutes data";
+
+    return `${name} is a ${age}${nationality}${position.toLowerCase()} at ${team}${competition ? `, competing in ${competition}` : ""}. This draft background paragraph is generated from the uploaded data and is styled to show what a Transfermarkt-based summary could look like later. The player profile currently indicates ${minutes}, which helps frame his recent usage and role within the squad.`;
+  };
+
+  const handlePhotoUpload = async () => {
+    if (!selectedPlayer || !photoFile) return;
+
+    const playerName =
+      selectedPlayer["Full Player Name"] ||
+      selectedPlayer["Player Name"] ||
+      selectedPlayer["Display Name"] ||
+      selectedPlayer.Player ||
+      "";
+
+    if (!playerName) {
+      setPhotoStatus("No player name found.");
+      return;
+    }
+
+    const cleanName = getDisplayName(playerName);
+    const filename = `${slugify(cleanName)}.png`;
+    const path = `player-photos/${filename}`;
+
+    const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || "https://syjsmvvsvvprxibqoizw.supabase.co";
+    const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY || "";
+
+    if (!supabaseAnonKey) {
+      setPhotoStatus("Missing REACT_APP_SUPABASE_ANON_KEY.");
+      return;
+    }
+
+    try {
+      setUploadingPhoto(true);
+      setPhotoStatus("");
+
+      const uploadRes = await fetch(`${supabaseUrl}/storage/v1/object/player-photos/${path}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "image/png",
+          "Authorization": `Bearer ${supabaseAnonKey}`,
+          "apikey": supabaseAnonKey,
+          "x-upsert": "true",
+        },
+        body: photoFile,
+      });
+
+      if (!uploadRes.ok) {
+        const errorText = await uploadRes.text();
+        throw new Error(errorText || "Upload failed");
+      }
+
+      const publicUrl = `${supabaseUrl}/storage/v1/object/public/player-photos/${path}`;
+
+      setPlayers((prev) => prev.map((p) => (
+        (p["Player Label"] === selectedPlayer["Player Label"] ||
+         p["Full Player Name"] === selectedPlayer["Full Player Name"]) ? { ...p, _photoUrl: publicUrl, Photo: publicUrl } : p
+      )));
+      setFilteredPlayers((prev) => prev.map((p) => (
+        (p["Player Label"] === selectedPlayer["Player Label"] ||
+         p["Full Player Name"] === selectedPlayer["Full Player Name"]) ? { ...p, _photoUrl: publicUrl, Photo: publicUrl } : p
+      )));
+      setSelectedPlayer((prev) => ({ ...prev, _photoUrl: publicUrl, Photo: publicUrl }));
+      setPhotoDataUrl(publicUrl);
+      setPhotoStatus("Photo uploaded and saved to Supabase.");
+      setPhotoFile(null);
+    } catch (err) {
+      setPhotoStatus(`Upload failed: ${err?.message || "Unknown error"}`);
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
   const NAME_CANDIDATES = ["Player Name", "Player", "Name", "player", "name", "Footballer"];
   const TEAM_CANDIDATES = ["Team", "Club", "Squad", "team", "club", "Current Team"];
   const LEAGUE_CANDIDATES = ["League", "Competition", "competition", "league", "Competition Name"];
@@ -296,8 +444,10 @@ const getPlayerPhoto = (player) => {
       const contractDateCol = findFirstExisting(normalizedRow, CONTRACT_DATE_CANDIDATES) || "Contract expires";
       const photoCol = findFirstExisting(normalizedRow, PHOTO_CANDIDATES) || "Photo";
 
-      const playerName = String(normalizedRow[nameCol] ?? normalizedRow["Player Name"] ?? normalizedRow["Name"] ?? normalizedRow["Player"] ?? `Player ${idx + 1}`).trim() || `Player ${idx + 1}`;
+      const rawPlayerName = String(normalizedRow[nameCol] ?? normalizedRow["Player Name"] ?? normalizedRow["Name"] ?? normalizedRow["Player"] ?? `Player ${idx + 1}`).trim() || `Player ${idx + 1}`;
+      const playerName = getDisplayName(rawPlayerName);
 
+      out["Full Player Name"] = rawPlayerName;
       out["Player Name"] = playerName;
       out["Display Name"] = playerName;
 
@@ -326,7 +476,7 @@ const getPlayerPhoto = (player) => {
       if (photoValue) out["_photoUrl"] = photoValue;
 
       out["Player Label"] = playerName;
-      out["__player_name__"] = playerName;
+      out["__player_name__"] = rawPlayerName;
       out["__team__"] = out["Team"];
       out["__league__"] = out["Competition Name"];
       out["__position__"] = out["Primary Position"];
@@ -808,7 +958,7 @@ const getPlayerPhoto = (player) => {
               }}
             >
              <img
-               src={getPlayerPhoto(selectedPlayer)}
+               src={photoDataUrl || getPlayerPhoto(selectedPlayer)}
                alt={selectedPlayer["Player Name"]}
                crossOrigin="anonymous"
                style={{
@@ -1243,7 +1393,69 @@ const getPlayerPhoto = (player) => {
                                       </div>
                                     )}
 
+                                <div
+                                  style={{
+                                    marginTop: 18,
+                                    background: "rgba(255,255,255,0.95)",
+                                    border: "1px solid #ddd",
+                                    borderRadius: 8,
+                                    padding: 16,
+                                  }}
+                                >
+                                  <h4 style={{ color: "#1f77b4", marginTop: 0, marginBottom: 10 }}>
+                                    Upload Player Photo
+                                  </h4>
+
+                                  <input
+                                    type="file"
+                                    accept="image/png"
+                                    onChange={(e) => setPhotoFile(e.target.files?.[0] || null)}
+                                    style={{ display: "block", marginBottom: 10 }}
+                                  />
+
+                                  <button
+                                    type="button"
+                                    onClick={handlePhotoUpload}
+                                    disabled={!photoFile || uploadingPhoto}
+                                    style={{
+                                      background: "#1f77b4",
+                                      color: "#fff",
+                                      border: "none",
+                                      padding: "8px 12px",
+                                      borderRadius: 6,
+                                      cursor: uploadingPhoto ? "not-allowed" : "pointer",
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    {uploadingPhoto ? "Uploading..." : "Upload to Supabase"}
+                                  </button>
+
+                                  {photoStatus && (
+                                    <div style={{ marginTop: 8, fontSize: 13, color: "#555" }}>
+                                      {photoStatus}
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div
+                                  style={{
+                                    marginTop: 18,
+                                    background: "rgba(255,255,255,0.95)",
+                                    border: "1px solid #ddd",
+                                    borderRadius: 8,
+                                    padding: 16,
+                                  }}
+                                >
+                                  <h4 style={{ color: "#1f77b4", marginTop: 0, marginBottom: 10 }}>
+                                    Player Background
+                                  </h4>
+                                  <p style={{ color: "#000", lineHeight: 1.7, margin: 0 }}>
+                                    {getPlayerBackground(selectedPlayer)}
+                                  </p>
+                                </div>
+
                                 {/* Clips */}
+
                                 <div
                                   style={{
                                     marginTop: 14,
@@ -1288,6 +1500,7 @@ const getPlayerPhoto = (player) => {
 }
 
 export default ScoutReportPage;
+
 
 
 
