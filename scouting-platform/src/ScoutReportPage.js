@@ -22,30 +22,134 @@ import {
   Legend
 } from "recharts";
 
-
-const uniquePreserveOrder = (items) => {
-  const seen = new Set();
-  const out = [];
-  items.forEach((item) => {
-    if (item !== null && item !== undefined && String(item).trim() !== "" && !seen.has(item)) {
-      seen.add(item);
-      out.push(item);
-    }
+function ScoutReportPage({ shadowSquad, setShadowSquad }) {
+  const [players, setPlayers] = useState([]);
+  const exportRef = useRef(null);
+  const [clipsLink, setClipsLink] = useState("");
+  const [filteredPlayers, setFilteredPlayers] = useState([]);
+  const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const [photoDataUrl, setPhotoDataUrl] = useState("");
+  const [photoFile, setPhotoFile] = useState(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoStatus, setPhotoStatus] = useState("");
+  const [metrics, setMetrics] = useState([]);
+  const [scatterMetrics, setScatterMetrics] = useState({ x: "", y: "" });
+  const [competitions, setCompetitions] = useState([]);
+  const [filters, setFilters] = useState({
+    minMinutes: 0,
+    maxMinutes: 99999,
+    competition: "All",
+    positions: []
   });
-  return out;
-};
+    const exportPDF = async () => {
+      if (!exportRef.current || !selectedPlayer) return;
+
+      const images = Array.from(exportRef.current.querySelectorAll("img"));
+      await Promise.all(
+        images.map(
+          (img) =>
+            new Promise((resolve) => {
+              if (img.complete) return resolve();
+              img.onload = resolve;
+              img.onerror = resolve;
+            })
+        )
+      );
+
+      const canvas = await html2canvas(exportRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: "#ffffff",
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      pdf.addImage(imgData, "PNG", 0, 10, pdfWidth, pdfHeight);
+      pdf.save(`${selectedPlayer["Player Name"]}_Report.pdf`);
+    };
+
+    const slugifyLegacy = (text) =>
+      String(text || "")
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "");
+
+    const slugify = (text) => {
+      const charMap = {
+        "ł": "l", "Ł": "l",
+        "đ": "d", "Đ": "d",
+        "ð": "d", "Ð": "d",
+        "þ": "th", "Þ": "th",
+        "æ": "ae", "Æ": "ae",
+        "œ": "oe", "Œ": "oe",
+        "ø": "o", "Ø": "o",
+        "ı": "i", "İ": "i",
+        "ß": "ss",
+      };
+
+      return String(text || "")
+        .split("")
+        .map((ch) => charMap[ch] || ch)
+        .join("")
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "");
+    };
+
+    const getDisplayName = (fullName) => {
+      const cleaned = String(fullName || "").replace(/\s+/g, " ").trim();
+      if (!cleaned) return "";
+      const parts = cleaned.split(" ").filter(Boolean);
+      if (parts.length <= 2) return cleaned;
+      return `${parts[0]} ${parts[parts.length - 1]}`;
+    };
+
+    const buildPhotoCandidates = (player) => {
+      const fullName =
+        player?.["Full Player Name"] ||
+        player?.["Player Name"] ||
+        player?.["Display Name"] ||
+        player?.Player ||
+        "";
+
+      const displayName = getDisplayName(fullName || player?.["Player Name"] || "");
+      const rawCandidates = uniquePreserveOrder([
+        fullName,
+        displayName,
+        player?.["Player Name"],
+        player?.["Display Name"],
+      ].filter(Boolean));
+
+      const bases = uniquePreserveOrder([
+        ...rawCandidates.map(slugify),
+        ...rawCandidates.map(slugifyLegacy),
+      ].filter(Boolean));
+
+      const variants = uniquePreserveOrder(
+        bases.flatMap((base) => [base, `_${base}`, `__${base}`])
+      );
+
+      return variants.map(
+        (filename) =>
+          `https://syjsmvvsvvprxibqoizw.supabase.co/storage/v1/object/public/player-photos/player-photos/${filename}.png`
+      );
+    };
+
     const getPlayerPhoto = (player) => {
       if (player?._photoUrl) return player._photoUrl;
       if (player?.Photo) return player.Photo;
 
       const candidates = buildPhotoCandidates(player);
       return candidates[0] || "/placeholder-player.png";
-    };
-
-    const samePlayer = (a, b) => {
-      if (!a || !b) return false;
-      const keys = ["Player Label", "Full Player Name", "Player Name", "Display Name"];
-      return keys.some((key) => String(a[key] || "") && String(a[key] || "") === String(b[key] || ""));
     };
 
   useEffect(() => {
@@ -510,7 +614,7 @@ const uniquePreserveOrder = (items) => {
 
     const ranked = sortRowsByScore(f, metrics);
     setFilteredPlayers(ranked);
-    if (selectedPlayer && !ranked.some((p) => samePlayer(p, selectedPlayer))) {
+    if (selectedPlayer && !ranked.includes(selectedPlayer)) {
       setSelectedPlayer(ranked[0] || null);
     } else if (!selectedPlayer && ranked.length > 0) {
       setSelectedPlayer(ranked[0]);
@@ -660,177 +764,6 @@ const uniquePreserveOrder = (items) => {
       return { strengths, weaknesses, clipsLink };
     };
 
-  const TabHeader = () => (
-    <div style={{ display: "flex", justifyContent: "center", gap: 10, margin: "12px 0 18px" }}>
-      <button
-        type="button"
-        onClick={() => setActivePanel("report")}
-        style={{
-          padding: "10px 16px",
-          borderRadius: 999,
-          border: "none",
-          cursor: "pointer",
-          background: activePanel === "report" ? "#1f77b4" : "rgba(255,255,255,0.95)",
-          color: activePanel === "report" ? "#fff" : "#1f77b4",
-          fontWeight: 700,
-          boxShadow: "0 3px 8px rgba(0,0,0,0.08)",
-        }}
-      >
-        Scout Report
-      </button>
-      <button
-        type="button"
-        onClick={() => setActivePanel("background")}
-        style={{
-          padding: "10px 16px",
-          borderRadius: 999,
-          border: "none",
-          cursor: "pointer",
-          background: activePanel === "background" ? "#1f77b4" : "rgba(255,255,255,0.95)",
-          color: activePanel === "background" ? "#fff" : "#1f77b4",
-          fontWeight: 700,
-          boxShadow: "0 3px 8px rgba(0,0,0,0.08)",
-        }}
-      >
-        Player Background
-      </button>
-    </div>
-  );
-
-  if (activePanel === "background") {
-    const backgroundSummary = generateScoutSummaryData(selectedPlayer || {});
-
-    return (
-      <div style={{
-        padding: 24,
-        fontFamily: "Arial",
-        background: "url('/scouting-world.png') center/cover no-repeat, linear-gradient(to bottom, #cceeff, #ffffff)",
-        minHeight: "100vh"
-      }}>
-        <TabHeader />
-        <div style={{ maxWidth: 1400, margin: "0 auto 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
-          <h1 style={{ color: "#159c4c", margin: 0 }}>{selectedPlayer ? `${selectedPlayer["Player Name"]} - Background` : "Player Background"}</h1>
-          <button
-            onClick={exportBackgroundPDF}
-            disabled={!selectedPlayer}
-            style={{
-              background: "#1f77b4",
-              color: "#fff",
-              border: "none",
-              padding: "10px 16px",
-              borderRadius: 8,
-              cursor: selectedPlayer ? "pointer" : "not-allowed",
-              fontWeight: 700,
-            }}
-          >
-            Export Background PDF
-          </button>
-        </div>
-
-        <div ref={backgroundExportRef} style={{ maxWidth: 1400, margin: "0 auto", background: "#fff", borderRadius: 16, padding: 18, boxShadow: "0 8px 22px rgba(0,0,0,0.10)" }}>
-          {!selectedPlayer ? (
-            <div style={{ padding: 30, textAlign: "center", color: "#666" }}>Select a player in the Scout Report tab to build the background page.</div>
-          ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "320px 1fr 340px", gap: 18, alignItems: "start" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 14, background: "#1f77b4", color: "#fff", borderRadius: 16, padding: 16 }}>
-                  <div style={{ width: 110, height: 110, borderRadius: "50%", overflow: "hidden", background: "#e6e6e6", border: "4px solid #fff", flexShrink: 0 }}>
-                    <img
-                      src={photoDataUrl || getPlayerPhoto(selectedPlayer)}
-                      alt={selectedPlayer["Player Name"]}
-                      crossOrigin="anonymous"
-                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                      onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "/placeholder-player.png"; }}
-                    />
-                  </div>
-                  <div style={{ lineHeight: 1.15 }}>
-                    <div style={{ fontSize: 28, fontWeight: 800 }}>{selectedPlayer["Player Name"]}</div>
-                    <div style={{ fontSize: 14, opacity: 0.95 }}>{selectedPlayer["Primary Position"] || ""} • {selectedPlayer["Team"] || selectedPlayer["Display Team"] || ""}</div>
-                  </div>
-                </div>
-
-                <div style={{ border: "2px solid #159c4c", borderRadius: 14, overflow: "hidden", background: "#fff" }}>
-                  <div style={{ background: "#111", color: "#fff", fontWeight: 800, padding: "10px 14px", fontSize: 18 }}>Player Overview</div>
-                  <div style={{ padding: 14, display: "grid", gap: 10, fontSize: 14, lineHeight: 1.5 }}>
-                    <div><strong>Name:</strong> {selectedPlayer["Player Name"]}</div>
-                    <div><strong>Team:</strong> {selectedPlayer["Team"] || selectedPlayer["Display Team"] || ""}</div>
-                    <div><strong>Position:</strong> {selectedPlayer["Primary Position"] || ""}</div>
-                    <div><strong>Competition:</strong> {getCompetitionValue(selectedPlayer)}</div>
-                    <div><strong>Age:</strong> {selectedPlayer["Age"] ?? ""}</div>
-                    <div><strong>Nationality:</strong> {selectedPlayer["Nationality"] ?? ""}</div>
-                    <div><strong>Games Played:</strong> {selectedPlayer["Appearances"] ?? ""}</div>
-                    <div><strong>Minutes Played:</strong> {selectedPlayer["Minutes Played"] ?? ""}</div>
-                    <div><strong>Average Rating:</strong> {averageRating(selectedPlayer)}</div>
-                    <div><strong>Overall Rank:</strong> {overallRank(selectedPlayer)} / {filteredPlayers.length}</div>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                <div style={{ border: "2px solid #159c4c", borderRadius: 14, overflow: "hidden", background: "#fff" }}>
-                  <div style={{ background: "#159c4c", color: "#fff", fontWeight: 800, padding: "10px 14px", fontSize: 18, textAlign: "center" }}>Playing Background</div>
-                  <div style={{ padding: 14, lineHeight: 1.6, fontSize: 16 }}>
-                    {getPlayerBackground(selectedPlayer)}
-                  </div>
-                </div>
-
-                <div style={{ border: "2px solid #159c4c", borderRadius: 14, overflow: "hidden", background: "#fff" }}>
-                  <div style={{ background: "#111", color: "#fff", fontWeight: 800, padding: "10px 14px", fontSize: 18, display: "flex", justifyContent: "space-between" }}>
-                    <span>Strengths</span><span>Weaknesses</span>
-                  </div>
-                  <div style={{ padding: 14, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, minHeight: 160 }}>
-                    <ul style={{ margin: 0, paddingLeft: 20 }}>
-                      {backgroundSummary.strengths.length ? backgroundSummary.strengths.map((item) => <li key={item}>{item}</li>) : <li>None detected</li>}
-                    </ul>
-                    <ul style={{ margin: 0, paddingLeft: 20 }}>
-                      {backgroundSummary.weaknesses.length ? backgroundSummary.weaknesses.map((item) => <li key={item}>{item}</li>) : <li>None detected</li>}
-                    </ul>
-                  </div>
-                </div>
-
-                <div style={{ border: "2px solid #159c4c", borderRadius: 14, overflow: "hidden", background: "#fff" }}>
-                  <div style={{ background: "#111", color: "#fff", fontWeight: 800, padding: "10px 14px", fontSize: 18 }}>Player Notes</div>
-                  <div style={{ padding: 14, minHeight: 120, lineHeight: 1.6 }}>
-                    {backgroundSummary.clipsLink && backgroundSummary.clipsLink !== "#" ? backgroundSummary.clipsLink : "Insert clips link in the Scout Report tab."}
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                <div style={{ border: "2px solid #159c4c", borderRadius: 14, overflow: "hidden", background: "#fff" }}>
-                  <div style={{ background: "#111", color: "#fff", fontWeight: 800, padding: "10px 14px", fontSize: 18, textAlign: "center" }}>Season Heatmap</div>
-                  <div style={{ padding: 14, background: "#dff0d8", minHeight: 280, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <div style={{ width: "100%", height: 220, border: "1px solid #fff", borderRadius: 12, background: "linear-gradient(180deg, rgba(255,0,0,0.85), rgba(255,255,0,0.35))", opacity: 0.9 }} />
-                  </div>
-                </div>
-
-                <div style={{ border: "2px solid #159c4c", borderRadius: 14, overflow: "hidden", background: "#fff" }}>
-                  <div style={{ background: "#111", color: "#fff", fontWeight: 800, padding: "10px 14px", fontSize: 18, textAlign: "center" }}>Positions Occupied</div>
-                  <div style={{ padding: 18, minHeight: 140 }}>
-                    <div style={{ width: 10, height: 10, borderRadius: 999, background: "#1f77b4", marginBottom: 8 }}></div>
-                    <div>{selectedPlayer["Primary Position"] || "Unknown"}</div>
-                    <div style={{ marginTop: 10, color: "#666", fontSize: 13 }}>This panel can later show a pitch map or position history.</div>
-                  </div>
-                </div>
-
-                <div style={{ border: "2px solid #159c4c", borderRadius: 14, overflow: "hidden", background: "#fff" }}>
-                  <div style={{ background: "#111", color: "#fff", fontWeight: 800, padding: "10px 14px", fontSize: 18, textAlign: "center" }}>Upload Player Photo</div>
-                  <div style={{ padding: 14 }}>
-                    <input type="file" accept="image/png" onChange={(e) => setPhotoFile(e.target.files?.[0] || null)} style={{ display: "block", marginBottom: 10 }} />
-                    <button type="button" onClick={handlePhotoUpload} disabled={!photoFile || uploadingPhoto} style={{ background: "#1f77b4", color: "#fff", border: "none", padding: "10px 14px", borderRadius: 8, cursor: uploadingPhoto ? "not-allowed" : "pointer", fontWeight: 700 }}>
-                      {uploadingPhoto ? "Uploading..." : "Upload to Supabase"}
-                    </button>
-                    {photoStatus && <div style={{ marginTop: 8, fontSize: 13, color: "#555" }}>{photoStatus}</div>}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div style={{
       padding: 24,
@@ -838,7 +771,6 @@ const uniquePreserveOrder = (items) => {
       background: "url('/scouting-world.png') center/cover no-repeat, linear-gradient(to bottom, #cceeff, #ffffff)",
       minHeight: "100vh"
     }}>
-      <TabHeader />
       <h1 style={{ color: "#1f77b4", textAlign:"center" }}>Create Scouting & Analysis Reports</h1>
       <input type="file" accept=".csv,.xlsx,.xls" onChange={handleUpload} style={{ marginTop: 10 }} />
 
@@ -896,7 +828,7 @@ const uniquePreserveOrder = (items) => {
           <div style={{ background:"rgba(255,255,255,0.95)", padding:16, borderRadius:12, boxShadow:"0 4px 12px rgba(0,0,0,0.08)" }}>
             <h3 style={{ color:"#1f77b4", marginTop:0 }}>Top Rated Players</h3>
             {filteredPlayers.map(p=>({p, rating:Number(averageRating(p))})).sort((a,b)=>b.rating-a.rating).slice(0,8).map((r,i)=>(
-              <div key={i} onClick={()=>{ setSelectedPlayer(r.p); setActivePanel("report"); }} style={{ display:"flex", justifyContent:"space-between", padding:"6px 8px", borderRadius:6, cursor:"pointer", background:samePlayer(selectedPlayer, r.p)?"#eaf3fb":"transparent", fontSize:13 }}>
+              <div key={i} onClick={()=>setSelectedPlayer(r.p)} style={{ display:"flex", justifyContent:"space-between", padding:"6px 8px", borderRadius:6, cursor:"pointer", background:selectedPlayer===r.p?"#eaf3fb":"transparent", fontSize:13 }}>
                 <span>{i+1}. {r.p["Player Name"]}</span>
                 <strong>{r.rating}</strong>
               </div>
@@ -907,7 +839,7 @@ const uniquePreserveOrder = (items) => {
 
       {/* Player Selector */}
       <div style={{ marginTop:5, textAlign:"center" }}>
-        <select onChange={e=>{ setSelectedPlayer(filteredPlayers[e.target.value]); setActivePanel("report"); }} style={{ padding:5, borderRadius:5 }}>
+        <select onChange={e=>setSelectedPlayer(filteredPlayers[e.target.value])} style={{ padding:5, borderRadius:5 }}>
           <option>Select Player</option>
           {filteredPlayers.map((p,i)=><option key={i} value={i}>{p["Player Name"]}</option>)}
         </select>
@@ -1568,6 +1500,7 @@ const uniquePreserveOrder = (items) => {
 }
 
 export default ScoutReportPage;
+
 
 
 
