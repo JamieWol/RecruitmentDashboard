@@ -22,199 +22,18 @@ import {
   Legend
 } from "recharts";
 
-function ScoutReportPage({ shadowSquad, setShadowSquad }) {
-  const loadStored = (key, fallback) => {
-    if (typeof window === "undefined") return fallback;
-    try {
-      const raw = window.localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : fallback;
-    } catch {
-      return fallback;
+
+const uniquePreserveOrder = (items) => {
+  const seen = new Set();
+  const out = [];
+  items.forEach((item) => {
+    if (item !== null && item !== undefined && String(item).trim() !== "" && !seen.has(item)) {
+      seen.add(item);
+      out.push(item);
     }
-  };
-
-  const saveStored = (key, value) => {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(key, JSON.stringify(value));
-    } catch {
-      // ignore storage quota issues
-    }
-  };
-
-  const [players, setPlayers] = useState(() => loadStored("scout_players", []));
-  const exportRef = useRef(null);
-  const backgroundExportRef = useRef(null);
-  const [clipsLink, setClipsLink] = useState(() => loadStored("scout_clipsLink", ""));
-  const [filteredPlayers, setFilteredPlayers] = useState(() => loadStored("scout_filteredPlayers", []));
-  const [selectedPlayer, setSelectedPlayer] = useState(() => loadStored("scout_selectedPlayer", null));
-  const [photoDataUrl, setPhotoDataUrl] = useState("");
-  const [photoFile, setPhotoFile] = useState(null);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [photoStatus, setPhotoStatus] = useState("");
-  const [metrics, setMetrics] = useState(() => loadStored("scout_metrics", []));
-  const [scatterMetrics, setScatterMetrics] = useState(() => loadStored("scout_scatterMetrics", { x: "", y: "" }));
-  const [competitions, setCompetitions] = useState(() => loadStored("scout_competitions", []));
-  const [filters, setFilters] = useState(() => loadStored("scout_filters", {
-    minMinutes: 0,
-    maxMinutes: 99999,
-    competition: "All",
-    positions: []
-  }));
-  const [activePanel, setActivePanel] = useState(() => loadStored("scout_activePanel", "report"));
-  useEffect(() => saveStored("scout_players", players), [players]);
-  useEffect(() => saveStored("scout_filteredPlayers", filteredPlayers), [filteredPlayers]);
-  useEffect(() => saveStored("scout_selectedPlayer", selectedPlayer), [selectedPlayer]);
-  useEffect(() => saveStored("scout_clipsLink", clipsLink), [clipsLink]);
-  useEffect(() => saveStored("scout_metrics", metrics), [metrics]);
-  useEffect(() => saveStored("scout_scatterMetrics", scatterMetrics), [scatterMetrics]);
-  useEffect(() => saveStored("scout_competitions", competitions), [competitions]);
-  useEffect(() => saveStored("scout_filters", filters), [filters]);
-  useEffect(() => saveStored("scout_activePanel", activePanel), [activePanel]);
-
-  useEffect(() => saveStored("scout_players", players), [players]);
-  useEffect(() => saveStored("scout_filteredPlayers", filteredPlayers), [filteredPlayers]);
-  useEffect(() => saveStored("scout_selectedPlayer", selectedPlayer), [selectedPlayer]);
-  useEffect(() => saveStored("scout_clipsLink", clipsLink), [clipsLink]);
-  useEffect(() => saveStored("scout_metrics", metrics), [metrics]);
-  useEffect(() => saveStored("scout_scatterMetrics", scatterMetrics), [scatterMetrics]);
-  useEffect(() => saveStored("scout_competitions", competitions), [competitions]);
-  useEffect(() => saveStored("scout_filters", filters), [filters]);
-  useEffect(() => saveStored("scout_activePanel", activePanel), [activePanel]);
-
-    const exportPDF = async () => {
-      if (!exportRef.current || !selectedPlayer) return;
-
-      const images = Array.from(exportRef.current.querySelectorAll("img"));
-      await Promise.all(
-        images.map(
-          (img) =>
-            new Promise((resolve) => {
-              if (img.complete) return resolve();
-              img.onload = resolve;
-              img.onerror = resolve;
-            })
-        )
-      );
-
-      const canvas = await html2canvas(exportRef.current, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: false,
-        backgroundColor: "#ffffff",
-      });
-
-      const imgData = canvas.toDataURL("image/png");
-
-      const pdf = new jsPDF("p", "mm", "a4");
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-      pdf.addImage(imgData, "PNG", 0, 10, pdfWidth, pdfHeight);
-      pdf.save(`${selectedPlayer["Player Name"]}_Report.pdf`);
-    };
-
-    const exportBackgroundPDF = async () => {
-      if (!backgroundExportRef.current || !selectedPlayer) return;
-
-      const images = Array.from(backgroundExportRef.current.querySelectorAll("img"));
-      await Promise.all(
-        images.map(
-          (img) =>
-            new Promise((resolve) => {
-              if (img.complete) return resolve();
-              img.onload = resolve;
-              img.onerror = resolve;
-            })
-        )
-      );
-
-      const canvas = await html2canvas(backgroundExportRef.current, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: false,
-        backgroundColor: "#ffffff",
-      });
-
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF("p", "mm", "a4");
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      pdf.addImage(imgData, "PNG", 0, 10, pdfWidth, pdfHeight);
-      pdf.save(`${selectedPlayer["Player Name"]}_Background.pdf`);
-    };
-
-    const slugifyLegacy = (text) =>
-      String(text || "")
-        .toLowerCase()
-        .trim()
-        .replace(/[^a-z0-9]+/g, "_")
-        .replace(/^_+|_+$/g, "");
-
-    const slugify = (text) => {
-      const charMap = {
-        "ł": "l", "Ł": "l",
-        "đ": "d", "Đ": "d",
-        "ð": "d", "Ð": "d",
-        "þ": "th", "Þ": "th",
-        "æ": "ae", "Æ": "ae",
-        "œ": "oe", "Œ": "oe",
-        "ø": "o", "Ø": "o",
-        "ı": "i", "İ": "i",
-        "ß": "ss",
-      };
-
-      return String(text || "")
-        .split("")
-        .map((ch) => charMap[ch] || ch)
-        .join("")
-        .normalize("NFD")
-        .replace(/[̀-ͯ]/g, "")
-        .toLowerCase()
-        .trim()
-        .replace(/[^a-z0-9]+/g, "_")
-        .replace(/^_+|_+$/g, "");
-    };
-
-    const getDisplayName = (fullName) => {
-      const cleaned = String(fullName || "").replace(/\s+/g, " ").trim();
-      if (!cleaned) return "";
-      const parts = cleaned.split(" ").filter(Boolean);
-      if (parts.length <= 2) return cleaned;
-      return `${parts[0]} ${parts[parts.length - 1]}`;
-    };
-
-    const buildPhotoCandidates = (player) => {
-      const fullName =
-        player?.["Full Player Name"] ||
-        player?.["Player Name"] ||
-        player?.["Display Name"] ||
-        player?.Player ||
-        "";
-
-      const displayName = getDisplayName(fullName || player?.["Player Name"] || "");
-      const rawCandidates = uniquePreserveOrder([
-        fullName,
-        displayName,
-        player?.["Player Name"],
-        player?.["Display Name"],
-      ].filter(Boolean));
-
-      const bases = uniquePreserveOrder([
-        ...rawCandidates.map(slugify),
-        ...rawCandidates.map(slugifyLegacy),
-      ].filter(Boolean));
-
-      const variants = uniquePreserveOrder(
-        bases.flatMap((base) => [base, `_${base}`, `__${base}`])
-      );
-
-      return variants.map(
-        (filename) =>
-          `https://syjsmvvsvvprxibqoizw.supabase.co/storage/v1/object/public/player-photos/player-photos/${filename}.png`
-      );
-    };
-
+  });
+  return out;
+};
     const getPlayerPhoto = (player) => {
       if (player?._photoUrl) return player._photoUrl;
       if (player?.Photo) return player.Photo;
@@ -1077,7 +896,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
           <div style={{ background:"rgba(255,255,255,0.95)", padding:16, borderRadius:12, boxShadow:"0 4px 12px rgba(0,0,0,0.08)" }}>
             <h3 style={{ color:"#1f77b4", marginTop:0 }}>Top Rated Players</h3>
             {filteredPlayers.map(p=>({p, rating:Number(averageRating(p))})).sort((a,b)=>b.rating-a.rating).slice(0,8).map((r,i)=>(
-              <div key={i} onClick={()=>{ setSelectedPlayer(r.p); setActivePanel("report"); }} style={{ display:"flex", justifyContent:"space-between", padding:"6px 8px", borderRadius:6, cursor:"pointer", background:selectedPlayer===r.p?"#eaf3fb":"transparent", fontSize:13 }}>
+              <div key={i} onClick={()=>{ setSelectedPlayer(r.p); setActivePanel("report"); }} style={{ display:"flex", justifyContent:"space-between", padding:"6px 8px", borderRadius:6, cursor:"pointer", background:samePlayer(selectedPlayer, r.p)?"#eaf3fb":"transparent", fontSize:13 }}>
                 <span>{i+1}. {r.p["Player Name"]}</span>
                 <strong>{r.rating}</strong>
               </div>
@@ -1749,6 +1568,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 }
 
 export default ScoutReportPage;
+
 
 
 
