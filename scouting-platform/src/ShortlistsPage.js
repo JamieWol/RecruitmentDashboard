@@ -1,0 +1,13 @@
+import React, { useMemo, useState } from "react";
+
+export default function ShortlistsPage() {
+  const assignments = useMemo(() => JSON.parse(localStorage.getItem("scoutingAssignments") || "[]"), []);
+  const [lists, setLists] = useState(() => JSON.parse(localStorage.getItem("scoutingShortlists") || "[]"));
+  const [name, setName] = useState("");
+  const [selected, setSelected] = useState(null);
+  const persist = next => { setLists(next); localStorage.setItem("scoutingShortlists", JSON.stringify(next)); };
+  const addList = e => { e.preventDefault(); if (!name.trim()) return; persist([...lists, { id: Date.now(), name, players: [] }]); setName(""); };
+  const addPlayer = (list, player) => { if (list.players.some(x => x.id === player.id)) return; persist(lists.map(x => x.id === list.id ? { ...x, players: [...x.players, player] } : x)); };
+  const removePlayer = (list, id) => persist(lists.map(x => x.id === list.id ? { ...x, players: x.players.filter(p => p.id !== id) } : x));
+  return <main className="sr-page"><section className="sr-dashboard-head"><div><div className="sr-kicker">SCOUTING PLATFORM</div><h1>Shortlists</h1><p>Create and share player shortlists with your recruitment team.</p></div><form className="sr-list-create" onSubmit={addList}><input placeholder="New shortlist name" value={name} onChange={e => setName(e.target.value)} /><button className="sr-cyan">Create Shortlist</button></form></section><section className="sr-list-grid">{lists.map(list => <article className="sr-list-card" key={list.id}><div className="sr-list-head"><div><h2>{list.name}</h2><span>{list.players.length} players</span></div><button className="sr-outline" onClick={() => setSelected(selected === list.id ? null : list.id)}>{selected === list.id ? "Close" : "Add Players"}</button></div>{selected === list.id && <div className="sr-player-picker">{assignments.length ? assignments.map(p => <button key={p.id} onClick={() => addPlayer(list, p)}>{p.player} <span>+ Add</span></button>) : <p>No assigned players available yet.</p>}</div>}<div className="sr-list-players">{list.players.map(p => <div className="sr-list-player" key={p.id}><div><strong>{p.player}</strong><small>{p.club || "Club not added"} · {p.position || "Position not added"}</small></div><button onClick={() => removePlayer(list, p.id)}>Remove</button></div>)}{!list.players.length && <p className="sr-muted">No players added yet.</p>}</div><button className="sr-share" onClick={() => navigator.clipboard?.writeText(`${window.location.origin}/shortlists/${list.id}`)}>Share Shortlist</button></article>)}</section>{!lists.length && <div className="sr-empty">Create your first shortlist to start organising players.</div>}</main>;
+}
