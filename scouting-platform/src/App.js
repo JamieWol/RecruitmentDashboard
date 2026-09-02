@@ -6,6 +6,7 @@ import ShadowSquadsPage from "./ShadowSquadsPage";
 import RecruitmentDashboardPage from "./RecruitmentDashboardPage";
 import ScoutingReportsPage from "./ScoutingReportsPage";
 import ShortlistsPage from "./ShortlistsPage";
+import CreateAssignmentPage from "./CreateAssignmentPage";
 import "./App.css";
 
 // ------------------- HEADER COMPONENT -------------------
@@ -18,6 +19,7 @@ function Header() {
     { label: "Scout Report", path: "/scout-report" },
     { label: "Scouting Reports", path: "/scouting-reports" },
     { label: "Shortlists", path: "/shortlists" },
+    { label: "Create Assignment", path: "/create-assignment" },
     { label: "Shadow Squads", path: "/shadow-squads" },
   ];
 
@@ -143,6 +145,7 @@ function App() {
           />
           <Route path="/scouting-reports" element={<ScoutingReportsPage />} />
           <Route path="/shortlists" element={<ShortlistsPage />} />
+          <Route path="/create-assignment" element={<CreateAssignmentPage />} />
           <Route
             path="/shadow-squads"
             element={
