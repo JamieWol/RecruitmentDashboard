@@ -19,7 +19,6 @@ function Header() {
     { label: "Scout Report", path: "/scout-report" },
     { label: "Scouting Reports", path: "/scouting-reports" },
     { label: "Shortlists", path: "/shortlists" },
-    { label: "Create Assignment", path: "/create-assignment" },
     { label: "Shadow Squads", path: "/shadow-squads" },
   ];
 
