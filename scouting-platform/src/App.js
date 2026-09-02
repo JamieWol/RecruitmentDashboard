@@ -5,6 +5,7 @@ import ScoutReportPage from "./ScoutReportPage";
 import ShadowSquadsPage from "./ShadowSquadsPage";
 import RecruitmentDashboardPage from "./RecruitmentDashboardPage";
 import ScoutingReportsPage from "./ScoutingReportsPage";
+import "./App.css";
 
 // ------------------- HEADER COMPONENT -------------------
 function Header() {
