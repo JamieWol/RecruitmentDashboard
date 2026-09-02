@@ -4,6 +4,7 @@ import LandingPage from "./LandingPage";
 import ScoutReportPage from "./ScoutReportPage";
 import ShadowSquadsPage from "./ShadowSquadsPage";
 import RecruitmentDashboardPage from "./RecruitmentDashboardPage";
+import ScoutingReportsPage from "./ScoutingReportsPage";
 
 // ------------------- HEADER COMPONENT -------------------
 function Header() {
@@ -13,6 +14,7 @@ function Header() {
   const links = [
     { label: "Home", path: "/" },
     { label: "Scout Report", path: "/scout-report" },
+    { label: "Scouting Reports", path: "/scouting-reports" },
     { label: "Shadow Squads", path: "/shadow-squads" },
   ];
 
@@ -40,7 +42,7 @@ function Header() {
         style={{ display: "flex", alignItems: "center", gap: 15, cursor: "pointer" }}
         onClick={() => navigate("/")}
       >
-        <span style={{ fontSize: 24, fontWeight: 700 }}>⚽ ScoutPro</span>
+        <span style={{ fontSize: 24, fontWeight: 700 }}>âš½ ScoutPro</span>
       </div>
 
       <nav className="desktop-nav">
@@ -136,12 +138,13 @@ function App() {
               />
             }
           />
+          <Route path="/scouting-reports" element={<ScoutingReportsPage />} />
           <Route
             path="/shadow-squads"
             element={
               <ShadowSquadsPage
                 shadowSquad={shadowSquad}
-                setShadowSquad={setShadowSquad} // ✅ pass setter here
+                setShadowSquad={setShadowSquad} // âœ… pass setter here
               />
             }
           />
