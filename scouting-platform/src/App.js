@@ -42,7 +42,7 @@ function Header() {
         style={{ display: "flex", alignItems: "center", gap: 15, cursor: "pointer" }}
         onClick={() => navigate("/")}
       >
-        <span style={{ fontSize: 24, fontWeight: 700 }}>âš½ ScoutPro</span>
+        <span style={{ fontSize: 24, fontWeight: 700 }}>&#9917; ScoutPro</span>
       </div>
 
       <nav className="desktop-nav">
@@ -144,7 +144,7 @@ function App() {
             element={
               <ShadowSquadsPage
                 shadowSquad={shadowSquad}
-                setShadowSquad={setShadowSquad} // âœ… pass setter here
+                setShadowSquad={setShadowSquad} // ✅ pass setter here
               />
             }
           />
@@ -159,5 +159,3 @@ function App() {
 }
 
 export default App;
-
-
