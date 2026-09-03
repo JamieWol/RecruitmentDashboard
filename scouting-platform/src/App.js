@@ -4,7 +4,7 @@ import LandingPage from "./LandingPage";
 import ScoutReportPage from "./ScoutReportPage";
 import ShadowSquadsPage from "./ShadowSquadsPage";
 import RecruitmentDashboardPage from "./RecruitmentDashboardPage";
-import ScoutingReportsPage from "./ScoutingReportsPage";
+import ScoutingReportsPage from "./ScoutingReportsPageFinal";
 import ShortlistsPage from "./ShortlistsPage";
 import CreateAssignmentPage from "./CreateAssignmentPage";
 import "./App.css";
