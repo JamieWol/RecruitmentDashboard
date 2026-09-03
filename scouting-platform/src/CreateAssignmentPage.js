@@ -1,11 +1,19 @@
 import React, { useMemo, useState } from "react";
-import { parsePlayerCsv } from "./playerDatabase";
 export default function CreateAssignmentPage() {
   const records = useMemo(
     () => JSON.parse(localStorage.getItem("scoutingAssignments") || "[]"),
     [],
   );
-  const imported = JSON.parse(localStorage.getItem("scoutingPlayers") || "[]");
+  const imported = JSON.parse(
+    localStorage.getItem("scoutingPlayers") || "[]",
+  ).map((x) => ({
+    ...x,
+    name:
+      x.name ||
+      [x.firstName || x.first_name, x.lastName || x.last_name]
+        .filter(Boolean)
+        .join(" "),
+  }));
   const players = [
     ...new Map([
       ...imported.map((x) => [x.name, x]),
@@ -33,24 +41,6 @@ export default function CreateAssignmentPage() {
     [date, setDate] = useState(""),
     [viewing, setViewing] = useState("Live"),
     [error, setError] = useState("");
-  const [importMessage, setImportMessage] = useState("");
-  const importPlayers = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const incoming = parsePlayerCsv(String(reader.result || ""));
-      const existing = JSON.parse(
-        localStorage.getItem("scoutingPlayers") || "[]",
-      );
-      const merged = [
-        ...new Map([...existing, ...incoming].map((p) => [p.id, p])).values(),
-      ];
-      localStorage.setItem("scoutingPlayers", JSON.stringify(merged));
-      setImportMessage(`${incoming.length} player records imported.`);
-    };
-    reader.readAsText(file);
-  };
   const matches = players.filter((p) =>
     p.name.toLowerCase().includes(query.toLowerCase()),
   );
@@ -120,15 +110,6 @@ export default function CreateAssignmentPage() {
           <h2>
             {mode === "player" ? "Assign by Player" : "Assign by Fixture"}
           </h2>
-          <label className="sr-import-button">
-            Import master player sheet
-            <input
-              type="file"
-              accept=".csv,text/csv"
-              onChange={importPlayers}
-            />
-          </label>
-          {importMessage && <p className="sr-success">{importMessage}</p>}
           <label className="sr-field">
             <span>Search Player</span>
             <input
