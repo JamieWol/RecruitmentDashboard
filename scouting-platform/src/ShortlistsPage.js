@@ -109,6 +109,32 @@ export default function ShortlistsPage() {
       ),
     [],
   );
+  const playerPool = useMemo(() => {
+    const database = JSON.parse(
+      localStorage.getItem("scoutingPlayers") || "[]",
+    ).map((p) => ({
+      ...p,
+      id: p.id || p.playerId || p.player_id || p.name,
+      player:
+        p.name ||
+        [p.firstName || p.first_name, p.lastName || p.last_name]
+          .filter(Boolean)
+          .join(" "),
+      club: p.club || p.team,
+    }));
+    const reports = published.map((x) => ({
+      ...x,
+      id: x.playerId || x.id,
+      player: x.player,
+    }));
+    return [
+      ...new Map(
+        [...database, ...reports]
+          .filter((p) => p.player)
+          .map((p) => [p.id || p.player, p]),
+      ).values(),
+    ];
+  }, [published]);
   const [lists, setLists] = useState(() =>
     JSON.parse(localStorage.getItem("scoutingShortlists") || "[]"),
   );
@@ -153,7 +179,7 @@ export default function ShortlistsPage() {
   };
   const zone = (pos) => {
     const players = current.players.filter((x) => x.slot === pos),
-      matches = published.filter((x) =>
+      matches = playerPool.filter((x) =>
         x.player.toLowerCase().includes(search.toLowerCase()),
       );
     return (
@@ -234,7 +260,11 @@ export default function ShortlistsPage() {
           ).map((r, i) => (
             <div
               className={"sr-pitch-row row-" + i}
-              style={{ zIndex: r.some((pos) => pick && pick.startsWith(pos + "-")) ? 10 : 2 }}
+              style={{
+                zIndex: r.some((pos) => pick && pick.startsWith(pos + "-"))
+                  ? 10
+                  : 2,
+              }}
               key={i}
             >
               {r.map((pos, j) => zone(pos + "-" + j))}
