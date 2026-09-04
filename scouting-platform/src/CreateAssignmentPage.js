@@ -1,18 +1,34 @@
 import React, { useMemo, useState } from "react";
+import { useEffect } from "react";
+import { supabase } from "./supabaseClient";
 export default function CreateAssignmentPage() {
+  const [databasePlayers, setDatabasePlayers] = useState([]);
+  useEffect(() => {
+    supabase
+      .from("players")
+      .select(
+        '"Player Id",Name,Team,"Primary Position","Secondary Position",Nationality,"Date of Birth"',
+      )
+      .limit(50000)
+      .then(({ data }) => {
+        if (data) setDatabasePlayers(data);
+      });
+  }, []);
   const records = useMemo(
     () => JSON.parse(localStorage.getItem("scoutingAssignments") || "[]"),
     [],
   );
-  const imported = JSON.parse(
-    localStorage.getItem("scoutingPlayers") || "[]",
-  ).map((x) => ({
+  const imported = databasePlayers.map((x) => ({
     ...x,
     name:
+      x.Name ||
       x.name ||
       [x.firstName || x.first_name, x.lastName || x.last_name]
         .filter(Boolean)
         .join(" "),
+    club: x.club || x.team || x.Team,
+    position: x.position || x["Primary Position"],
+    id: x.id || x["Player Id"] || x.Name,
   }));
   const players = [
     ...new Map([

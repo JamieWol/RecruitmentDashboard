@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { supabase } from "./supabaseClient";
 const formations = [
     "4-1-4-1",
     "4-2-2-2",
@@ -102,6 +103,18 @@ const formations = [
     ["GK"],
   ];
 export default function ShortlistsPage() {
+  const [databasePlayers, setDatabasePlayers] = useState([]);
+  useEffect(() => {
+    supabase
+      .from("players")
+      .select(
+        '"Player Id",Name,Team,"Primary Position","Secondary Position",Nationality,"Date of Birth",Season,"Season Id","Team Id"',
+      )
+      .limit(50000)
+      .then(({ data }) => {
+        if (data) setDatabasePlayers(data);
+      });
+  }, []);
   const published = useMemo(
     () =>
       JSON.parse(localStorage.getItem("scoutingAssignments") || "[]").filter(
@@ -110,17 +123,17 @@ export default function ShortlistsPage() {
     [],
   );
   const playerPool = useMemo(() => {
-    const database = JSON.parse(
-      localStorage.getItem("scoutingPlayers") || "[]",
-    ).map((p) => ({
+    const database = databasePlayers.map((p) => ({
       ...p,
-      id: p.id || p.playerId || p.player_id || p.name,
+      id:
+        p.id || p.playerId || p.player_id || p["Player Id"] || p.Name || p.name,
       player:
+        p.Name ||
         p.name ||
         [p.firstName || p.first_name, p.lastName || p.last_name]
           .filter(Boolean)
           .join(" "),
-      club: p.club || p.team,
+      club: p.club || p.team || p.Team,
     }));
     const reports = published.map((x) => ({
       ...x,
@@ -134,7 +147,7 @@ export default function ShortlistsPage() {
           .map((p) => [p.id || p.player, p]),
       ).values(),
     ];
-  }, [published]);
+  }, [databasePlayers, published]);
   const [lists, setLists] = useState(() =>
     JSON.parse(localStorage.getItem("scoutingShortlists") || "[]"),
   );
@@ -215,12 +228,13 @@ export default function ShortlistsPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
-            {matches.map((p) => (
-              <button key={p.id} onClick={() => add(p, pos)}>
-                {p.player}
-                <small>{p.club || "Club not added"}</small>
-              </button>
-            ))}
+            {search.trim() &&
+              matches.map((p) => (
+                <button key={p.id} onClick={() => add(p, pos)}>
+                  {p.player}
+                  <small>{p.club || "Club not added"}</small>
+                </button>
+              ))}
           </div>
         )}
       </div>
