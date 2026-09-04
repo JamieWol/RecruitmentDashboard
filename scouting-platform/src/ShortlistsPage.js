@@ -107,11 +107,10 @@ export default function ShortlistsPage() {
   useEffect(() => {
     supabase
       .from("players")
-      .select(
-        '"Player Id",Name,Team,"Primary Position","Secondary Position",Nationality,"Date of Birth",Season,"Season Id","Team Id"',
-      )
+      .select("*")
       .limit(50000)
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) console.error("Player database error", error);
         if (data) setDatabasePlayers(data);
       });
   }, []);
