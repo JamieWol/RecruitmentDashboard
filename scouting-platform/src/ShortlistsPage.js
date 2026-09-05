@@ -207,6 +207,7 @@ export default function ShortlistsPage() {
     persist(lists.map(x=>x.id===current.id?updated:x)); setCurrent(updated); setTagPlayer(n);
   };
   const createTag = (e) => { e.preventDefault(); if (!newTagName.trim()) return; const n={id:`custom-${Date.now()}`,name:newTagName.trim(),color:newTagColor}; const next=[...tags,n]; setTags(next); localStorage.setItem("scoutingTags",JSON.stringify(next)); setNewTagName(""); };
+  const changeFormation = (value) => { const n={...current,formation:value}; persist(lists.map(x=>x.id===current.id?n:x)); setCurrent(n); };
   const tagManager=manageTags&&<div className="sr-modal" onClick={()=>setManageTags(false)}><form className="sr-form sr-tag-modal" onClick={e=>e.stopPropagation()} onSubmit={createTag}><div className="sr-form-head"><div><div className="sr-kicker">SHORTLIST TAGS</div><h2>Manage Tags</h2></div><button type="button" className="sr-close" onClick={()=>setManageTags(false)}>×</button></div><label className="sr-field"><span>New tag</span><input value={newTagName} onChange={e=>setNewTagName(e.target.value)} placeholder="Tag name"/></label><div className="sr-color-palette">{["#62dcff","#142b83","#a56bc5","#ff7416","#22c55e","#f2b807","#ef4444","#3b82f6","#ec4899","#14b8a6","#64748b","#84cc16"].map(c=><button type="button" key={c} style={{background:c}} className={newTagColor===c?"selected":""} onClick={()=>setNewTagColor(c)} />)}</div><button className="sr-cyan">Add Tag</button><div className="sr-existing-tags">{tags.map(t=><span key={t.id} style={{background:t.color}}>{t.name}</span>)}</div></form></div>;
   const tagModal=tagPlayer&&<div className="sr-modal" onClick={()=>setTagPlayer(null)}><section className="sr-form sr-tag-modal" onClick={e=>e.stopPropagation()}><div className="sr-form-head"><div><div className="sr-kicker">PLAYER TAGS</div><h2>{tagPlayer.player}</h2></div><button className="sr-close" onClick={()=>setTagPlayer(null)}>×</button></div><p>Click a tag to add or remove it.</p><div className="sr-tag-list">{tags.map(t=><button key={t.id} style={{background:t.color,color:t.color==="#f2b807"?"#071d3d":"#fff"}} className={tagPlayer.tags?.includes(t.id)?"active":""} onClick={()=>toggleTag(t.id)}>{t.name}</button>)}</div><button className="sr-cyan" onClick={()=>setTagPlayer(null)}>Done</button></section></div>;
   const zone = (pos) => {
@@ -276,16 +277,14 @@ export default function ShortlistsPage() {
           <div>
             <div className="sr-kicker">SHORTLIST</div>
             <h1>{current.name}</h1>
-            <p>
-              {current.type === "Flex"
-                ? "Flex · 14 positions"
-                : current.formation}
-            </p>
+            {current.type === "Flex" ? <p>Flex · 14 positions</p> : <select className="sr-formation-select" value={current.formation} onChange={e=>changeFormation(e.target.value)}>{formations.map(f=><option key={f}>{f}</option>)}</select>}
           </div>
           <button className="sr-delete-list" onClick={() => del(current.id)}>
             Delete Shortlist
           </button>
         </section>
+        <div className="sr-shortlist-actions"><button className="sr-outline" onClick={()=>setManageTags(true)}>Add Tags</button><button className="sr-outline" onClick={()=>setPick("new-player")}>Add New Player</button></div>
+        <div className="sr-tag-legend">{tags.map(t=><span key={t.id}><i style={{background:t.color}}/>{t.name}</span>)}</div>
         <div className="sr-real-pitch">
           <div className="sr-goal-box top" />
           {(current.type === "Flex"
@@ -308,8 +307,6 @@ export default function ShortlistsPage() {
           <div className="sr-halfway-line" />
           <div className="sr-goal-box bottom" />
         </div>
-        <div className="sr-shortlist-actions"><button className="sr-outline" onClick={()=>setManageTags(true)}>Add Tags</button><button className="sr-outline" onClick={()=>setPick("new-player")}>Add New Player</button></div>
-        <div className="sr-tag-legend">{tags.map(t=><span key={t.id}><i style={{background:t.color}}/>{t.name}</span>)}</div>
         {tagModal}
         {tagManager}
       </main>
