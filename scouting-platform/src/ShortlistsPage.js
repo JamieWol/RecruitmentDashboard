@@ -117,7 +117,7 @@ export default function ShortlistsPage() {
     [pick, setPick] = useState(null),
     [search, setSearch] = useState(""),
     [tagPlayer, setTagPlayer] = useState(null),
-    [tags, setTags] = useState(() => JSON.parse(localStorage.getItem("scoutingTags") || JSON.stringify(defaultTags)));
+    [tags] = useState(() => JSON.parse(localStorage.getItem("scoutingTags") || JSON.stringify(defaultTags)));
   useEffect(() => {
     if (!search.trim()) {
       setDatabasePlayers([]);
