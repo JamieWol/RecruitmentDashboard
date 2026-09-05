@@ -102,6 +102,7 @@ const formations = [
     ["LB", "LCB", "CB", "RCB", "RB"],
     ["GK"],
   ];
+const shortlistPhoto=(name)=>`https://syjsmvvsvvprxibqoizw.supabase.co/storage/v1/object/public/player-photos/player-photos/${String(name||"").trim().split(/\s+/).filter(Boolean).map(x=>x.normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,"_")).join("_")}.png`;
 export default function ShortlistsPage() {
   const [databasePlayers, setDatabasePlayers] = useState([]);
   const [lists, setLists] = useState(() =>
@@ -217,8 +218,8 @@ export default function ShortlistsPage() {
           {players.map((p) => (
             <div className="sr-pitch-player-card" key={p.id}>
               <button onClick={() => window.alert(p.player)}>
-                <strong>{p.player}</strong>
-                <small>{p.club || "Club not added"}</small>
+                <img className="sr-shortlist-player-photo" src={shortlistPhoto(p.player)} alt="" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                <span><strong>{p.player}</strong><small>{p.club || "Club not added"}</small></span>
               </button>
               <button onClick={() => remove(p.id, pos)}>×</button>
             </div>
