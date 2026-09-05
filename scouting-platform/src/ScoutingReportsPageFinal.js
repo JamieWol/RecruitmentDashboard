@@ -401,7 +401,17 @@ export default function ScoutingReportsPageFinal() {
                 Delete
               </button>
             </div>
-            <h3>{x.player}</h3>
+            <button
+              type="button"
+              className="sr-assignment-player-link"
+              onClick={(e) => {
+                e.stopPropagation();
+                setActive(x);
+                setReport(x.report || { ...empty });
+              }}
+            >
+              {x.player}
+            </button>
             <p>
               {x.club || "Club not added"} ·{" "}
               {x.position || "Position not added"}
