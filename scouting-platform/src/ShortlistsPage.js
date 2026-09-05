@@ -117,7 +117,10 @@ export default function ShortlistsPage() {
     [pick, setPick] = useState(null),
     [search, setSearch] = useState(""),
     [tagPlayer, setTagPlayer] = useState(null),
-    [tags] = useState(() => JSON.parse(localStorage.getItem("scoutingTags") || JSON.stringify(defaultTags)));
+    [tags, setTags] = useState(() => JSON.parse(localStorage.getItem("scoutingTags") || JSON.stringify(defaultTags))),
+    [manageTags, setManageTags] = useState(false),
+    [newTagName, setNewTagName] = useState(""),
+    [newTagColor, setNewTagColor] = useState("#62dcff");
   useEffect(() => {
     if (!search.trim()) {
       setDatabasePlayers([]);
@@ -203,6 +206,8 @@ export default function ShortlistsPage() {
     const updated={...current,players:current.players.map(x=>x.id===tagPlayer.id&&x.slot===tagPlayer.slot?n:x)};
     persist(lists.map(x=>x.id===current.id?updated:x)); setCurrent(updated); setTagPlayer(n);
   };
+  const createTag = (e) => { e.preventDefault(); if (!newTagName.trim()) return; const n={id:`custom-${Date.now()}`,name:newTagName.trim(),color:newTagColor}; const next=[...tags,n]; setTags(next); localStorage.setItem("scoutingTags",JSON.stringify(next)); setNewTagName(""); };
+  const tagManager=manageTags&&<div className="sr-modal" onClick={()=>setManageTags(false)}><form className="sr-form sr-tag-modal" onClick={e=>e.stopPropagation()} onSubmit={createTag}><div className="sr-form-head"><div><div className="sr-kicker">SHORTLIST TAGS</div><h2>Manage Tags</h2></div><button type="button" className="sr-close" onClick={()=>setManageTags(false)}>×</button></div><label className="sr-field"><span>New tag</span><input value={newTagName} onChange={e=>setNewTagName(e.target.value)} placeholder="Tag name"/></label><div className="sr-color-palette">{["#62dcff","#142b83","#a56bc5","#ff7416","#22c55e","#f2b807","#ef4444","#3b82f6","#ec4899","#14b8a6","#64748b","#84cc16"].map(c=><button type="button" key={c} style={{background:c}} className={newTagColor===c?"selected":""} onClick={()=>setNewTagColor(c)} />)}</div><button className="sr-cyan">Add Tag</button><div className="sr-existing-tags">{tags.map(t=><span key={t.id} style={{background:t.color}}>{t.name}</span>)}</div></form></div>;
   const tagModal=tagPlayer&&<div className="sr-modal" onClick={()=>setTagPlayer(null)}><section className="sr-form sr-tag-modal" onClick={e=>e.stopPropagation()}><div className="sr-form-head"><div><div className="sr-kicker">PLAYER TAGS</div><h2>{tagPlayer.player}</h2></div><button className="sr-close" onClick={()=>setTagPlayer(null)}>×</button></div><p>Click a tag to add or remove it.</p><div className="sr-tag-list">{tags.map(t=><button key={t.id} style={{background:t.color,color:t.color==="#f2b807"?"#071d3d":"#fff"}} className={tagPlayer.tags?.includes(t.id)?"active":""} onClick={()=>toggleTag(t.id)}>{t.name}</button>)}</div><button className="sr-cyan" onClick={()=>setTagPlayer(null)}>Done</button></section></div>;
   const zone = (pos) => {
     const players = current.players.filter((x) => x.slot === pos),
@@ -225,7 +230,7 @@ export default function ShortlistsPage() {
         </div>
         <div className="sr-zone-list">
           {players.map((p) => (
-            <div className="sr-pitch-player-card" key={p.id}>
+            <div className="sr-pitch-player-card" key={p.id} style={{background:(tags.find(t=>(p.tags||[]).includes(t.id))?.color||"#f7fbff")+"33"}}>
               <button onClick={() => setTagPlayer(p)}>
                 <img className="sr-shortlist-player-photo" src={shortlistPhoto(p.player)} alt="" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                 <span><strong>{p.player}</strong><small>{p.club || "Club not added"}</small></span>
@@ -302,8 +307,10 @@ export default function ShortlistsPage() {
           <div className="sr-halfway-line" />
           <div className="sr-goal-box bottom" />
         </div>
+        <div className="sr-shortlist-actions"><button className="sr-outline" onClick={()=>setManageTags(true)}>Add Tags</button><button className="sr-outline" onClick={()=>setPick("new-player")}>Add New Player</button></div>
         <div className="sr-tag-legend">{tags.map(t=><span key={t.id}><i style={{background:t.color}}/>{t.name}</span>)}</div>
         {tagModal}
+        {tagManager}
       </main>
     );
   return (
