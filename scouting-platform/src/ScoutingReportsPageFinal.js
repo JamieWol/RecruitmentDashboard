@@ -306,8 +306,16 @@ export default function ScoutingReportsPageFinal() {
         <div className="sr-fixture-box">
           <strong>Assigned Fixture</strong>
           <span>
-            {active.game || "Fixture not added"} ·{" "}
-            {active.fixtureDates?.[0] || active.date || "Date not added"}
+            {active.games?.length
+              ? active.games.map((fixture, i) => (
+                  <React.Fragment key={i}>
+                    {i > 0 && " • "}
+                    {typeof fixture === "string"
+                      ? `${fixture} · ${active.fixtureDates?.[i] || "Date not added"}`
+                      : `${fixture.name} · ${fixture.date || "Date not added"}`}
+                  </React.Fragment>
+                ))
+              : `${active.game || "Fixture not added"} · ${active.fixtureDates?.[0] || active.date || "Date not added"}`}
           </span>
           <small>{active.viewing || "Viewing not added"}</small>
           <button
