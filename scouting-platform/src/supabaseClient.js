@@ -30,25 +30,14 @@ export const supabase = {
         },
       }),
       limit: async (count) => {
-        const pageSize = 100;
-        const all = [];
-        for (let offset = 0; offset < count; offset += pageSize) {
-          const response = await fetch(
-            `${url}/rest/v1/${table}?select=${encodeURIComponent(columns)}&limit=${pageSize}&offset=${offset}`,
-            {
-              headers: {
-                apikey: key,
-                Authorization: `Bearer ${key}`,
-                Prefer: "count=exact",
-              },
-            },
-          );
-          if (!response.ok) return { data: null, error: await response.text() };
-          const page = await response.json();
-          all.push(...page);
-            if (!page.length) break;
-        }
-        return { data: all, error: null };
+        const response = await fetch(
+          `${url}/rest/v1/${table}?select=${encodeURIComponent(columns)}&limit=${count}`,
+          { headers: { apikey: key, Authorization: `Bearer ${key}` } },
+        );
+        return {
+          data: response.ok ? await response.json() : null,
+          error: response.ok ? null : await response.text(),
+        };
       },
     }),
   }),

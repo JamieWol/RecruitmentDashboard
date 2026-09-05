@@ -115,15 +115,20 @@ export default function ShortlistsPage() {
     [pick, setPick] = useState(null),
     [search, setSearch] = useState("");
   useEffect(() => {
+    if (!search.trim()) {
+      setDatabasePlayers([]);
+      return;
+    }
     supabase
       .from("players")
       .select("*")
-      .limit(30000)
+      .ilike("Name", search.trim())
+      .limit(50)
       .then(({ data, error }) => {
         if (error) console.error("Player database error", error);
         if (data) setDatabasePlayers(data);
       });
-  }, []);
+  }, [search]);
   const published = useMemo(
     () =>
       JSON.parse(localStorage.getItem("scoutingAssignments") || "[]").filter(

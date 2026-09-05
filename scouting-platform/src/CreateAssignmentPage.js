@@ -8,15 +8,20 @@ export default function CreateAssignmentPage() {
     [selected, setSelected] = useState(""),
     [newPlayer, setNewPlayer] = useState(false);
   useEffect(() => {
+    if (!query.trim()) {
+      setDatabasePlayers([]);
+      return;
+    }
     supabase
       .from("players")
       .select("*")
-      .limit(30000)
+      .ilike("Name", query.trim())
+      .limit(50)
       .then(({ data, error }) => {
         if (error) console.error("Player database error", error);
         if (data) setDatabasePlayers(data);
       });
-  }, []);
+  }, [query]);
   const records = useMemo(
     () => JSON.parse(localStorage.getItem("scoutingAssignments") || "[]"),
     [],
