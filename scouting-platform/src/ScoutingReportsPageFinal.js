@@ -4,6 +4,7 @@ import { supabase } from "./supabaseClient";
 const empty = {
   type: "Long Report",
   foot: "",
+  playedPosition: "",
   performance: "",
   potential: "",
   conclusion: "",
@@ -300,7 +301,7 @@ export default function ScoutingReportsPageFinal() {
           <strong>Assigned Fixture</strong>
           <span>{active.game || "Fixture not added"}</span>
           <small>
-            {active.date || "Date not added"} ·{" "}
+            {active.fixtureDates?.[0] || active.date || "Date not added"} ·{" "}
             {active.viewing || "Viewing not added"}
           </small>
         </div>
@@ -349,6 +350,38 @@ export default function ScoutingReportsPageFinal() {
               <option>Right</option>
               <option>Left</option>
               <option>Both</option>
+            </select>
+          </label>
+          <label className="sr-field">
+            <span>Position Played</span>
+            <select
+              value={report.playedPosition || active.position || ""}
+              onChange={(e) =>
+                setReport({ ...report, playedPosition: e.target.value })
+              }
+            >
+              <option value="">Select position</option>
+              {[
+                "GK",
+                "LB",
+                "LCB",
+                "CB",
+                "RCB",
+                "RB",
+                "DM",
+                "LM",
+                "LCM",
+                "CM",
+                "RCM",
+                "RM",
+                "LW",
+                "AM",
+                "RW",
+                "CF",
+                "ST",
+              ].map((x) => (
+                <option key={x}>{x}</option>
+              ))}
             </select>
           </label>
         </div>
