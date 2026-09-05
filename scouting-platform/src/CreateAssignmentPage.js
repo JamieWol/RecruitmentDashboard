@@ -62,6 +62,29 @@ export default function CreateAssignmentPage() {
     [date, setDate] = useState(""),
     [viewing, setViewing] = useState("Live"),
     [error, setError] = useState("");
+  useEffect(() => {
+    const editing = JSON.parse(
+      localStorage.getItem("editingAssignment") || "null",
+    );
+    if (!editing) return;
+    setSelected(editing.player);
+    setQuery(editing.player);
+    setDetails({
+      name: editing.player,
+      club: editing.club || "",
+      position: editing.position || "",
+      dob: "",
+      nationality: "",
+      foot: "",
+    });
+    setGames(
+      editing.games || [
+        { name: editing.game || "", date: editing.fixtureDates?.[0] || "" },
+      ],
+    );
+    setDate(editing.date || "");
+    setViewing(editing.viewing || "Live");
+  }, []);
   const matches = players.filter((p) =>
     p.name.toLowerCase().includes(query.toLowerCase()),
   );
@@ -105,10 +128,20 @@ export default function CreateAssignmentPage() {
       status: "Not Started",
       report: null,
     };
+    const editing = JSON.parse(
+      localStorage.getItem("editingAssignment") || "null",
+    );
     localStorage.setItem(
       "scoutingAssignments",
-      JSON.stringify([...old, assignment]),
+      JSON.stringify(
+        editing
+          ? old.map((x) =>
+              x.id === editing.id ? { ...assignment, id: editing.id } : x,
+            )
+          : [...old, assignment],
+      ),
     );
+    localStorage.removeItem("editingAssignment");
     window.history.back();
   };
   return (

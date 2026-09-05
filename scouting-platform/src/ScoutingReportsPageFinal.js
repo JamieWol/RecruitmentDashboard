@@ -305,11 +305,11 @@ export default function ScoutingReportsPageFinal() {
         </div>
         <div className="sr-fixture-box">
           <strong>Assigned Fixture</strong>
-          <span>{active.game || "Fixture not added"}</span>
-          <small>
-            {active.fixtureDates?.[0] || active.date || "Date not added"} ·{" "}
-            {active.viewing || "Viewing not added"}
-          </small>
+          <span>
+            {active.game || "Fixture not added"} ·{" "}
+            {active.fixtureDates?.[0] || active.date || "Date not added"}
+          </span>
+          <small>{active.viewing || "Viewing not added"}</small>
           <button
             className="sr-edit-games"
             onClick={() => {
