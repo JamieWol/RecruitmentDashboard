@@ -238,7 +238,7 @@ export default function ShortlistsPage() {
         <div className="sr-zone-list">
           {players.map((p) => (
             <div className="sr-pitch-player-card" key={p.id} draggable onDragStart={()=>setDragging({id:p.id,pos})} onDragOver={e=>e.preventDefault()} onDrop={()=>reorder(pos,p.id)} style={{"--tag-color":tags.find(t=>(p.tags||[]).includes(t.id))?.color||"#f7fbff"}}>
-              <button onClick={() => { localStorage.setItem("scoutingProfilePlayer", p.player); window.location.href="/scouting-reports"; }}>
+              <button onClick={() => { localStorage.setItem("scoutingProfilePlayer", p.player); localStorage.setItem("scoutingProfileOrigin", "shortlists"); window.location.href="/scouting-reports"; }}>
                 <img className="sr-shortlist-player-photo" src={shortlistPhoto(p.player)} alt="" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                 <span><strong>{p.player}</strong><small>{p.club || "Club not added"}</small><em className="sr-report-count">▤ {JSON.parse(localStorage.getItem("scoutingAssignments") || "[]").filter(x=>x.player===p.player&&x.status==="Published").length}</em></span>
               </button>
