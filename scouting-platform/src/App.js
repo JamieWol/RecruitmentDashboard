@@ -1,5 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, useNavigate } from "react-router-dom";
 import { useState } from "react";
+import { AuthProvider, useAuth } from "./AuthContext";
+import { supabase } from "./supabaseClient";
 import LandingPage from "./LandingPage";
 import ScoutReportPage from "./ScoutReportPage";
 import ShadowSquadsPage from "./ShadowSquadsPage";
@@ -8,6 +10,21 @@ import ScoutingReportsPage from "./ScoutingReportsPageFinal";
 import ShortlistsPage from "./ShortlistsPage";
 import CreateAssignmentPage from "./CreateAssignmentPage";
 import "./App.css";
+
+function LoginGate() {
+  const { user, profile, loading } = useAuth();
+  const [signup, setSignup] = useState(false), [email, setEmail] = useState(""), [password, setPassword] = useState(""), [name, setName] = useState(""), [error, setError] = useState("");
+  if (loading) return <div className="sr-auth-screen">Loading…</div>;
+  if (user && profile?.approved) return <AppRoutes />;
+  if (user) return <div className="sr-auth-screen"><h1>Awaiting admin approval</h1><p>Your account has been created. An administrator must assign your club before you can access the platform.</p><button className="sr-cyan" onClick={() => supabase.auth.signOut()}>Sign out</button></div>;
+  const submit = async (e) => { e.preventDefault(); setError(""); const result = signup ? await supabase.auth.signUp({ email, password, options: { data: { full_name: name } } }) : await supabase.auth.signInWithPassword({ email, password }); if (result.error) setError(result.error.message); };
+  return <main className="sr-auth-screen"><form className="sr-form" onSubmit={submit}><h1>{signup ? "Create account" : "Sign in"}</h1>{signup && <input placeholder="Full name" value={name} onChange={e => setName(e.target.value)} required />}<input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required /><input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />{error && <p className="sr-auth-error">{error}</p>}<button className="sr-cyan">{signup ? "Request account" : "Sign in"}</button><button type="button" className="sr-outline" onClick={() => setSignup(!signup)}>{signup ? "Already have an account? Sign in" : "Create an account"}</button></form></main>;
+}
+
+function AppRoutes() {
+  const [shadowSquad, setShadowSquad] = useState([]);
+  return <><Header /><div style={{ paddingTop: 80 }}><Routes><Route path="/" element={<LandingPage />} /><Route path="/scout-report" element={<ScoutReportPage shadowSquad={shadowSquad} setShadowSquad={setShadowSquad} />} /><Route path="/scouting-reports" element={<ScoutingReportsPage />} /><Route path="/shortlists" element={<ShortlistsPage />} /><Route path="/create-assignment" element={<CreateAssignmentPage />} /><Route path="/shadow-squads" element={<ShadowSquadsPage shadowSquad={shadowSquad} setShadowSquad={setShadowSquad} />} /><Route path="/recruitment-dashboard" element={<RecruitmentDashboardPage />} /></Routes></div></>;
+}
 
 // ------------------- HEADER COMPONENT -------------------
 function Header() {
@@ -133,12 +150,10 @@ function Header() {
 
 // ------------------- MAIN APP -------------------
 function App() {
-  const [shadowSquad, setShadowSquad] = useState([]);
-
   return (
     <Router>
-      <Header />
-      <div style={{ paddingTop: 80 }}>
+      <AuthProvider><LoginGate /></AuthProvider>
+      {/* <Header />
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route
@@ -166,8 +181,7 @@ function App() {
             path="/recruitment-dashboard"
             element={<RecruitmentDashboardPage />}
           />
-        </Routes>
-      </div>
+        </Routes> */}
     </Router>
   );
 }

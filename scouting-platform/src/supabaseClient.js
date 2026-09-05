@@ -1,3 +1,5 @@
+import { createClient } from "@supabase/supabase-js";
+
 const url =
   process.env.REACT_APP_SUPABASE_URL ||
   process.env.SUPABASE_URL ||
@@ -9,7 +11,12 @@ const key =
   process.env.SUPABASE_ANON_KEY ||
   "sb_publishable_iEKXNM7vpUypQ_nryAYhHA_7H577-I2";
 
-export const supabase = {
+/* The Supabase client keeps the signed-in session and automatically refreshes it. */
+export const supabase = createClient(url, key, {
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+});
+/*
+export const legacySupabase = {
   from: (table) => ({
     select: (columns) => ({
       ilike: (column, value) => ({
@@ -41,4 +48,4 @@ export const supabase = {
       },
     }),
   }),
-};
+};*/
