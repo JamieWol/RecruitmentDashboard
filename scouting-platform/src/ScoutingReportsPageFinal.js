@@ -119,6 +119,36 @@ export default function ScoutingReportsPageFinal() {
     );
     return key ? source[key] : "—";
   };
+  const grades = (
+    <div className="sr-grade-row">
+      <label className="sr-field">
+        <span>Performance Grade (1–5)</span>
+        <select
+          value={report.performance}
+          onChange={(e) =>
+            setReport({ ...report, performance: e.target.value })
+          }
+        >
+          <option value="">Select</option>
+          {[5, 4, 3, 2, 1].map((x) => (
+            <option key={x}>{x}</option>
+          ))}
+        </select>
+      </label>
+      <label className="sr-field">
+        <span>Potential Grade (A–F)</span>
+        <select
+          value={report.potential}
+          onChange={(e) => setReport({ ...report, potential: e.target.value })}
+        >
+          <option value="">Select</option>
+          {["A", "B", "C", "D", "E", "F"].map((x) => (
+            <option key={x}>{x}</option>
+          ))}
+        </select>
+      </label>
+    </div>
+  );
   const reportPage = active && (
     <div className="sr-modal">
       <section className="sr-form sr-report">
@@ -140,10 +170,7 @@ export default function ScoutingReportsPageFinal() {
               >
                 <span>{active.player}</span>
               </button>
-              <p>
-                {dataValue("club", "Club", "team", "Team")} · {active.game} ·{" "}
-                {active.viewing} · {active.date}
-              </p>
+              <p>{dataValue("club", "Club", "team", "Team")}</p>
               <p className="sr-report-player-meta">
                 Primary: {dataValue("Position", "position")} · Secondary:{" "}
                 {dataValue(
@@ -162,6 +189,14 @@ export default function ScoutingReportsPageFinal() {
             ×
           </button>
         </div>
+        <div className="sr-fixture-box">
+          <strong>Assigned Fixture</strong>
+          <span>{active.game || "Fixture not added"}</span>
+          <small>
+            {active.date || "Date not added"} ·{" "}
+            {active.viewing || "Viewing not added"}
+          </small>
+        </div>
         <div className="sr-form-grid">
           <label className="sr-field">
             <span>Report type</span>
@@ -171,6 +206,30 @@ export default function ScoutingReportsPageFinal() {
             >
               <option>Long Report</option>
               <option>Short Report</option>
+            </select>
+          </label>
+          <label className="sr-field">
+            <span>Footage</span>
+            <select
+              value={report.footage || "Full game"}
+              onChange={(e) =>
+                setReport({ ...report, footage: e.target.value })
+              }
+            >
+              <option>Full game</option>
+              <option>Edited footage</option>
+            </select>
+          </label>
+          <label className="sr-field">
+            <span>Viewing</span>
+            <select
+              value={report.viewing || active.viewing || "Video"}
+              onChange={(e) =>
+                setReport({ ...report, viewing: e.target.value })
+              }
+            >
+              <option>Live</option>
+              <option>Video</option>
             </select>
           </label>
           <label className="sr-field">
@@ -197,40 +256,43 @@ export default function ScoutingReportsPageFinal() {
             <div>
               {field("Strengths", "strengths")}
               {field("Weaknesses", "weaknesses")}
+              {report.type === "Long Report" && grades}
             </div>
           </div>
         )}
         {field("Conclusion", "conclusion", 4)}
-        <div className="sr-grade-row">
-          <label className="sr-field">
-            <span>Performance Grade (1–5)</span>
-            <select
-              value={report.performance}
-              onChange={(e) =>
-                setReport({ ...report, performance: e.target.value })
-              }
-            >
-              <option value="">Select</option>
-              {[5, 4, 3, 2, 1].map((x) => (
-                <option key={x}>{x}</option>
-              ))}
-            </select>
-          </label>
-          <label className="sr-field">
-            <span>Potential Grade (A–F)</span>
-            <select
-              value={report.potential}
-              onChange={(e) =>
-                setReport({ ...report, potential: e.target.value })
-              }
-            >
-              <option value="">Select</option>
-              {["A", "B", "C", "D", "E", "F"].map((x) => (
-                <option key={x}>{x}</option>
-              ))}
-            </select>
-          </label>
-        </div>
+        {report.type === "Short Report" && (
+          <div className="sr-grade-row">
+            <label className="sr-field">
+              <span>Performance Grade (1–5)</span>
+              <select
+                value={report.performance}
+                onChange={(e) =>
+                  setReport({ ...report, performance: e.target.value })
+                }
+              >
+                <option value="">Select</option>
+                {[5, 4, 3, 2, 1].map((x) => (
+                  <option key={x}>{x}</option>
+                ))}
+              </select>
+            </label>
+            <label className="sr-field">
+              <span>Potential Grade (A–F)</span>
+              <select
+                value={report.potential}
+                onChange={(e) =>
+                  setReport({ ...report, potential: e.target.value })
+                }
+              >
+                <option value="">Select</option>
+                {["A", "B", "C", "D", "E", "F"].map((x) => (
+                  <option key={x}>{x}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
         {field("Reasons Why", "reasons", 6)}
       </section>
     </div>
