@@ -119,6 +119,9 @@ export default function ScoutingReportsPageFinal() {
     );
     return key ? source[key] : "—";
   };
+  const reportFoot = [...items]
+    .reverse()
+    .find((x) => x.player === profile?.player && x.report?.foot)?.report?.foot;
   const grades = (
     <div className="sr-grade-row">
       <label className="sr-field">
@@ -172,7 +175,16 @@ export default function ScoutingReportsPageFinal() {
               </button>
               <p>{dataValue("club", "Club", "team", "Team")}</p>
               <p className="sr-report-player-meta">
-                Primary: {dataValue("Position", "position")} · Secondary:{" "}
+                Primary:{" "}
+                {dataValue(
+                  "Playing Position",
+                  "Primary Position",
+                  "Position",
+                  "playing_position",
+                  "primary_position",
+                  "position",
+                )}{" "}
+                · Secondary:{" "}
                 {dataValue(
                   "Secondary Position",
                   "secondary_position",
@@ -371,7 +383,6 @@ export default function ScoutingReportsPageFinal() {
                 ["Name", ["Name", "name"]],
                 ["DOB", ["DOB", "Date of Birth", "date_of_birth"]],
                 ["Age", ["Age", "age"]],
-                ["Place of birth", ["Place of Birth", "place_of_birth"]],
                 ["Nationality", ["Nationality", "nationality"]],
                 [
                   "Dominant Foot",
@@ -379,12 +390,26 @@ export default function ScoutingReportsPageFinal() {
                 ],
                 ["Contract Expiry", ["Contract Expiry", "contract_expiry"]],
                 ["Height", ["Height", "height"]],
-                ["Position", ["Position", "position"]],
+                [
+                  "Position",
+                  [
+                    "Playing Position",
+                    "Primary Position",
+                    "Position",
+                    "playing_position",
+                    "primary_position",
+                    "position",
+                  ],
+                ],
                 ["Agent", ["Agent", "agent"]],
               ].map(([label, keys]) => (
                 <div className="sr-detail-row" key={label}>
                   <strong>{label}:</strong>
-                  <span>{dataValue(...keys)}</span>
+                  <span>
+                    {label === "Dominant Foot"
+                      ? reportFoot || dataValue(...keys)
+                      : dataValue(...keys)}
+                  </span>
                 </div>
               ))}
             </div>
