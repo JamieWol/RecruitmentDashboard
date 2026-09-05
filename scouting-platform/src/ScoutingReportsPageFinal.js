@@ -55,7 +55,9 @@ export default function ScoutingReportsPageFinal() {
       .limit(5)
       .then(({ data }) => {
         const exact = (data || []).find(
-          (row) => String(row.Name || row.name || "").toLowerCase() === profile.player.toLowerCase(),
+          (row) =>
+            String(row.Name || row.name || "").toLowerCase() ===
+            profile.player.toLowerCase(),
         );
         setPlayerData(exact || data?.[0] || null);
       })
@@ -108,7 +110,9 @@ export default function ScoutingReportsPageFinal() {
   );
   const dataValue = (...keys) => {
     const source = playerData || profile || {};
-    const key = keys.find((k) => source[k] !== undefined && source[k] !== null && source[k] !== "");
+    const key = keys.find(
+      (k) => source[k] !== undefined && source[k] !== null && source[k] !== "",
+    );
     return key ? source[key] : "—";
   };
   const reportPage = active && (
@@ -117,7 +121,16 @@ export default function ScoutingReportsPageFinal() {
         <div className="sr-form-head">
           <div>
             <div className="sr-kicker">PLAYER REPORT</div>
-            <h2>{active.player}</h2>
+            <button
+              className="sr-report-player-link"
+              onClick={() => {
+                setActive(null);
+                setProfile(active);
+              }}
+            >
+              <img src={playerPhoto(active.player)} alt="" />
+              <span>{active.player}</span>
+            </button>
             <p>
               {active.game} · {active.viewing} · {active.date}
             </p>
@@ -278,7 +291,10 @@ export default function ScoutingReportsPageFinal() {
                 ["Age", ["Age", "age"]],
                 ["Place of birth", ["Place of Birth", "place_of_birth"]],
                 ["Nationality", ["Nationality", "nationality"]],
-                ["Dominant Foot", ["Dominant Foot", "Preferred Foot", "preferred_foot"]],
+                [
+                  "Dominant Foot",
+                  ["Dominant Foot", "Preferred Foot", "preferred_foot"],
+                ],
                 ["Contract Expiry", ["Contract Expiry", "contract_expiry"]],
                 ["Height", ["Height", "height"]],
                 ["Position", ["Position", "position"]],
@@ -369,7 +385,7 @@ export default function ScoutingReportsPageFinal() {
             key={x.id}
             onClick={() => {
               localStorage.setItem("scoutingProfileOrigin", "assignments");
-              setProfile(x);
+              openReport(x);
             }}
           >
             <div className="sr-card-top">
