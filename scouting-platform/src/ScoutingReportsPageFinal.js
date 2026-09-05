@@ -101,6 +101,21 @@ export default function ScoutingReportsPageFinal() {
     setActive(x);
     setReport(x.report || empty);
   };
+  const searchPlayer = () => {
+    const match =
+      items.find(
+        (x) => x.player?.toLowerCase() === query.trim().toLowerCase(),
+      ) ||
+      items.find((x) =>
+        x.player?.toLowerCase().includes(query.trim().toLowerCase()),
+      );
+    if (match) {
+      localStorage.setItem("scoutingProfileOrigin", "assignments");
+      setActive(null);
+      setProfile(match);
+      setQuery("");
+    }
+  };
   const saveReport = () => {
     const n = items.map((x) =>
       x.id === active.id ? { ...x, report, status: "Published" } : x,
@@ -276,10 +291,11 @@ export default function ScoutingReportsPageFinal() {
             <div>
               {field("Strengths", "strengths")}
               {field("Weaknesses", "weaknesses")}
+              {field("Conclusion", "conclusion", 4)}
             </div>
           </div>
         )}
-        {field("Conclusion", "conclusion", 4)}
+        {report.type === "Short Report" && field("Conclusion", "conclusion", 4)}
         {grades}
         {field("Reasons Why", "reasons", 6)}
       </section>
@@ -318,8 +334,8 @@ export default function ScoutingReportsPageFinal() {
               {profile.position || "Position not added"}
             </p>
           </div>
-          <button className="sr-cyan" onClick={() => openReport(profile)}>
-            Open Report
+          <button className="sr-cyan" onClick={() => nav("/create-assignment")}>
+            Create Assignment
           </button>
         </section>
         <section className="sr-profile-summary">
@@ -443,6 +459,9 @@ export default function ScoutingReportsPageFinal() {
         placeholder="Search scout or player..."
         value={query}
         onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") searchPlayer();
+        }}
       />
       <section className="sr-tabs">
         {["My Assignments", "All Assigned", "Published"].map((x) => (
