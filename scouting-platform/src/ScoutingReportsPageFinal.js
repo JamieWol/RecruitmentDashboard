@@ -243,6 +243,15 @@ export default function ScoutingReportsPageFinal() {
   const reportPage = active && (
     <div className="sr-modal">
       <section className="sr-form sr-report">
+        <button
+          className="sr-report-back"
+          onClick={() => {
+            setActive(null);
+            setProfile(null);
+          }}
+        >
+          ‹ Back to Assignments
+        </button>
         <div className="sr-form-head sr-report-banner">
           <div className="sr-report-banner-main">
             <img
@@ -285,9 +294,6 @@ export default function ScoutingReportsPageFinal() {
           </div>
           <button className="sr-cyan sr-banner-publish" onClick={saveReport}>
             Publish Report
-          </button>
-          <button className="sr-close" onClick={() => setActive(null)}>
-            ×
           </button>
         </div>
         <div className="sr-fixture-box">

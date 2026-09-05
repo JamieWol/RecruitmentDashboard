@@ -57,6 +57,7 @@ export default function CreateAssignmentPage() {
     }),
     [game, setGame] = useState(""),
     [games, setGames] = useState([]),
+    [gameDate, setGameDate] = useState(""),
     [scout, setScout] = useState(""),
     [date, setDate] = useState(""),
     [viewing, setViewing] = useState("Live"),
@@ -65,18 +66,23 @@ export default function CreateAssignmentPage() {
     p.name.toLowerCase().includes(query.toLowerCase()),
   );
   const addGame = () => {
-    if (!game.trim()) {
+    if (!game.trim() || !gameDate) {
       setError("Enter a fixture before adding it.");
       return;
     }
-    setGames([...games, game.trim()]);
+    setGames([...games, { name: game.trim(), date: gameDate }]);
     setGame("");
+    setGameDate("");
     setError("");
   };
   const save = (e) => {
     e.preventDefault();
     const player = selected || details.name;
-    const fixtures = games.length ? games : game.trim() ? [game.trim()] : [];
+    const fixtures = games.length
+      ? games
+      : game.trim() && gameDate
+        ? [{ name: game.trim(), date: gameDate }]
+        : [];
     if (!player)
       return setError("Select an existing player or create a new player.");
     if (!fixtures.length) return setError("Add at least one fixture / game.");
@@ -89,7 +95,10 @@ export default function CreateAssignmentPage() {
       club: details.club || chosen?.club || "",
       position: details.position || chosen?.position || "",
       games: fixtures,
-      game: fixtures.join(" • "),
+      game: fixtures
+        .map((x) => (typeof x === "string" ? x : x.name))
+        .join(" • "),
+      fixtureDates: fixtures.map((x) => (typeof x === "string" ? "" : x.date)),
       scout,
       date,
       viewing,
@@ -224,6 +233,12 @@ export default function CreateAssignmentPage() {
                 onChange={(e) => setGame(e.target.value)}
                 placeholder="Home v Away"
               />
+              <input
+                type="date"
+                value={gameDate}
+                onChange={(e) => setGameDate(e.target.value)}
+                aria-label="Fixture date"
+              />
               <button type="button" className="sr-outline" onClick={addGame}>
                 Add Game
               </button>
@@ -232,7 +247,9 @@ export default function CreateAssignmentPage() {
           {games.map((fixture, i) => (
             <div className="sr-game-list" key={fixture + i}>
               <div>
-                {fixture}
+                {typeof fixture === "string"
+                  ? fixture
+                  : `${fixture.name} · ${fixture.date}`}
                 <button
                   type="button"
                   onClick={() => setGames(games.filter((_, n) => n !== i))}
