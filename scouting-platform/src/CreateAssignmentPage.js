@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { supabase } from "./supabaseClient";
 export default function CreateAssignmentPage() {
   const [databasePlayers, setDatabasePlayers] = useState([]);
-  const [mode, setMode] = useState(""),
+  const [mode, setMode] = useState(() => localStorage.getItem("editingAssignment") ? "player" : ""),
     [query, setQuery] = useState(""),
     [selected, setSelected] = useState(""),
     [newPlayer, setNewPlayer] = useState(false);
