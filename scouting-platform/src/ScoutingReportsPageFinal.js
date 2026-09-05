@@ -26,7 +26,8 @@ const photoSlug = (name, lower = false) =>
       x
         .normalize("NFD")
         .replace(/[̀-ͯ]/g, "")
-        .replace(/[^a-zA-Z0-9]+/g, "_"),
+        .replace(/[^a-zA-Z0-9]+/g, "_")
+        [lower ? "toLowerCase" : "toString"](),
     )
     .join("_");
 const playerPhoto = (name, lower = true) =>

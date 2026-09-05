@@ -113,7 +113,8 @@ const shortlistPhoto = (name, lower = true) =>
       x
         .normalize("NFD")
         .replace(/[̀-ͯ]/g, "")
-        .replace(/[^a-zA-Z0-9]+/g, "_"),
+        .replace(/[^a-zA-Z0-9]+/g, "_")
+        [lower ? "toLowerCase" : "toString"](),
     )
     .join("_")}.png`;
 const retryShortlistPhoto = (e, name) => {
@@ -493,6 +494,16 @@ export default function ShortlistsPage() {
                   ) : null;
                 })}
               </div>
+              <button
+                className="sr-player-tag-button"
+                title="Add or remove tags"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setTagPlayer(p);
+                }}
+              >
+                🏷
+              </button>
               <button onClick={() => remove(p.id, pos)}>×</button>
             </div>
           ))}
