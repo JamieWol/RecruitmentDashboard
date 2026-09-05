@@ -35,9 +35,13 @@ export default function ScoutingReportsPageFinal() {
   const [items, setItems] = useState(() =>
     JSON.parse(localStorage.getItem("scoutingAssignments") || "[]"),
   );
+  const assignmentFromUrl = new URLSearchParams(window.location.search).get(
+    "assignment",
+  );
   const [tab, setTab] = useState("My Assignments");
   const [query, setQuery] = useState("");
   const [profile, setProfile] = useState(() => {
+    if (assignmentFromUrl) return null;
     const n = JSON.parse(localStorage.getItem("scoutingAssignments") || "[]"),
       name = localStorage.getItem("scoutingProfilePlayer");
     return name ? n.find((x) => x.player === name) || { player: name } : null;
@@ -63,8 +67,17 @@ export default function ScoutingReportsPageFinal() {
       })
       .catch(() => setPlayerData(null));
   }, [profile]);
-  const [active, setActive] = useState(null);
+  const [active, setActive] = useState(() => {
+    if (!assignmentFromUrl) return null;
+    const assignments = JSON.parse(
+      localStorage.getItem("scoutingAssignments") || "[]",
+    );
+    return assignments.find((x) => String(x.id) === assignmentFromUrl) || null;
+  });
   const [report, setReport] = useState(empty);
+  useEffect(() => {
+    if (active) setReport(active.report || { ...empty });
+  }, [active]);
   const saveItems = (n) => {
     setItems(n);
     localStorage.setItem("scoutingAssignments", JSON.stringify(n));
@@ -384,10 +397,7 @@ export default function ScoutingReportsPageFinal() {
             className="sr-card"
             key={x.id}
             onClick={() => {
-              localStorage.setItem("scoutingProfileOrigin", "assignments");
-              setProfile(null);
-              setActive(x);
-              setReport(x.report || { ...empty });
+              window.location.href = `/scouting-reports?assignment=${encodeURIComponent(x.id)}`;
             }}
           >
             <div className="sr-card-top">
@@ -407,9 +417,7 @@ export default function ScoutingReportsPageFinal() {
               className="sr-assignment-player-link"
               onClick={(e) => {
                 e.stopPropagation();
-                setProfile(null);
-                setActive(x);
-                setReport(x.report || { ...empty });
+                window.location.href = `/scouting-reports?assignment=${encodeURIComponent(x.id)}`;
               }}
             >
               {x.player}
