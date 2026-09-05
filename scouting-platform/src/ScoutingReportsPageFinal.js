@@ -246,15 +246,7 @@ export default function ScoutingReportsPageFinal() {
       <section
         className={`sr-form sr-report ${active?.status === "Published" && !editing ? "readonly" : ""}`}
       >
-        <button
-          className="sr-report-back"
-          onClick={() => {
-            setActive(null);
-            setProfile(null);
-          }}
-        >
-          ‹ Back to Assignments
-        </button>
+        <button className="sr-report-back" onClick={() => { setActive(null); setProfile(null); }}>‹ Back to Assignments</button>
         <div className="sr-form-head sr-report-banner">
           <div className="sr-report-banner-main">
             <img
