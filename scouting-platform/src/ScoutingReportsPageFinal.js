@@ -15,10 +15,10 @@ const empty = {
   strengths: "",
   weaknesses: "",
 };
-const playerPhoto = (name) =>
-  `https://syjsmvvsvvprxibqoizw.supabase.co/storage/v1/object/public/player-photos/player-photos/${String(
-    name || "",
-  )
+const photoBase =
+  "https://syjsmvvsvvprxibqoizw.supabase.co/storage/v1/object/public/player-photos/player-photos/";
+const photoSlug = (name, lower = false) =>
+  String(name || "")
     .trim()
     .split(/\s+/)
     .filter(Boolean)
@@ -26,10 +26,17 @@ const playerPhoto = (name) =>
       x
         .normalize("NFD")
         .replace(/[̀-ͯ]/g, "")
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "_"),
+        .replace(/[^a-zA-Z0-9]+/g, "_"),
     )
-    .join("_")}.png`;
+    .join("_");
+const playerPhoto = (name, lower = true) =>
+  `${photoBase}${photoSlug(name, lower)}.png`;
+const retryPhoto = (e, name) => {
+  if (e.currentTarget.dataset.fallback !== "1") {
+    e.currentTarget.dataset.fallback = "1";
+    e.currentTarget.src = playerPhoto(name, false);
+  } else e.currentTarget.style.display = "none";
+};
 export default function ScoutingReportsPageFinal() {
   const nav = useNavigate();
   const [items, setItems] = useState(() =>
@@ -161,6 +168,7 @@ export default function ScoutingReportsPageFinal() {
               className="sr-report-banner-photo"
               src={playerPhoto(active.player)}
               alt=""
+              onError={(e) => retryPhoto(e, active.player)}
             />
             <div>
               <div className="sr-kicker">PLAYER REPORT</div>
@@ -264,52 +272,16 @@ export default function ScoutingReportsPageFinal() {
               {field("Out of Possession", "outPossession")}
               {field("Physical", "physical")}
               {field("On-Pitch Behaviour", "behaviour")}
-              {report.type === "Long Report" && grades}
-              {report.type === "Long Report" &&
-                field("Reasons Why", "reasons", 6)}
             </div>
             <div>
               {field("Strengths", "strengths")}
               {field("Weaknesses", "weaknesses")}
-              {report.type === "Long Report" &&
-                field("Conclusion", "conclusion", 4)}
             </div>
           </div>
         )}
-        {report.type === "Short Report" && field("Conclusion", "conclusion", 4)}
-        {report.type === "Short Report" && (
-          <div className="sr-grade-row">
-            <label className="sr-field">
-              <span>Performance Grade (1–5)</span>
-              <select
-                value={report.performance}
-                onChange={(e) =>
-                  setReport({ ...report, performance: e.target.value })
-                }
-              >
-                <option value="">Select</option>
-                {[5, 4, 3, 2, 1].map((x) => (
-                  <option key={x}>{x}</option>
-                ))}
-              </select>
-            </label>
-            <label className="sr-field">
-              <span>Potential Grade (A–F)</span>
-              <select
-                value={report.potential}
-                onChange={(e) =>
-                  setReport({ ...report, potential: e.target.value })
-                }
-              >
-                <option value="">Select</option>
-                {["A", "B", "C", "D", "E", "F"].map((x) => (
-                  <option key={x}>{x}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-        )}
-        {report.type === "Short Report" && field("Reasons Why", "reasons", 6)}
+        {field("Conclusion", "conclusion", 4)}
+        {grades}
+        {field("Reasons Why", "reasons", 6)}
       </section>
     </div>
   );
@@ -358,9 +330,7 @@ export default function ScoutingReportsPageFinal() {
               onLoad={(e) => {
                 e.currentTarget.nextElementSibling.style.display = "none";
               }}
-              onError={(e) => {
-                e.currentTarget.style.display = "none";
-              }}
+              onError={(e) => retryPhoto(e, profile.player)}
             />
             <span>{profile.player.slice(0, 2).toUpperCase()}</span>
           </div>
