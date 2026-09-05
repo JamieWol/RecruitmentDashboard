@@ -385,6 +385,7 @@ export default function ScoutingReportsPageFinal() {
             key={x.id}
             onClick={() => {
               localStorage.setItem("scoutingProfileOrigin", "assignments");
+              setProfile(null);
               setActive(x);
               setReport(x.report || { ...empty });
             }}
@@ -406,6 +407,7 @@ export default function ScoutingReportsPageFinal() {
               className="sr-assignment-player-link"
               onClick={(e) => {
                 e.stopPropagation();
+                setProfile(null);
                 setActive(x);
                 setReport(x.report || { ...empty });
               }}
