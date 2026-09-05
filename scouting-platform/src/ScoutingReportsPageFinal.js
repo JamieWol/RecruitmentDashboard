@@ -177,40 +177,40 @@ export default function ScoutingReportsPageFinal() {
             <div>
               {field("Strengths", "strengths")}
               {field("Weaknesses", "weaknesses")}
+              <div className="sr-grade-row">
+                <label className="sr-field">
+                  <span>Performance Grade (1–5)</span>
+                  <select
+                    value={report.performance}
+                    onChange={(e) =>
+                      setReport({ ...report, performance: e.target.value })
+                    }
+                  >
+                    <option value="">Select</option>
+                    {[5, 4, 3, 2, 1].map((x) => (
+                      <option key={x}>{x}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="sr-field">
+                  <span>Potential Grade (A–F)</span>
+                  <select
+                    value={report.potential}
+                    onChange={(e) =>
+                      setReport({ ...report, potential: e.target.value })
+                    }
+                  >
+                    <option value="">Select</option>
+                    {["A", "B", "C", "D", "E", "F"].map((x) => (
+                      <option key={x}>{x}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
             </div>
           </div>
         )}
         {field("Conclusion", "conclusion", 4)}
-        <div className="sr-grade-row">
-          <label className="sr-field">
-            <span>Performance Grade (1–5)</span>
-            <select
-              value={report.performance}
-              onChange={(e) =>
-                setReport({ ...report, performance: e.target.value })
-              }
-            >
-              <option value="">Select</option>
-              {[5, 4, 3, 2, 1].map((x) => (
-                <option key={x}>{x}</option>
-              ))}
-            </select>
-          </label>
-          <label className="sr-field">
-            <span>Potential Grade (A–F)</span>
-            <select
-              value={report.potential}
-              onChange={(e) =>
-                setReport({ ...report, potential: e.target.value })
-              }
-            >
-              <option value="">Select</option>
-              {["A", "B", "C", "D", "E", "F"].map((x) => (
-                <option key={x}>{x}</option>
-              ))}
-            </select>
-          </label>
-        </div>
         {field("Reasons Why", "reasons", 6)}
         <button className="sr-cyan sr-save" onClick={saveReport}>
           Publish Report
