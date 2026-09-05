@@ -14,6 +14,14 @@ function Header() {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
 
+  const goTo = (path) => {
+    if (path === "/scouting-reports") {
+      localStorage.removeItem("scoutingProfilePlayer");
+      localStorage.removeItem("scoutingProfileOrigin");
+    }
+    navigate(path);
+  };
+
   const links = [
     { label: "Home", path: "/" },
     { label: "Scout Report", path: "/scout-report" },
@@ -53,7 +61,7 @@ function Header() {
         {links.map((link) => (
           <span
             key={link.label}
-            onClick={() => navigate(link.path)}
+            onClick={() => goTo(link.path)}
             className="nav-link"
           >
             {link.label}
@@ -80,7 +88,7 @@ function Header() {
           <span
             key={link.label}
             onClick={() => {
-              navigate(link.path);
+              goTo(link.path);
               setMenuOpen(false);
             }}
             className="nav-link"
