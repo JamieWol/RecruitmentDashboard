@@ -103,6 +103,7 @@ const formations = [
     ["GK"],
   ];
 const shortlistPhoto=(name)=>`https://syjsmvvsvvprxibqoizw.supabase.co/storage/v1/object/public/player-photos/player-photos/${String(name||"").trim().split(/\s+/).filter(Boolean).map(x=>x.normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,"_")).join("_")}.png`;
+const defaultTags=[{id:"elite",name:"Elite",color:"#62dcff"},{id:"high",name:"High Potential",color:"#142b83"},{id:"value",name:"Value Potential",color:"#a56bc5"},{id:"monitor",name:"Monitor",color:"#ff7416"},{id:"contract",name:"Out of contract",color:"#22c55e"},{id:"deprioritise",name:"Deprioritise",color:"#f2b807"}];
 export default function ShortlistsPage() {
   const [databasePlayers, setDatabasePlayers] = useState([]);
   const [lists, setLists] = useState(() =>
@@ -114,7 +115,9 @@ export default function ShortlistsPage() {
     [type, setType] = useState("Formation"),
     [formation, setFormation] = useState("4-3-3"),
     [pick, setPick] = useState(null),
-    [search, setSearch] = useState("");
+    [search, setSearch] = useState(""),
+    [tagPlayer, setTagPlayer] = useState(null),
+    [tags, setTags] = useState(() => JSON.parse(localStorage.getItem("scoutingTags") || JSON.stringify(defaultTags)));
   useEffect(() => {
     if (!search.trim()) {
       setDatabasePlayers([]);
@@ -195,6 +198,12 @@ export default function ShortlistsPage() {
     persist(lists.map((x) => (x.id === current.id ? n : x)));
     setCurrent(n);
   };
+  const toggleTag = (tagId) => {
+    const n = {...tagPlayer, tags: tagPlayer.tags?.includes(tagId) ? tagPlayer.tags.filter(x=>x!==tagId) : [...(tagPlayer.tags||[]),tagId]};
+    const updated={...current,players:current.players.map(x=>x.id===tagPlayer.id&&x.slot===tagPlayer.slot?n:x)};
+    persist(lists.map(x=>x.id===current.id?updated:x)); setCurrent(updated); setTagPlayer(n);
+  };
+  const tagModal=tagPlayer&&<div className="sr-modal" onClick={()=>setTagPlayer(null)}><section className="sr-form sr-tag-modal" onClick={e=>e.stopPropagation()}><div className="sr-form-head"><div><div className="sr-kicker">PLAYER TAGS</div><h2>{tagPlayer.player}</h2></div><button className="sr-close" onClick={()=>setTagPlayer(null)}>×</button></div><p>Click a tag to add or remove it.</p><div className="sr-tag-list">{tags.map(t=><button key={t.id} style={{background:t.color,color:t.color==="#f2b807"?"#071d3d":"#fff"}} className={tagPlayer.tags?.includes(t.id)?"active":""} onClick={()=>toggleTag(t.id)}>{t.name}</button>)}</div><button className="sr-cyan" onClick={()=>setTagPlayer(null)}>Done</button></section></div>;
   const zone = (pos) => {
     const players = current.players.filter((x) => x.slot === pos),
       matches = playerPool.filter((x) =>
@@ -217,11 +226,11 @@ export default function ShortlistsPage() {
         <div className="sr-zone-list">
           {players.map((p) => (
             <div className="sr-pitch-player-card" key={p.id}>
-              <button onClick={() => window.alert(p.player)}>
+              <button onClick={() => setTagPlayer(p)}>
                 <img className="sr-shortlist-player-photo" src={shortlistPhoto(p.player)} alt="" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                 <span><strong>{p.player}</strong><small>{p.club || "Club not added"}</small></span>
               </button>
-              <button onClick={() => remove(p.id, pos)}>×</button>
+              <div className="sr-card-tags">{(p.tags||[]).map(id=>{const t=tags.find(x=>x.id===id);return t?<i key={id} title={t.name} style={{background:t.color}}/>:null})}</div><button onClick={() => remove(p.id, pos)}>×</button>
             </div>
           ))}
         </div>
@@ -293,6 +302,8 @@ export default function ShortlistsPage() {
           <div className="sr-halfway-line" />
           <div className="sr-goal-box bottom" />
         </div>
+        <div className="sr-tag-legend">{tags.map(t=><span key={t.id}><i style={{background:t.color}}/>{t.name}</span>)}</div>
+        {tagModal}
       </main>
     );
   return (
