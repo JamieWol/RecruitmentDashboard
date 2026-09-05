@@ -104,11 +104,21 @@ const formations = [
   ];
 export default function ShortlistsPage() {
   const [databasePlayers, setDatabasePlayers] = useState([]);
+  const [lists, setLists] = useState(() =>
+    JSON.parse(localStorage.getItem("scoutingShortlists") || "[]"),
+  );
+  const [current, setCurrent] = useState(null),
+    [show, setShow] = useState(false),
+    [name, setName] = useState(""),
+    [type, setType] = useState("Formation"),
+    [formation, setFormation] = useState("4-3-3"),
+    [pick, setPick] = useState(null),
+    [search, setSearch] = useState("");
   useEffect(() => {
     supabase
       .from("players")
       .select("*")
-      .limit(50000)
+      .limit(30000)
       .then(({ data, error }) => {
         if (error) console.error("Player database error", error);
         if (data) setDatabasePlayers(data);
@@ -147,16 +157,6 @@ export default function ShortlistsPage() {
       ).values(),
     ];
   }, [databasePlayers, published]);
-  const [lists, setLists] = useState(() =>
-    JSON.parse(localStorage.getItem("scoutingShortlists") || "[]"),
-  );
-  const [current, setCurrent] = useState(null),
-    [show, setShow] = useState(false),
-    [name, setName] = useState(""),
-    [type, setType] = useState("Formation"),
-    [formation, setFormation] = useState("4-3-3"),
-    [pick, setPick] = useState(null),
-    [search, setSearch] = useState("");
   const persist = (n) => {
     setLists(n);
     localStorage.setItem("scoutingShortlists", JSON.stringify(n));

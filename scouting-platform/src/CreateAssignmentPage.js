@@ -3,11 +3,15 @@ import { useEffect } from "react";
 import { supabase } from "./supabaseClient";
 export default function CreateAssignmentPage() {
   const [databasePlayers, setDatabasePlayers] = useState([]);
+  const [mode, setMode] = useState(""),
+    [query, setQuery] = useState(""),
+    [selected, setSelected] = useState(""),
+    [newPlayer, setNewPlayer] = useState(false);
   useEffect(() => {
     supabase
       .from("players")
       .select("*")
-      .limit(50000)
+      .limit(30000)
       .then(({ data, error }) => {
         if (error) console.error("Player database error", error);
         if (data) setDatabasePlayers(data);
@@ -38,10 +42,6 @@ export default function CreateAssignmentPage() {
       ]),
     ]).values(),
   ];
-  const [mode, setMode] = useState(""),
-    [query, setQuery] = useState(""),
-    [selected, setSelected] = useState(""),
-    [newPlayer, setNewPlayer] = useState(false);
   const [details, setDetails] = useState({
       name: "",
       club: "",
