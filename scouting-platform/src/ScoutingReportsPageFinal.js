@@ -42,28 +42,29 @@ export default function ScoutingReportsPageFinal() {
       name = localStorage.getItem("scoutingProfilePlayer");
     return name ? n.find((x) => x.player === name) || { player: name } : null;
   });
+  const [active, setActive] = useState(null);
   const [playerData, setPlayerData] = useState(null);
   useEffect(() => {
-    if (!profile?.player) {
+    const selectedPlayer = profile || active;
+    if (!selectedPlayer?.player) {
       setPlayerData(null);
       return;
     }
     supabase
       .from("players")
       .select("*")
-      .ilike("Name", profile.player)
+      .ilike("Name", selectedPlayer.player)
       .limit(5)
       .then(({ data }) => {
         const exact = (data || []).find(
           (row) =>
             String(row.Name || row.name || "").toLowerCase() ===
-            profile.player.toLowerCase(),
+            selectedPlayer.player.toLowerCase(),
         );
         setPlayerData(exact || data?.[0] || null);
       })
       .catch(() => setPlayerData(null));
-  }, [profile]);
-  const [active, setActive] = useState(null);
+  }, [profile, active]);
   const [report, setReport] = useState(empty);
   useEffect(() => {
     if (active) setReport(active.report || { ...empty });
@@ -112,7 +113,7 @@ export default function ScoutingReportsPageFinal() {
     </label>
   );
   const dataValue = (...keys) => {
-    const source = playerData || profile || {};
+    const source = playerData || profile || active || {};
     const key = keys.find(
       (k) => source[k] !== undefined && source[k] !== null && source[k] !== "",
     );
@@ -121,23 +122,42 @@ export default function ScoutingReportsPageFinal() {
   const reportPage = active && (
     <div className="sr-modal">
       <section className="sr-form sr-report">
-        <div className="sr-form-head">
-          <div>
-            <div className="sr-kicker">PLAYER REPORT</div>
-            <button
-              className="sr-report-player-link"
-              onClick={() => {
-                setActive(null);
-                setProfile(active);
-              }}
-            >
-              <img src={playerPhoto(active.player)} alt="" />
-              <span>{active.player}</span>
-            </button>
-            <p>
-              {active.game} · {active.viewing} · {active.date}
-            </p>
+        <div className="sr-form-head sr-report-banner">
+          <div className="sr-report-banner-main">
+            <img
+              className="sr-report-banner-photo"
+              src={playerPhoto(active.player)}
+              alt=""
+            />
+            <div>
+              <div className="sr-kicker">PLAYER REPORT</div>
+              <button
+                className="sr-report-player-link"
+                onClick={() => {
+                  setActive(null);
+                  setProfile(active);
+                }}
+              >
+                <span>{active.player}</span>
+              </button>
+              <p>
+                {dataValue("club", "Club", "team", "Team")} · {active.game} ·{" "}
+                {active.viewing} · {active.date}
+              </p>
+              <p className="sr-report-player-meta">
+                Primary: {dataValue("Position", "position")} · Secondary:{" "}
+                {dataValue(
+                  "Secondary Position",
+                  "secondary_position",
+                  "Secondary position",
+                )}{" "}
+                · DOB: {dataValue("DOB", "Date of Birth", "date_of_birth")}
+              </p>
+            </div>
           </div>
+          <button className="sr-cyan sr-banner-publish" onClick={saveReport}>
+            Publish Report
+          </button>
           <button className="sr-close" onClick={() => setActive(null)}>
             ×
           </button>
@@ -177,44 +197,41 @@ export default function ScoutingReportsPageFinal() {
             <div>
               {field("Strengths", "strengths")}
               {field("Weaknesses", "weaknesses")}
-              <div className="sr-grade-row">
-                <label className="sr-field">
-                  <span>Performance Grade (1–5)</span>
-                  <select
-                    value={report.performance}
-                    onChange={(e) =>
-                      setReport({ ...report, performance: e.target.value })
-                    }
-                  >
-                    <option value="">Select</option>
-                    {[5, 4, 3, 2, 1].map((x) => (
-                      <option key={x}>{x}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="sr-field">
-                  <span>Potential Grade (A–F)</span>
-                  <select
-                    value={report.potential}
-                    onChange={(e) =>
-                      setReport({ ...report, potential: e.target.value })
-                    }
-                  >
-                    <option value="">Select</option>
-                    {["A", "B", "C", "D", "E", "F"].map((x) => (
-                      <option key={x}>{x}</option>
-                    ))}
-                  </select>
-                </label>
-              </div>
             </div>
           </div>
         )}
         {field("Conclusion", "conclusion", 4)}
+        <div className="sr-grade-row">
+          <label className="sr-field">
+            <span>Performance Grade (1–5)</span>
+            <select
+              value={report.performance}
+              onChange={(e) =>
+                setReport({ ...report, performance: e.target.value })
+              }
+            >
+              <option value="">Select</option>
+              {[5, 4, 3, 2, 1].map((x) => (
+                <option key={x}>{x}</option>
+              ))}
+            </select>
+          </label>
+          <label className="sr-field">
+            <span>Potential Grade (A–F)</span>
+            <select
+              value={report.potential}
+              onChange={(e) =>
+                setReport({ ...report, potential: e.target.value })
+              }
+            >
+              <option value="">Select</option>
+              {["A", "B", "C", "D", "E", "F"].map((x) => (
+                <option key={x}>{x}</option>
+              ))}
+            </select>
+          </label>
+        </div>
         {field("Reasons Why", "reasons", 6)}
-        <button className="sr-cyan sr-save" onClick={saveReport}>
-          Publish Report
-        </button>
       </section>
     </div>
   );
