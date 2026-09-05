@@ -385,7 +385,8 @@ export default function ScoutingReportsPageFinal() {
             key={x.id}
             onClick={() => {
               localStorage.setItem("scoutingProfileOrigin", "assignments");
-              openReport(x);
+              setActive(x);
+              setReport(x.report || { ...empty });
             }}
           >
             <div className="sr-card-top">
