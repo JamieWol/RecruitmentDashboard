@@ -159,9 +159,7 @@ export default function ScoutingReportsPageFinal() {
         .filter((x) =>
           tab === "Published"
             ? x.status === "Published"
-            : tab === "My Assignments"
-              ? x.status !== "Published"
-              : true,
+            : x.status !== "Published",
         ),
     [items, query, tab],
   );
