@@ -44,6 +44,8 @@ export default function ScoutingReportsPageFinal() {
   );
   const [tab, setTab] = useState("My Assignments");
   const [query, setQuery] = useState("");
+  const [playerSearch, setPlayerSearch] = useState("");
+  const [playerMatches, setPlayerMatches] = useState([]);
   const [profile, setProfile] = useState(() => {
     const n = JSON.parse(localStorage.getItem("scoutingAssignments") || "[]"),
       name = localStorage.getItem("scoutingProfilePlayer");
@@ -73,12 +75,75 @@ export default function ScoutingReportsPageFinal() {
       .catch(() => setPlayerData(null));
   }, [profile, active]);
   const [report, setReport] = useState(empty);
+  const [shortlistPicker, setShortlistPicker] = useState(false);
+  const [selectedShortlist, setSelectedShortlist] = useState("");
+  const [selectedPosition, setSelectedPosition] = useState("CF-0");
+  useEffect(() => {
+    if (playerSearch.trim().length < 2) {
+      setPlayerMatches([]);
+      return;
+    }
+    supabase
+      .from("players")
+      .select("*")
+      .ilike("Name", playerSearch.trim())
+      .limit(8)
+      .then(({ data }) => setPlayerMatches(data || []))
+      .catch(() => setPlayerMatches([]));
+  }, [playerSearch]);
   useEffect(() => {
     if (active) setReport(active.report || { ...empty });
   }, [active]);
   const saveItems = (n) => {
     setItems(n);
     localStorage.setItem("scoutingAssignments", JSON.stringify(n));
+  };
+  const shortlistPositions = [
+    "GK",
+    "LB",
+    "LCB",
+    "CB",
+    "RCB",
+    "RB",
+    "DM",
+    "LM",
+    "LCM",
+    "CM",
+    "RCM",
+    "RM",
+    "LW",
+    "AM",
+    "RW",
+    "CF",
+    "ST",
+  ];
+  const addProfileToShortlist = () => {
+    const lists = JSON.parse(
+      localStorage.getItem("scoutingShortlists") || "[]",
+    );
+    const list = lists.find((x) => x.id === selectedShortlist);
+    if (!list) return;
+    const id = profile.id || profile.playerId || profile.player;
+    const player = {
+      ...profile,
+      id,
+      player: profile.player,
+      slot: selectedPosition,
+    };
+    const next = {
+      ...list,
+      players: [
+        ...(list.players || []).filter(
+          (x) => !(x.id === id && x.slot === selectedPosition),
+        ),
+        player,
+      ],
+    };
+    localStorage.setItem(
+      "scoutingShortlists",
+      JSON.stringify(lists.map((x) => (x.id === list.id ? next : x))),
+    );
+    setShortlistPicker(false);
   };
   const shown = useMemo(
     () =>
@@ -363,7 +428,18 @@ export default function ScoutingReportsPageFinal() {
               published reports
             </span>
           </div>
-          <button className="sr-outline">Add to Shortlist</button>
+          <button
+            className="sr-outline"
+            onClick={() => {
+              const lists = JSON.parse(
+                localStorage.getItem("scoutingShortlists") || "[]",
+              );
+              setSelectedShortlist(lists[0]?.id || "");
+              setShortlistPicker(true);
+            }}
+          >
+            Add to Shortlist
+          </button>
         </section>
         <section className="sr-profile-layout">
           <section className="sr-player-details">
@@ -434,6 +510,60 @@ export default function ScoutingReportsPageFinal() {
             </div>
           </section>
         </section>
+        {shortlistPicker && (
+          <div className="sr-modal" onClick={() => setShortlistPicker(false)}>
+            <section
+              className="sr-form sr-shortlist-picker"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="sr-form-head">
+                <h2>Add to Shortlist</h2>
+                <button
+                  className="sr-close"
+                  onClick={() => setShortlistPicker(false)}
+                >
+                  ×
+                </button>
+              </div>
+              <label className="sr-field">
+                <span>Shortlist</span>
+                <select
+                  value={selectedShortlist}
+                  onChange={(e) => setSelectedShortlist(e.target.value)}
+                >
+                  <option value="">Select shortlist</option>
+                  {JSON.parse(
+                    localStorage.getItem("scoutingShortlists") || "[]",
+                  ).map((x) => (
+                    <option key={x.id} value={x.id}>
+                      {x.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="sr-field">
+                <span>Position</span>
+                <select
+                  value={selectedPosition}
+                  onChange={(e) => setSelectedPosition(e.target.value)}
+                >
+                  {shortlistPositions.map((x, i) => (
+                    <option key={`${x}-${i}`} value={`${x}-${i}`}>
+                      {x}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                className="sr-cyan"
+                disabled={!selectedShortlist}
+                onClick={addProfileToShortlist}
+              >
+                Add Player
+              </button>
+            </section>
+          </div>
+        )}
         {reportPage}
       </main>
     );
@@ -446,6 +576,48 @@ export default function ScoutingReportsPageFinal() {
           <p>Manage player observations and complete your scouting reports.</p>
         </div>
         <div className="sr-head-actions">
+          <div className="sr-player-search-wrap">
+            <input
+              className="sr-player-search"
+              placeholder="Search player..."
+              value={playerSearch}
+              onChange={(e) => setPlayerSearch(e.target.value)}
+            />
+            {!!playerMatches.length && (
+              <div className="sr-player-search-results">
+                {playerMatches.map((p) => {
+                  const name = p.Name || p.name;
+                  return (
+                    <button
+                      key={p.id || name}
+                      onClick={() => {
+                        setProfile({
+                          ...p,
+                          player: name,
+                          club: p.club || p.Club || p.team || p.Team,
+                        });
+                        setPlayerSearch("");
+                        setPlayerMatches([]);
+                        localStorage.setItem(
+                          "scoutingProfileOrigin",
+                          "assignments",
+                        );
+                      }}
+                    >
+                      {name}
+                      <small>
+                        {p.club ||
+                          p.Club ||
+                          p.team ||
+                          p.Team ||
+                          "Club not added"}
+                      </small>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
           <button className="sr-outline" onClick={() => nav("/shortlists")}>
             View Shortlists
           </button>
