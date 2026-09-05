@@ -264,15 +264,19 @@ export default function ScoutingReportsPageFinal() {
               {field("Out of Possession", "outPossession")}
               {field("Physical", "physical")}
               {field("On-Pitch Behaviour", "behaviour")}
+              {report.type === "Long Report" && grades}
+              {report.type === "Long Report" &&
+                field("Reasons Why", "reasons", 6)}
             </div>
             <div>
               {field("Strengths", "strengths")}
               {field("Weaknesses", "weaknesses")}
-              {report.type === "Long Report" && grades}
+              {report.type === "Long Report" &&
+                field("Conclusion", "conclusion", 4)}
             </div>
           </div>
         )}
-        {field("Conclusion", "conclusion", 4)}
+        {report.type === "Short Report" && field("Conclusion", "conclusion", 4)}
         {report.type === "Short Report" && (
           <div className="sr-grade-row">
             <label className="sr-field">
@@ -305,7 +309,7 @@ export default function ScoutingReportsPageFinal() {
             </label>
           </div>
         )}
-        {field("Reasons Why", "reasons", 6)}
+        {report.type === "Short Report" && field("Reasons Why", "reasons", 6)}
       </section>
     </div>
   );
