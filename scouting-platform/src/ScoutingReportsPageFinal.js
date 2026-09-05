@@ -310,6 +310,16 @@ export default function ScoutingReportsPageFinal() {
             {active.fixtureDates?.[0] || active.date || "Date not added"} ·{" "}
             {active.viewing || "Viewing not added"}
           </small>
+          <button
+            className="sr-edit-games"
+            onClick={() => {
+              localStorage.setItem("editingAssignment", JSON.stringify(active));
+              setActive(null);
+              nav("/create-assignment");
+            }}
+          >
+            Edit Games
+          </button>
         </div>
         <div className="sr-form-grid">
           <label className="sr-field">
