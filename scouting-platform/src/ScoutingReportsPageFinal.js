@@ -77,6 +77,7 @@ export default function ScoutingReportsPageFinal() {
       .catch(() => setPlayerData(null));
   }, [profile, active]);
   const [report, setReport] = useState(empty);
+  const [editing, setEditing] = useState(false);
   const [shortlistPicker, setShortlistPicker] = useState(false);
   const [selectedShortlist, setSelectedShortlist] = useState("");
   const [selectedPosition, setSelectedPosition] = useState("CF-0");
@@ -167,6 +168,7 @@ export default function ScoutingReportsPageFinal() {
   const openReport = (x) => {
     setActive(x);
     setReport(x.report || empty);
+    setEditing(x.status !== "Published");
   };
   const searchPlayer = () => {
     const match =
@@ -243,7 +245,9 @@ export default function ScoutingReportsPageFinal() {
   );
   const reportPage = active && (
     <div className="sr-modal">
-      <section className="sr-form sr-report">
+      <section
+        className={`sr-form sr-report ${active?.status === "Published" && !editing ? "readonly" : ""}`}
+      >
         <button
           className="sr-report-back"
           onClick={() => {
@@ -293,9 +297,11 @@ export default function ScoutingReportsPageFinal() {
               </p>
             </div>
           </div>
-          <button className="sr-cyan sr-banner-publish" onClick={saveReport}>
-            Publish Report
-          </button>
+          {(!active || active.status !== "Published" || editing) && (
+            <button className="sr-cyan sr-banner-publish" onClick={saveReport}>
+              Publish Report
+            </button>
+          )}
         </div>
         <div className="sr-fixture-box">
           <strong>Assigned Fixture</strong>
@@ -403,6 +409,13 @@ export default function ScoutingReportsPageFinal() {
         {report.type === "Short Report" && field("Conclusion", "conclusion", 4)}
         {grades}
         {field("Reasons Why", "reasons", 6)}
+        {active?.status === "Published" && !editing && (
+          <div className="sr-report-bottom-actions">
+            <button className="sr-outline" onClick={() => setEditing(true)}>
+              Edit Report
+            </button>
+          </div>
+        )}
       </section>
     </div>
   );
