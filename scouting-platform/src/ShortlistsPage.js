@@ -230,11 +230,12 @@ export default function ShortlistsPage() {
         </div>
         <div className="sr-zone-list">
           {players.map((p) => (
-            <div className="sr-pitch-player-card" key={p.id} style={{background:(tags.find(t=>(p.tags||[]).includes(t.id))?.color||"#f7fbff")+"33"}}>
+            <div className="sr-pitch-player-card" key={p.id}>
               <button onClick={() => setTagPlayer(p)}>
                 <img className="sr-shortlist-player-photo" src={shortlistPhoto(p.player)} alt="" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                 <span><strong>{p.player}</strong><small>{p.club || "Club not added"}</small></span>
               </button>
+              <div className="sr-player-highlight" style={{background:tags.find(t=>(p.tags||[]).includes(t.id))?.color||"transparent"}} />
               <div className="sr-card-tags">{(p.tags||[]).map(id=>{const t=tags.find(x=>x.id===id);return t?<i key={id} title={t.name} style={{background:t.color}}/>:null})}</div><button onClick={() => remove(p.id, pos)}>×</button>
             </div>
           ))}
