@@ -26,7 +26,7 @@ export default function CreateAssignmentPage() {
   }, [query]);
   const records = useMemo(
     () => appState?.assignments || JSON.parse(localStorage.getItem("scoutingAssignments") || "[]"),
-    [],
+    [appState?.assignments],
   );
   const imported = databasePlayers.map((x) => ({
     ...x,
