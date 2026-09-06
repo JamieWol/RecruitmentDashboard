@@ -82,8 +82,12 @@ export default function ScoutingReportsPageFinal() {
   const [report, setReport] = useState(empty);
   const [editing, setEditing] = useState(false);
   useEffect(() => {
-    if (appState) setItems((appState.assignments || []).filter((assignment) => !assignment.scoutId || assignment.scoutId === user?.id));
-  }, [appState, user?.id]);
+    // Once a user belongs to a club, club_assignments is the canonical source.
+    // Do not let the general app-state restore put deleted/old assignments back.
+    if (appState && (!user || !accountProfile?.club)) {
+      setItems((appState.assignments || []).filter((assignment) => !assignment.scoutId || assignment.scoutId === user?.id));
+    }
+  }, [appState, user?.id, accountProfile?.club]);
   useEffect(() => {
     if (!user || !accountProfile?.club) return;
     supabase.from("club_reports").select("*").eq("club", accountProfile.club).eq("status", "Published").then(({ data, error }) => {
