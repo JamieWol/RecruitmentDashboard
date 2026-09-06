@@ -94,7 +94,7 @@ export default function ScoutingReportsPageFinal() {
       .select("*")
       .ilike("Name", playerSearch.trim())
       .limit(8)
-      .then(({ data }) => setPlayerMatches(data || []))
+      .then(({ data }) => setPlayerMatches([...new Map((data || []).map((p) => [String(p.Name || p.name || "").trim().toLowerCase(), p])).values()]))
       .catch(() => setPlayerMatches([]));
   }, [playerSearch]);
   useEffect(() => {

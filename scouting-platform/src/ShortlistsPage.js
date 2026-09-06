@@ -171,7 +171,7 @@ export default function ShortlistsPage() {
       .limit(50)
       .then(({ data, error }) => {
         if (error) console.error("Player database error", error);
-        if (data) setDatabasePlayers(data);
+        if (data) setDatabasePlayers([...new Map(data.map((p) => [String(p.Name || p.name || "").trim().toLowerCase(), p])).values()]);
       });
   }, [search]);
   const published = useMemo(
