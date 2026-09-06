@@ -28,3 +28,15 @@ export async function saveCloudState(user, state) {
   const { error } = await supabase.from("user_app_state").upsert({ user_id: user.id, ...state, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
   if (error) throw error;
 }
+
+export async function syncPublishedReports(user, state, club) {
+  if (!user || !club) return;
+  const reports = (state?.assignments || []).filter((x) => ["Published", "Complete"].includes(x.status) && x.report).map((x) => ({
+    id: Number(x.id), assignment_id: Number(x.id), player_id: x.playerId || null,
+    player: x.player, club, author_id: user.id, report: x.report, status: "Published",
+  }));
+  if (reports.length) {
+    const { error } = await supabase.from("club_reports").upsert(reports, { onConflict: "id" });
+    if (error) console.error("Could not migrate published reports", error);
+  }
+}

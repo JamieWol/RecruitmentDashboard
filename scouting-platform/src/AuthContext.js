@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "./supabaseClient";
-import { migrateAndLoadState, saveCloudState } from "./cloudState";
+import { migrateAndLoadState, saveCloudState, syncPublishedReports } from "./cloudState";
 
 const AuthContext = createContext(null);
 
@@ -18,7 +18,7 @@ export function AuthProvider({ children }) {
     setProfileError("");
     setProfile(data || null);
     if (data?.approved) {
-      try { setAppState(await migrateAndLoadState(user)); } catch (error) { console.error("Could not load cloud data", error); }
+      try { const state = await migrateAndLoadState(user); setAppState(state); await syncPublishedReports(user, state, data.club); } catch (error) { console.error("Could not load cloud data", error); }
     }
   };
   useEffect(() => {
