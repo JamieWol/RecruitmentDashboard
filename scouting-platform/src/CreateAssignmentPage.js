@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from "react";
 import { useEffect } from "react";
 import { supabase } from "./supabaseClient";
+import { useAuth } from "./AuthContext";
 export default function CreateAssignmentPage() {
+  const { appState, updateAppState } = useAuth();
   const [databasePlayers, setDatabasePlayers] = useState([]);
   const [mode, setMode] = useState(() => localStorage.getItem("editingAssignment") ? "player" : ""),
     [query, setQuery] = useState(""),
@@ -23,7 +25,7 @@ export default function CreateAssignmentPage() {
       });
   }, [query]);
   const records = useMemo(
-    () => JSON.parse(localStorage.getItem("scoutingAssignments") || "[]"),
+    () => appState?.assignments || JSON.parse(localStorage.getItem("scoutingAssignments") || "[]"),
     [],
   );
   const imported = databasePlayers.map((x) => ({
@@ -110,7 +112,7 @@ export default function CreateAssignmentPage() {
       return setError("Select an existing player or create a new player.");
     if (!fixtures.length) return setError("Add at least one fixture / game.");
     const chosen = players.find((p) => p.name === selected);
-    const old = JSON.parse(localStorage.getItem("scoutingAssignments") || "[]");
+    const old = appState?.assignments || JSON.parse(localStorage.getItem("scoutingAssignments") || "[]");
     const assignment = {
       id: Date.now(),
       player,
@@ -131,16 +133,10 @@ export default function CreateAssignmentPage() {
     const editing = JSON.parse(
       localStorage.getItem("editingAssignment") || "null",
     );
-    localStorage.setItem(
-      "scoutingAssignments",
-      JSON.stringify(
-        editing
-          ? old.map((x) =>
-              x.id === editing.id ? { ...assignment, id: editing.id } : x,
-            )
-          : [...old, assignment],
-      ),
-    );
+    const nextAssignments = editing
+      ? old.map((x) => x.id === editing.id ? { ...assignment, id: editing.id } : x)
+      : [...old, assignment];
+    updateAppState({ assignments: nextAssignments, shortlists: appState?.shortlists || [], tags: appState?.tags || [] });
     localStorage.removeItem("editingAssignment");
     window.history.back();
   };

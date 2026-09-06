@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "./supabaseClient";
+import { useAuth } from "./AuthContext";
 const empty = {
   type: "Long Report",
   foot: "",
@@ -41,6 +42,7 @@ const retryPhoto = (e, name) => {
 };
 export default function ScoutingReportsPageFinal() {
   const nav = useNavigate();
+  const { appState, updateAppState } = useAuth();
   const [items, setItems] = useState(() =>
     JSON.parse(localStorage.getItem("scoutingAssignments") || "[]"),
   );
@@ -78,6 +80,7 @@ export default function ScoutingReportsPageFinal() {
   }, [profile, active]);
   const [report, setReport] = useState(empty);
   const [editing, setEditing] = useState(false);
+  useEffect(() => { if (appState) setItems(appState.assignments || []); }, [appState]);
   const [shortlistPicker, setShortlistPicker] = useState(false);
   const [selectedShortlist, setSelectedShortlist] = useState("");
   const [selectedPosition, setSelectedPosition] = useState("CF-0");
@@ -99,7 +102,7 @@ export default function ScoutingReportsPageFinal() {
   }, [active]);
   const saveItems = (n) => {
     setItems(n);
-    localStorage.setItem("scoutingAssignments", JSON.stringify(n));
+    updateAppState({ assignments: n, shortlists: appState?.shortlists || [], tags: appState?.tags || [] });
   };
   const shortlistPositions = [
     "GK",

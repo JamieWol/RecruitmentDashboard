@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "./supabaseClient";
+import { useAuth } from "./AuthContext";
 const formations = [
     "4-1-4-1",
     "4-2-2-2",
@@ -132,7 +133,9 @@ const defaultTags = [
   { id: "deprioritise", name: "Deprioritise", color: "#f2b807" },
 ];
 export default function ShortlistsPage() {
+  const { appState, updateAppState } = useAuth();
   const [databasePlayers, setDatabasePlayers] = useState([]);
+  useEffect(() => { if (appState) { setLists(appState.shortlists || []); setTags(appState.tags || defaultTags); } }, [appState]);
   const [lists, setLists] = useState(() =>
     JSON.parse(localStorage.getItem("scoutingShortlists") || "[]"),
   );
@@ -206,7 +209,7 @@ export default function ShortlistsPage() {
   }, [databasePlayers, published]);
   const persist = (n) => {
     setLists(n);
-    localStorage.setItem("scoutingShortlists", JSON.stringify(n));
+    updateAppState({ assignments: appState?.assignments || [], shortlists: n, tags: appState?.tags || tags });
   };
   const create = (e) => {
     e.preventDefault();
