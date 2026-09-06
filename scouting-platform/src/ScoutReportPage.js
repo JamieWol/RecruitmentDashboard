@@ -37,14 +37,6 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoStatus, setPhotoStatus] = useState("");
   useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem("scoutingReportPlayers") || "[]");
-      if (saved.length) processRows(saved);
-    } catch (error) { console.warn("Could not restore scouting data", error); }
-  // processRows is intentionally stable for restoring the locally saved player dataset.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  useEffect(() => {
     if (!profile?.club) return;
     supabase.from("club_reports").select("player,report,status,scout,completed_at").eq("club", profile.club).eq("status", "Published")
       .then(({ data }) => setPublishedReports(data || []));
@@ -362,7 +354,6 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
           (p["Player Label"] === selectedPlayer["Player Label"] ||
            p["Full Player Name"] === selectedPlayer["Full Player Name"]) ? { ...p, _photoUrl: publicUrl, Photo: publicUrl } : p
         ));
-        localStorage.setItem("scoutingReportPlayers", JSON.stringify(next));
         return next;
       });
       setFilteredPlayers((prev) => prev.map((p) => (
@@ -582,7 +573,6 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     const ranked = sortRowsByScore(normalized, detected);
 
     setPlayers(normalized);
-    localStorage.setItem("scoutingReportPlayers", JSON.stringify(normalized));
     setFilteredPlayers(ranked);
     setMetrics(detected);
     setScatterMetrics({ x: detected[0] || "", y: detected[1] || "" });
@@ -1538,7 +1528,6 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 }
 
 export default ScoutReportPage;
-
 
 
 
