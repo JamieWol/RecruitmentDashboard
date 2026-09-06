@@ -82,24 +82,19 @@ export default function ScoutingReportsPageFinal() {
   const [report, setReport] = useState(empty);
   const [editing, setEditing] = useState(false);
   useEffect(() => {
-    // Once a user belongs to a club, club_assignments is the canonical source.
-    // Do not let the general app-state restore put deleted/old assignments back.
-    if (appState && (!user || !accountProfile?.club)) {
-      setItems((appState.assignments || []).filter((assignment) => !assignment.scoutId || assignment.scoutId === user?.id));
-    }
-  }, [appState, user?.id, accountProfile?.club]);
+    if (appState) setItems((appState.assignments || []).filter((assignment) => !assignment.scoutId || assignment.scoutId === user?.id));
+  }, [appState, user?.id]);
   useEffect(() => {
-    if (!user || !accountProfile?.club) return;
-    supabase.from("club_reports").select("*").eq("club", accountProfile.club).eq("status", "Published").then(({ data, error }) => {
+    if (!user) return;
+    supabase.from("club_reports").select("*").eq("status", "Published").then(({ data, error }) => {
       if (error) console.error("Could not load club reports", error);
       setSharedReports(data || []);
     });
-  }, [user, accountProfile?.club]);
+  }, [user]);
   useEffect(() => {
     if (!accountProfile?.club || !user) return;
-    supabase.from("club_assignments").select("*").eq("club", accountProfile.club).then(({ data, error }) => {
-      if (!error && data?.length) setItems(data.map((row) => ({ ...row.assignment, id: row.id, status: row.status, club: row.club, assigned_to: row.assigned_to, created_by: row.created_by })));
-      else if (!error) setItems([]);
+    supabase.from("club_assignments").select("*").eq("club", accountProfile.club).eq("assigned_to", user.id).then(({ data, error }) => {
+      if (!error && data?.length) setItems(data.map((row) => ({ ...row.assignment, id: row.id, status: row.status })));
     });
   }, [accountProfile?.club, user]);
   const [shortlistPicker, setShortlistPicker] = useState(false);
@@ -174,12 +169,9 @@ export default function ScoutingReportsPageFinal() {
   };
   const shown = useMemo(
     () => {
-      const shared = sharedReports.map((x) => ({ ...x, id: x.assignment_id || x.id, report: x.report, status: "Published", club: x.club, date: x.completed_at, game: x.fixture_summary, scout: x.scout }));
-      const clubItems = accountProfile?.club ? items.filter((x) => !x.club || x.club === accountProfile.club) : items;
-      const mine = clubItems.filter((x) => x.assigned_to === user?.id || x.scoutId === user?.id);
-      const source = tab === "Published" ? [...clubItems.filter((x) => x.status === "Published"), ...shared] : tab === "My Assignments" ? mine : clubItems;
-      const uniqueSource = [...new Map(source.map((x) => [String(x.id), x])).values()];
-      return uniqueSource
+      const shared = sharedReports.map((x) => ({ ...x, id: x.assignment_id || x.id, report: x.report, status: "Published", club: x.club }));
+      const source = tab === "Published" ? [...items.filter((x) => x.status === "Published"), ...shared] : items;
+      return source
         .filter((x) =>
           `${x.player} ${x.club} ${x.scout}`
             .toLowerCase()
@@ -191,7 +183,7 @@ export default function ScoutingReportsPageFinal() {
             : x.status !== "Published",
         );
     },
-    [items, query, tab, sharedReports, accountProfile?.club, user?.id],
+    [items, query, tab, sharedReports],
   );
   const openReport = (x) => {
     setActive(x);
@@ -213,32 +205,17 @@ export default function ScoutingReportsPageFinal() {
       setQuery("");
     }
   };
-  const saveReport = async () => {
-    const fixtures = active.games || active.fixtures || [];
-    const fixtureSummary = fixtures.length > 1
-      ? "Multiple"
-      : fixtures.length === 1
-        ? `${fixtures[0].date || ""} · ${fixtures[0].name || fixtures[0]}`
-        : active.game || "—";
-    const completionDate = new Date().toISOString().slice(0, 10);
+  const saveReport = () => {
     const n = items.map((x) =>
-      x.id === active.id ? { ...x, report, status: "Published", completedAt: completionDate, date: completionDate, game: fixtureSummary } : x,
+      x.id === active.id ? { ...x, report, status: "Published", completedAt: new Date().toISOString().slice(0, 10) } : x,
     );
     saveItems(n);
     if (user && accountProfile?.club) {
-      const assignmentUpdate = supabase.from("club_assignments").update({ status: "Published", assignment: { ...active, report, status: "Published", completedAt: completionDate, date: completionDate, game: fixtureSummary } }).eq("id", Number(active.id));
-      const reportUpsert = supabase.from("club_reports").upsert({
+      supabase.from("club_reports").upsert({
         id: Number(active.id), assignment_id: Number(active.id), player_id: active.playerId || null,
         player: active.player, club: accountProfile.club, author_id: user.id, report, status: "Published",
-        updated_at: new Date().toISOString(), completed_at: completionDate, scout: active.scout || "", fixture_summary: fixtureSummary,
-      }, { onConflict: "id" });
-      const results = await Promise.all([assignmentUpdate, reportUpsert]);
-      const failed = results.find((result) => result.error);
-      if (failed) {
-        console.error("Could not save published report", failed.error);
-        window.alert(`The report could not be fully saved: ${failed.error.message}`);
-        return;
-      }
+        updated_at: new Date().toISOString(), completed_at: active.completedAt || active.date || new Date().toISOString().slice(0, 10), scout: active.scout || "", fixture_summary: (active.games || []).length > 1 ? "Multiple" : (active.games?.[0] ? `${active.games[0].date || ""} · ${active.games[0].name || active.games[0]}` : active.game || ""),
+      }, { onConflict: "id" }).then(({ error }) => { if (error) console.error("Could not publish shared report", error); });
     }
     setActive(null);
     setProfile(n.find((x) => x.id === active.id) || profile);
@@ -777,12 +754,7 @@ export default function ScoutingReportsPageFinal() {
                 className="sr-trash"
                 onClick={(e) => {
                   e.stopPropagation();
-                  const removeAssignment = async () => {
-                    const { error } = await supabase.from("club_assignments").delete().eq("id", Number(x.id));
-                    if (error) { window.alert(`The assignment could not be deleted: ${error.message}`); return; }
-                    saveItems(items.filter((y) => y.id !== x.id));
-                  };
-                  removeAssignment();
+                  saveItems(items.filter((y) => y.id !== x.id));
                 }}
               >
                 Delete
