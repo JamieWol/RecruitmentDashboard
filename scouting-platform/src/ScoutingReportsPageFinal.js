@@ -85,12 +85,12 @@ export default function ScoutingReportsPageFinal() {
     if (appState) setItems((appState.assignments || []).filter((assignment) => !assignment.scoutId || assignment.scoutId === user?.id));
   }, [appState, user?.id]);
   useEffect(() => {
-    if (!user) return;
-    supabase.from("club_reports").select("*").eq("status", "Published").then(({ data, error }) => {
+    if (!user || !accountProfile?.club) return;
+    supabase.from("club_reports").select("*").eq("club", accountProfile.club).eq("status", "Published").then(({ data, error }) => {
       if (error) console.error("Could not load club reports", error);
       setSharedReports(data || []);
     });
-  }, [user]);
+  }, [user, accountProfile?.club]);
   useEffect(() => {
     if (!accountProfile?.club || !user) return;
     supabase.from("club_assignments").select("*").eq("club", accountProfile.club).eq("assigned_to", user.id).then(({ data, error }) => {
@@ -169,9 +169,9 @@ export default function ScoutingReportsPageFinal() {
   };
   const shown = useMemo(
     () => {
-      const shared = sharedReports.map((x) => ({ ...x, id: x.assignment_id || x.id, report: x.report, status: "Published", club: x.club }));
-      const source = tab === "Published" ? [...items.filter((x) => x.status === "Published"), ...shared] : items;
-      return source
+      const shared = sharedReports.map((x) => ({ ...x, id: x.assignment_id || x.id, report: x.report, status: "Published", club: x.club, position: x.position || x.report?.playedPosition || "", date: x.completed_at, game: x.fixture_summary, scout: x.scout }));
+      const source = tab === "Published" ? shared : items;
+      return [...new Map(source.map((x) => [String(x.id), x])).values()]
         .filter((x) =>
           `${x.player} ${x.club} ${x.scout}`
             .toLowerCase()
