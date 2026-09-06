@@ -147,7 +147,7 @@ export default function ShortlistsPage() {
       const ids = (data || []).map((x) => String(x.shortlist_id));
       if (!ids.length) return setSharedLists([]);
       const result = await supabase.from("shared_shortlists").select("*").in("shortlist_id", ids);
-      setSharedLists((result.data || []).map((x) => ({ ...x.shortlist, sharedPermission: data.find((s) => String(s.shortlist_id) === String(x.shortlist_id))?.permission || "view", shared: true })));
+      setSharedLists((result.data || []).map((x) => ({ ...x.shortlist, owner_id: x.owner_id, sharedPermission: data.find((s) => String(s.shortlist_id) === String(x.shortlist_id))?.permission || "view", shared: true })));
     });
   }, [user]);
   const [lists, setLists] = useState(() =>
@@ -221,9 +221,13 @@ export default function ShortlistsPage() {
       ).values(),
     ];
   }, [databasePlayers, published]);
-  const persist = (n) => {
+  const persist = (n, sharedUpdate = null) => {
     setLists(n);
     updateAppState({ assignments: appState?.assignments || [], shortlists: n, tags });
+    if (current?.shared && current.sharedPermission === "edit" && user) {
+      const changed = sharedUpdate || n.find((list) => list.id === current.id) || current;
+      supabase.from("shared_shortlists").update({ shortlist: { ...changed, shared: undefined, sharedPermission: undefined }, updated_at: new Date().toISOString() }).eq("shortlist_id", String(current.id)).eq("owner_id", current.owner_id).then(({ error }) => { if (error) console.error("Could not save shared shortlist", error); });
+    }
   };
   const create = async (e) => {
     e.preventDefault();
@@ -245,7 +249,7 @@ export default function ShortlistsPage() {
       ...current,
       players: [...current.players, { ...p, slot: pos }],
     };
-    persist(lists.map((x) => (x.id === current.id ? n : x)));
+    persist(lists.map((x) => (x.id === current.id ? n : x)), n);
     setCurrent(n);
     setPick(null);
     setSearch("");
@@ -255,7 +259,7 @@ export default function ShortlistsPage() {
       ...current,
       players: current.players.filter((x) => !(x.id === id && x.slot === pos)),
     };
-    persist(lists.map((x) => (x.id === current.id ? n : x)));
+    persist(lists.map((x) => (x.id === current.id ? n : x)), n);
     setCurrent(n);
   };
   const toggleTag = (tagId) => {
@@ -271,7 +275,7 @@ export default function ShortlistsPage() {
         x.id === tagPlayer.id && x.slot === tagPlayer.slot ? n : x,
       ),
     };
-    persist(lists.map((x) => (x.id === current.id ? updated : x)));
+    persist(lists.map((x) => (x.id === current.id ? updated : x)), updated);
     setCurrent(updated);
     setTagPlayer(n);
   };
@@ -298,7 +302,7 @@ export default function ShortlistsPage() {
       return { ...p, slot };
     });
     const n = { ...current, formation: value, players };
-    persist(lists.map((x) => (x.id === current.id ? n : x)));
+    persist(lists.map((x) => (x.id === current.id ? n : x)), n);
     setCurrent(n);
   };
   const addSelectedPlayers = () => {
@@ -310,7 +314,7 @@ export default function ShortlistsPage() {
       ...newPlayers.map((p) => ({ ...p, slot: p.addSlot || fallback })),
     ];
     const n = { ...current, players };
-    persist(lists.map((x) => (x.id === current.id ? n : x)));
+    persist(lists.map((x) => (x.id === current.id ? n : x)), n);
     setCurrent(n);
     setNewPlayers([]);
     setNewPlayerQuery("");
@@ -329,7 +333,7 @@ export default function ShortlistsPage() {
       ...current,
       players: [...current.players.filter((x) => x.slot !== pos), ...ordered],
     };
-    persist(lists.map((x) => (x.id === current.id ? n : x)));
+    persist(lists.map((x) => (x.id === current.id ? n : x)), n);
     setCurrent(n);
     setDragging(null);
   };
@@ -736,7 +740,7 @@ export default function ShortlistsPage() {
           <h1>Your Shortlists</h1>
           <p>Open a shortlist to view its formation pitch.</p>
         </div>
-        <div className="sr-head-actions"><button className="sr-outline" onClick={() => setShowShared(!showShared)}>Shared Shortlists</button><button className="sr-cyan" onClick={() => setShow(true)}>Create New Shortlist</button></div>
+        <div className="sr-head-actions"><button className={!showShared ? "sr-cyan" : "sr-outline"} onClick={() => setShowShared(false)}>My Shortlists</button><button className={showShared ? "sr-cyan" : "sr-outline"} onClick={() => setShowShared(true)}>Shared Shortlists</button><button className="sr-cyan" onClick={() => setShow(true)}>Create New Shortlist</button></div>
       </section>
       <section className="sr-list-grid">
         {(showShared ? sharedLists : lists).map((l) => (
