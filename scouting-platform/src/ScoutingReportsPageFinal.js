@@ -88,15 +88,10 @@ export default function ScoutingReportsPageFinal() {
     if (!user || !accountProfile?.club) return;
     supabase.from("club_reports").select("*").eq("club", accountProfile.club).eq("status", "Published").then(({ data, error }) => {
       if (error) console.error("Could not load club reports", error);
-      setSharedReports(data || []);
+      const published = data || [];
+      setSharedReports(published);
     });
   }, [user, accountProfile?.club]);
-  useEffect(() => {
-    if (!accountProfile?.club || !user) return;
-    supabase.from("club_assignments").select("*").eq("club", accountProfile.club).eq("assigned_to", user.id).then(({ data, error }) => {
-      if (!error && data?.length) setItems(data.map((row) => ({ ...row.assignment, id: row.id, status: row.status })));
-    });
-  }, [accountProfile?.club, user]);
   const [shortlistPicker, setShortlistPicker] = useState(false);
   const [selectedShortlist, setSelectedShortlist] = useState("");
   const [selectedPosition, setSelectedPosition] = useState("CF-0");
