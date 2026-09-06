@@ -206,7 +206,7 @@ export default function ScoutingReportsPageFinal() {
       supabase.from("club_reports").upsert({
         id: Number(active.id), assignment_id: Number(active.id), player_id: active.playerId || null,
         player: active.player, club: accountProfile.club, author_id: user.id, report, status: "Published",
-        updated_at: new Date().toISOString(), completed_at: active.date || new Date().toISOString().slice(0, 10), scout: active.scout || "", fixture_summary: (active.games || []).length > 1 ? "Multiple" : (active.games?.[0] ? `${active.games[0].name || active.games[0]} · ${active.games[0].date || ""}` : active.game || ""),
+        updated_at: new Date().toISOString(), completed_at: active.completedAt || active.date || new Date().toISOString().slice(0, 10), scout: active.scout || "", fixture_summary: (active.games || []).length > 1 ? "Multiple" : (active.games?.[0] ? `${active.games[0].date || ""} · ${active.games[0].name || active.games[0]}` : active.game || ""),
       }, { onConflict: "id" }).then(({ error }) => { if (error) console.error("Could not publish shared report", error); });
     }
     setActive(null);
