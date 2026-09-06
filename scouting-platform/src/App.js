@@ -29,6 +29,7 @@ function AppRoutes() {
 // ------------------- HEADER COMPONENT -------------------
 function Header() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
 
   const goTo = (path) => {
@@ -92,6 +93,7 @@ function Header() {
         >
           Recruitment Dashboard
         </a>
+        {user && <button className="header-signout" onClick={() => supabase.auth.signOut()}>Sign out</button>}
       </nav>
 
       <div className={`hamburger ${menuOpen ? "open" : ""}`} onClick={() => setMenuOpen(!menuOpen)}>
@@ -123,6 +125,7 @@ function Header() {
         >
           Recruitment Dashboard
         </a>
+        {user && <button className="header-signout" onClick={() => supabase.auth.signOut()}>Sign out</button>}
       </div>
 
       <style>{`
