@@ -85,12 +85,12 @@ export default function ScoutingReportsPageFinal() {
     if (appState) setItems((appState.assignments || []).filter((assignment) => !assignment.scoutId || assignment.scoutId === user?.id));
   }, [appState, user?.id]);
   useEffect(() => {
-    if (!user) return;
-    supabase.from("club_reports").select("*").eq("status", "Published").then(({ data, error }) => {
+    if (!user || !accountProfile?.club) return;
+    supabase.from("club_reports").select("*").eq("club", accountProfile.club).eq("status", "Published").then(({ data, error }) => {
       if (error) console.error("Could not load club reports", error);
       setSharedReports(data || []);
     });
-  }, [user]);
+  }, [user, accountProfile?.club]);
   useEffect(() => {
     if (!accountProfile?.club || !user) return;
     supabase.from("club_assignments").select("*").eq("club", accountProfile.club).eq("assigned_to", user.id).then(({ data, error }) => {
@@ -218,6 +218,8 @@ export default function ScoutingReportsPageFinal() {
     );
     saveItems(n);
     if (user && accountProfile?.club) {
+      supabase.from("club_assignments").update({ status: "Published", assignment: { ...active, report, status: "Published", completedAt: completionDate, date: completionDate, game: fixtureSummary } }).eq("id", Number(active.id)).eq("assigned_to", user.id)
+        .then(({ error }) => { if (error) console.error("Could not mark assignment as published", error); });
       supabase.from("club_reports").upsert({
         id: Number(active.id), assignment_id: Number(active.id), player_id: active.playerId || null,
         player: active.player, club: accountProfile.club, author_id: user.id, report, status: "Published",
