@@ -105,7 +105,7 @@ export default function CreateAssignmentPage() {
     setGameDate("");
     setError("");
   };
-  const save = (e) => {
+  const save = async (e) => {
     e.preventDefault();
     const player = selected || details.name;
     const fixtures = games.length
@@ -129,7 +129,8 @@ export default function CreateAssignmentPage() {
         .map((x) => (typeof x === "string" ? x : x.name))
         .join(" • "),
       fixtureDates: fixtures.map((x) => (typeof x === "string" ? "" : x.date)),
-      scout,
+      scout: scouts.find((member) => member.id === scout)?.full_name || scout,
+      scoutId: scout,
       date,
       viewing,
       status: "Not Started",
@@ -142,6 +143,7 @@ export default function CreateAssignmentPage() {
       ? old.map((x) => x.id === editing.id ? { ...assignment, id: editing.id } : x)
       : [...old, assignment];
     updateAppState({ assignments: nextAssignments, shortlists: appState?.shortlists || [], tags: appState?.tags || [] });
+    if (profile?.club && scout) await supabase.from("club_assignments").upsert({ id: Number(assignment.id), club: profile.club, assigned_to: scout, created_by: (await supabase.auth.getUser()).data.user.id, assignment: { ...assignment, id: Number(assignment.id) }, status: assignment.status }, { onConflict: "id" });
     localStorage.removeItem("editingAssignment");
     window.history.back();
   };
@@ -298,7 +300,7 @@ export default function CreateAssignmentPage() {
               <span>Assign scout</span>
               <select value={scout} onChange={(e) => setScout(e.target.value)}>
                 <option value="">Select scout</option>
-                {scouts.map((member) => <option key={member.id} value={member.full_name || member.id}>{member.full_name || member.id}</option>)}
+                {scouts.map((member) => <option key={member.id} value={member.id}>{member.full_name || member.id}</option>)}
               </select>
             </label>
             <label className="sr-field">
