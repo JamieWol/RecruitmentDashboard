@@ -157,8 +157,25 @@ export default function ShortlistsPage() {
   const [lists, setLists] = useState(() =>
     JSON.parse(localStorage.getItem("scoutingShortlists") || "[]"),
   );
-  const [current, setCurrent] = useState(null),
-    [show, setShow] = useState(false),
+  const [current, setCurrent] = useState(null);
+  useEffect(() => {
+    if (!user) return;
+    const loadOwnedSharedLists = async () => {
+      const { data, error } = await supabase.from("shared_shortlists").select("*").eq("owner_id", user.id);
+      if (error || !data?.length) return;
+      setLists((previous) => previous.map((list) => {
+        const snapshot = data.find((item) => String(item.shortlist_id) === String(list.id));
+        if (!snapshot) return list;
+        const next = { ...snapshot.shortlist, owner_id: user.id, shared: true, sharedPermission: list.sharedPermission || "edit" };
+        if (current?.id === list.id) setCurrent(next);
+        return next;
+      }));
+    };
+    loadOwnedSharedLists();
+    window.addEventListener("focus", loadOwnedSharedLists);
+    return () => window.removeEventListener("focus", loadOwnedSharedLists);
+  }, [user, current?.id]);
+  const [show, setShow] = useState(false),
     [name, setName] = useState(""),
     [type, setType] = useState("Formation"),
     [formation, setFormation] = useState("4-3-3"),
@@ -228,7 +245,7 @@ export default function ShortlistsPage() {
   const persist = (n, sharedUpdate = null) => {
     setLists(n);
     updateAppState({ assignments: appState?.assignments || [], shortlists: n, tags });
-    if (current?.shared && current.sharedPermission === "edit" && user) {
+    if (current?.shared && user && (current.owner_id === user.id || current.sharedPermission === "edit")) {
       const changed = sharedUpdate || n.find((list) => list.id === current.id) || current;
       supabase.from("shared_shortlists").update({ shortlist: { ...changed, shared: undefined, sharedPermission: undefined }, updated_at: new Date().toISOString() }).eq("shortlist_id", String(current.id)).eq("owner_id", current.owner_id).then(({ error }) => { if (error) console.error("Could not save shared shortlist", error); });
     }
