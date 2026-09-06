@@ -783,11 +783,22 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
       const playerName = player["Player Name"] || player["Full Player Name"] || "";
       const reports = publishedReports.filter((item) => String(item.player || "").trim().toLowerCase() === String(playerName).trim().toLowerCase());
       const reportValues = reports.flatMap((item) => [item.report]).filter(Boolean);
-      const reportStrengths = [...new Set(reportValues.flatMap((report) => Array.isArray(report.strengths) ? report.strengths : []))];
-      const reportWeaknesses = [...new Set(reportValues.flatMap((report) => Array.isArray(report.weaknesses) ? report.weaknesses : []))];
+      const reportBullets = (value) => Array.isArray(value)
+        ? value
+        : String(value || "").split(/\n|•|\r/).map((item) => item.replace(/^\s*[-*+]\s*/, "").trim()).filter(Boolean);
+      const reportStrengths = [...new Set(reportValues.flatMap((report) => reportBullets(report.strengths)))];
+      const reportWeaknesses = [...new Set(reportValues.flatMap((report) => reportBullets(report.weaknesses)))];
       const clipsLink = player.ClipsLink || "#";
 
       return { strengths: reportStrengths.length ? reportStrengths : strengths, weaknesses: reportWeaknesses.length ? reportWeaknesses : weaknesses, clipsLink, reportCount: reports.length };
+    };
+
+    const getPlayerSummary = (player) => {
+      const name = player?.["Player Name"] || player?.["Full Player Name"] || "This player";
+      const reports = publishedReports.filter((item) => String(item.player || "").trim().toLowerCase() === String(name).trim().toLowerCase());
+      const conclusions = reports.map((item) => String(item.report?.conclusion || "").trim()).filter(Boolean);
+      if (conclusions.length) return conclusions.join(" ");
+      return getPlayerBackground(player);
     };
 
   return (
@@ -1474,10 +1485,10 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                                   }}
                                 >
                                   <h4 style={{ color: "#1f77b4", marginTop: 0, marginBottom: 10 }}>
-                                    Player Background
+                                    Player Summary
                                   </h4>
                                   <p style={{ color: "#000", lineHeight: 1.7, margin: 0 }}>
-                                    {getPlayerBackground(selectedPlayer)}
+                                    {getPlayerSummary(selectedPlayer)}
                                   </p>
                                 </div>
 
@@ -1527,8 +1538,6 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 }
 
 export default ScoutReportPage;
-
-
 
 
 
