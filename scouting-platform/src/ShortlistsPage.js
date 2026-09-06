@@ -133,9 +133,11 @@ const defaultTags = [
   { id: "deprioritise", name: "Deprioritise", color: "#f2b807" },
 ];
 export default function ShortlistsPage() {
-  const { appState, updateAppState } = useAuth();
+  const { appState, updateAppState, profile: accountProfile } = useAuth();
   const [databasePlayers, setDatabasePlayers] = useState([]);
-  useEffect(() => { if (appState) { setLists(appState.shortlists || []); setTags(appState.tags || defaultTags); } }, [appState]);
+  const [sharedReports, setSharedReports] = useState([]);
+  useEffect(() => { if (appState) { setLists(appState.shortlists || []); setTags(appState.tags?.length ? appState.tags : defaultTags); } }, [appState]);
+  useEffect(() => { if (accountProfile?.club) supabase.from("club_reports").select("player").eq("status", "Published").then(({ data }) => setSharedReports(data || [])); }, [accountProfile?.club]);
   const [lists, setLists] = useState(() =>
     JSON.parse(localStorage.getItem("scoutingShortlists") || "[]"),
   );
@@ -209,7 +211,7 @@ export default function ShortlistsPage() {
   }, [databasePlayers, published]);
   const persist = (n) => {
     setLists(n);
-    updateAppState({ assignments: appState?.assignments || [], shortlists: n, tags: appState?.tags || tags });
+    updateAppState({ assignments: appState?.assignments || [], shortlists: n, tags });
   };
   const create = (e) => {
     e.preventDefault();
@@ -266,7 +268,7 @@ export default function ShortlistsPage() {
     };
     const next = [...tags, n];
     setTags(next);
-    localStorage.setItem("scoutingTags", JSON.stringify(next));
+    updateAppState({ assignments: appState?.assignments || [], shortlists: appState?.shortlists || [], tags: next });
     setNewTagName("");
   };
   const changeFormation = (value) => {
@@ -467,12 +469,11 @@ export default function ShortlistsPage() {
                   <em className="sr-report-count">
                     ▤{" "}
                     {
-                      JSON.parse(
-                        localStorage.getItem("scoutingAssignments") || "[]",
-                      ).filter(
+                      (appState?.assignments || []).filter(
                         (x) =>
-                          x.player === p.player && x.status === "Published",
+                        x.player === p.player && x.status === "Published",
                       ).length
+                      + sharedReports.filter((x) => x.player === p.player).length
                     }
                   </em>
                 </span>
