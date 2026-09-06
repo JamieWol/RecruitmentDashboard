@@ -501,12 +501,10 @@ export default function ScoutingReportsPageFinal() {
             <h2>{profile.player}</h2>
             <p>{profile.club || "Club not added"}</p>
             <span>
-              {
-                items.filter(
-                  (x) =>
-                    x.player === profile.player && x.status === "Published",
-                ).length
-              }{" "}
+              {[...new Map([
+                ...items.filter((x) => x.player === profile.player && x.status === "Published"),
+                ...sharedReports.filter((x) => x.player === profile.player).map((x) => ({ ...x, id: x.assignment_id || x.id, report: x.report, status: "Published" })),
+              ].map((x) => [x.id, x])).values()].length} {" "}
               published reports
             </span>
           </div>
@@ -573,8 +571,10 @@ export default function ScoutingReportsPageFinal() {
                 <span>Performance</span>
                 <span>Status</span>
               </div>
-              {items
-                .filter((x) => x.player === profile.player)
+              {[...new Map([
+                ...items.filter((x) => x.player === profile.player),
+                ...sharedReports.filter((x) => x.player === profile.player).map((x) => ({ ...x, id: x.assignment_id || x.id, report: x.report, status: "Published" })),
+              ].map((x) => [x.id, x])).values()]
                 .map((x) => (
                   <button
                     className="sr-table-row"
