@@ -169,9 +169,10 @@ export default function ScoutingReportsPageFinal() {
   };
   const shown = useMemo(
     () => {
-      const shared = sharedReports.map((x) => ({ ...x, id: x.assignment_id || x.id, report: x.report, status: "Published", club: x.club }));
+      const shared = sharedReports.map((x) => ({ ...x, id: x.assignment_id || x.id, report: x.report, status: "Published", club: x.club, date: x.completed_at, game: x.fixture_summary, scout: x.scout }));
       const source = tab === "Published" ? [...items.filter((x) => x.status === "Published"), ...shared] : items;
-      return source
+      const uniqueSource = [...new Map(source.map((x) => [String(x.id), x])).values()];
+      return uniqueSource
         .filter((x) =>
           `${x.player} ${x.club} ${x.scout}`
             .toLowerCase()
@@ -218,7 +219,7 @@ export default function ScoutingReportsPageFinal() {
     );
     saveItems(n);
     if (user && accountProfile?.club) {
-      supabase.from("club_assignments").update({ status: "Published", assignment: { ...active, report, status: "Published", completedAt: completionDate, date: completionDate, game: fixtureSummary } }).eq("id", Number(active.id)).eq("assigned_to", user.id)
+      supabase.from("club_assignments").update({ status: "Published", assignment: { ...active, report, status: "Published", completedAt: completionDate, date: completionDate, game: fixtureSummary } }).eq("id", Number(active.id))
         .then(({ error }) => { if (error) console.error("Could not mark assignment as published", error); });
       supabase.from("club_reports").upsert({
         id: Number(active.id), assignment_id: Number(active.id), player_id: active.playerId || null,
