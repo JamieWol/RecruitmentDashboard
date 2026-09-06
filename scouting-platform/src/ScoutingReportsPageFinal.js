@@ -42,7 +42,7 @@ const retryPhoto = (e, name) => {
 };
 export default function ScoutingReportsPageFinal() {
   const nav = useNavigate();
-  const { appState, updateAppState } = useAuth();
+  const { appState, updateAppState, user, profile: accountProfile } = useAuth();
   const [items, setItems] = useState(() =>
     JSON.parse(localStorage.getItem("scoutingAssignments") || "[]"),
   );
@@ -56,6 +56,7 @@ export default function ScoutingReportsPageFinal() {
     return name ? n.find((x) => x.player === name) || { player: name } : null;
   });
   const [active, setActive] = useState(null);
+  const [sharedReports, setSharedReports] = useState([]);
   const [playerData, setPlayerData] = useState(null);
   useEffect(() => {
     const selectedPlayer = profile || active;
@@ -81,6 +82,13 @@ export default function ScoutingReportsPageFinal() {
   const [report, setReport] = useState(empty);
   const [editing, setEditing] = useState(false);
   useEffect(() => { if (appState) setItems(appState.assignments || []); }, [appState]);
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("club_reports").select("*").eq("status", "Published").then(({ data, error }) => {
+      if (error) console.error("Could not load club reports", error);
+      setSharedReports(data || []);
+    });
+  }, [user]);
   const [shortlistPicker, setShortlistPicker] = useState(false);
   const [selectedShortlist, setSelectedShortlist] = useState("");
   const [selectedPosition, setSelectedPosition] = useState("CF-0");
@@ -92,7 +100,7 @@ export default function ScoutingReportsPageFinal() {
     supabase
       .from("players")
       .select("*")
-      .ilike("Name", playerSearch.trim())
+      .ilike("Name", `%${playerSearch.trim()}%`)
       .limit(8)
       .then(({ data }) => setPlayerMatches([...new Map((data || []).map((p) => [String(p.Name || p.name || "").trim().toLowerCase(), p])).values()]))
       .catch(() => setPlayerMatches([]));
@@ -152,8 +160,10 @@ export default function ScoutingReportsPageFinal() {
     setShortlistPicker(false);
   };
   const shown = useMemo(
-    () =>
-      items
+    () => {
+      const shared = sharedReports.map((x) => ({ ...x, id: x.assignment_id || x.id, report: x.report, status: "Published", club: x.club }));
+      const source = tab === "Published" ? [...items.filter((x) => x.status === "Published"), ...shared] : items;
+      return source
         .filter((x) =>
           `${x.player} ${x.club} ${x.scout}`
             .toLowerCase()
@@ -163,8 +173,9 @@ export default function ScoutingReportsPageFinal() {
           tab === "Published"
             ? x.status === "Published"
             : x.status !== "Published",
-        ),
-    [items, query, tab],
+        );
+    },
+    [items, query, tab, sharedReports],
   );
   const openReport = (x) => {
     setActive(x);
@@ -191,6 +202,13 @@ export default function ScoutingReportsPageFinal() {
       x.id === active.id ? { ...x, report, status: "Published" } : x,
     );
     saveItems(n);
+    if (user && accountProfile?.club) {
+      supabase.from("club_reports").upsert({
+        id: Number(active.id), assignment_id: Number(active.id), player_id: active.playerId || null,
+        player: active.player, club: accountProfile.club, author_id: user.id, report, status: "Published",
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "id" }).then(({ error }) => { if (error) console.error("Could not publish shared report", error); });
+    }
     setActive(null);
     setProfile(n.find((x) => x.id === active.id) || profile);
   };
@@ -420,7 +438,7 @@ export default function ScoutingReportsPageFinal() {
         {report.type === "Short Report" && field("Conclusion", "conclusion", 4)}
         {grades}
         {field("Reasons Why", "reasons", 6)}
-        {active?.status === "Published" && !editing && (
+          {active?.status === "Published" && !editing && (!active.author_id || active.author_id === user?.id) && (
           <div className="sr-report-bottom-actions">
             <button className="sr-outline" onClick={() => setEditing(true)}>
               Edit Report

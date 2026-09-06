@@ -22,7 +22,7 @@ export default function CreateAssignmentPage() {
     supabase
       .from("players")
       .select("*")
-      .ilike("Name", query.trim())
+      .ilike("Name", `%${query.trim()}%`)
       .limit(50)
       .then(({ data, error }) => {
         if (error) console.error("Player database error", error);

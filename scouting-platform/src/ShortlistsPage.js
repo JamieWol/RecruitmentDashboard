@@ -167,7 +167,7 @@ export default function ShortlistsPage() {
     supabase
       .from("players")
       .select("*")
-      .ilike("Name", search.trim())
+      .ilike("Name", `%${search.trim()}%`)
       .limit(50)
       .then(({ data, error }) => {
         if (error) console.error("Player database error", error);
