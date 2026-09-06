@@ -143,12 +143,16 @@ export default function ShortlistsPage() {
   useEffect(() => { if (accountProfile?.club) supabase.from("profiles").select("id,full_name").eq("club", accountProfile.club).eq("approved", true).then(({ data }) => setScouts((data || []).filter((x) => x.id !== user?.id))); }, [accountProfile?.club, user?.id]);
   useEffect(() => {
     if (!user) return;
-    supabase.from("shortlist_shares").select("shortlist_id,permission").eq("member_id", user.id).then(async ({ data }) => {
+    const loadSharedLists = async () => {
+      const { data } = await supabase.from("shortlist_shares").select("shortlist_id,permission").eq("member_id", user.id);
       const ids = (data || []).map((x) => String(x.shortlist_id));
       if (!ids.length) return setSharedLists([]);
       const result = await supabase.from("shared_shortlists").select("*").in("shortlist_id", ids);
       setSharedLists((result.data || []).map((x) => ({ ...x.shortlist, owner_id: x.owner_id, sharedPermission: data.find((s) => String(s.shortlist_id) === String(x.shortlist_id))?.permission || "view", shared: true })));
-    });
+    };
+    loadSharedLists();
+    window.addEventListener("focus", loadSharedLists);
+    return () => window.removeEventListener("focus", loadSharedLists);
   }, [user]);
   const [lists, setLists] = useState(() =>
     JSON.parse(localStorage.getItem("scoutingShortlists") || "[]"),
