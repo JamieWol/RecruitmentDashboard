@@ -81,7 +81,9 @@ export default function ScoutingReportsPageFinal() {
   }, [profile, active]);
   const [report, setReport] = useState(empty);
   const [editing, setEditing] = useState(false);
-  useEffect(() => { if (appState) setItems(appState.assignments || []); }, [appState]);
+  useEffect(() => {
+    if (appState) setItems((appState.assignments || []).filter((assignment) => !assignment.scoutId || assignment.scoutId === user?.id));
+  }, [appState, user?.id]);
   useEffect(() => {
     if (!user) return;
     supabase.from("club_reports").select("*").eq("status", "Published").then(({ data, error }) => {
