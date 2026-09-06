@@ -136,10 +136,20 @@ export default function ShortlistsPage() {
   const { appState, updateAppState, profile: accountProfile, user } = useAuth();
   const [databasePlayers, setDatabasePlayers] = useState([]);
   const [sharedReports, setSharedReports] = useState([]);
+  const [sharedLists, setSharedLists] = useState([]), [showShared, setShowShared] = useState(false);
   const [scouts, setScouts] = useState([]), [shareEnabled, setShareEnabled] = useState(false), [shareScout, setShareScout] = useState(""), [sharePermission, setSharePermission] = useState("view");
   useEffect(() => { if (appState) { setLists(appState.shortlists || []); setTags(appState.tags?.length ? appState.tags : defaultTags); } }, [appState]);
   useEffect(() => { if (accountProfile?.club) supabase.from("club_reports").select("player").eq("status", "Published").then(({ data }) => setSharedReports(data || [])); }, [accountProfile?.club]);
   useEffect(() => { if (accountProfile?.club) supabase.from("profiles").select("id,full_name").eq("club", accountProfile.club).eq("approved", true).then(({ data }) => setScouts((data || []).filter((x) => x.id !== user?.id))); }, [accountProfile?.club, user?.id]);
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("shortlist_shares").select("shortlist_id,permission").eq("member_id", user.id).then(async ({ data }) => {
+      const ids = (data || []).map((x) => String(x.shortlist_id));
+      if (!ids.length) return setSharedLists([]);
+      const result = await supabase.from("shared_shortlists").select("*").in("shortlist_id", ids);
+      setSharedLists((result.data || []).map((x) => ({ ...x.shortlist, sharedPermission: data.find((s) => String(s.shortlist_id) === String(x.shortlist_id))?.permission || "view", shared: true })));
+    });
+  }, [user]);
   const [lists, setLists] = useState(() =>
     JSON.parse(localStorage.getItem("scoutingShortlists") || "[]"),
   );
@@ -220,7 +230,10 @@ export default function ShortlistsPage() {
     if (!name.trim()) return;
     const l = { id: Date.now(), name, type, formation, players: [] };
     persist([...lists, l]);
-    if (shareEnabled && shareScout && user && accountProfile?.club) await supabase.from("shortlist_shares").insert({ shortlist_id: String(l.id), owner_id: user.id, member_id: shareScout, club: accountProfile.club, permission: sharePermission });
+    if (shareEnabled && shareScout && user && accountProfile?.club) {
+      await supabase.from("shortlist_shares").insert({ shortlist_id: String(l.id), owner_id: user.id, member_id: shareScout, club: accountProfile.club, permission: sharePermission });
+      await supabase.from("shared_shortlists").upsert({ shortlist_id: String(l.id), owner_id: user.id, club: accountProfile.club, shortlist: l }, { onConflict: "shortlist_id" });
+    }
     setName("");
     setShow(false);
     setShareEnabled(false); setShareScout(""); setSharePermission("view");
@@ -723,12 +736,10 @@ export default function ShortlistsPage() {
           <h1>Your Shortlists</h1>
           <p>Open a shortlist to view its formation pitch.</p>
         </div>
-        <button className="sr-cyan" onClick={() => setShow(true)}>
-          Create New Shortlist
-        </button>
+        <div className="sr-head-actions"><button className="sr-outline" onClick={() => setShowShared(!showShared)}>Shared Shortlists</button><button className="sr-cyan" onClick={() => setShow(true)}>Create New Shortlist</button></div>
       </section>
       <section className="sr-list-grid">
-        {lists.map((l) => (
+        {(showShared ? sharedLists : lists).map((l) => (
           <button
             className="sr-list-card sr-list-card-button"
             key={l.id}
