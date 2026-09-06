@@ -233,7 +233,8 @@ export default function ShortlistsPage() {
     e.preventDefault();
     if (!name.trim()) return;
     const l = { id: Date.now(), name, type, formation, players: [] };
-    persist([...lists, l]);
+    const sharedL = shareEnabled && shareScout && user ? { ...l, shared: true, sharedPermission: sharePermission, owner_id: user.id } : l;
+    persist([...lists, sharedL]);
     if (shareEnabled && shareScout && user && accountProfile?.club) {
       await supabase.from("shortlist_shares").insert({ shortlist_id: String(l.id), owner_id: user.id, member_id: shareScout, club: accountProfile.club, permission: sharePermission });
       await supabase.from("shared_shortlists").upsert({ shortlist_id: String(l.id), owner_id: user.id, club: accountProfile.club, shortlist: l }, { onConflict: "shortlist_id" });
@@ -241,7 +242,7 @@ export default function ShortlistsPage() {
     setName("");
     setShow(false);
     setShareEnabled(false); setShareScout(""); setSharePermission("view");
-    setCurrent(l);
+    setCurrent(sharedL);
   };
   const add = (p, pos) => {
     if (current.players.some((x) => x.id === p.id && x.slot === pos)) return;
@@ -556,6 +557,7 @@ export default function ShortlistsPage() {
   const del = (id) => {
     if (window.confirm("Delete this shortlist?")) {
       persist(lists.filter((x) => x.id !== id));
+      if (user) { supabase.from("shortlist_shares").delete().eq("shortlist_id", String(id)).eq("owner_id", user.id); supabase.from("shared_shortlists").delete().eq("shortlist_id", String(id)).eq("owner_id", user.id); }
       setCurrent(null);
     }
   };
