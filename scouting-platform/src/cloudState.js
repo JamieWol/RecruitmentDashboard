@@ -33,7 +33,7 @@ export async function syncPublishedReports(user, state, club) {
   if (!user || !club) return;
   const reports = (state?.assignments || []).filter((x) => ["Published", "Complete"].includes(x.status) && x.report).map((x) => ({
     id: Number(x.id), assignment_id: Number(x.id), player_id: x.playerId || null,
-    player: x.player, club, author_id: user.id, report: x.report, status: "Published",
+    player: x.player, club, author_id: user.id, report: x.report, status: "Published", completed_at: x.date || new Date().toISOString().slice(0, 10), scout: x.scout || "", fixture_summary: (x.games || []).length > 1 ? "Multiple" : (x.games?.[0] ? `${x.games[0].name || x.games[0]} · ${x.games[0].date || ""}` : x.game || ""),
   }));
   if (reports.length) {
     const { error } = await supabase.from("club_reports").upsert(reports, { onConflict: "id" });

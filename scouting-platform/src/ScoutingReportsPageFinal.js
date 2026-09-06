@@ -199,14 +199,14 @@ export default function ScoutingReportsPageFinal() {
   };
   const saveReport = () => {
     const n = items.map((x) =>
-      x.id === active.id ? { ...x, report, status: "Published" } : x,
+      x.id === active.id ? { ...x, report, status: "Published", completedAt: new Date().toISOString().slice(0, 10) } : x,
     );
     saveItems(n);
     if (user && accountProfile?.club) {
       supabase.from("club_reports").upsert({
         id: Number(active.id), assignment_id: Number(active.id), player_id: active.playerId || null,
         player: active.player, club: accountProfile.club, author_id: user.id, report, status: "Published",
-        updated_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(), completed_at: active.date || new Date().toISOString().slice(0, 10), scout: active.scout || "", fixture_summary: (active.games || []).length > 1 ? "Multiple" : (active.games?.[0] ? `${active.games[0].name || active.games[0]} · ${active.games[0].date || ""}` : active.game || ""),
       }, { onConflict: "id" }).then(({ error }) => { if (error) console.error("Could not publish shared report", error); });
     }
     setActive(null);
@@ -329,16 +329,14 @@ export default function ScoutingReportsPageFinal() {
               : `${active.game || "Fixture not added"} · ${active.fixtureDates?.[0] || active.date || "Date not added"}`}
           </span>
           <small>{active.viewing || "Viewing not added"}</small>
-          <button
+          {(!active.author_id || active.author_id === user?.id) && <button
             className="sr-edit-games"
             onClick={() => {
               localStorage.setItem("editingAssignment", JSON.stringify(active));
               setActive(null);
               nav("/create-assignment");
             }}
-          >
-            Edit Games
-          </button>
+          >Edit Games</button>}
         </div>
         <div className="sr-form-grid">
           <label className="sr-field">
@@ -503,7 +501,7 @@ export default function ScoutingReportsPageFinal() {
             <span>
               {[...new Map([
                 ...items.filter((x) => x.player === profile.player && x.status === "Published"),
-                ...sharedReports.filter((x) => x.player === profile.player).map((x) => ({ ...x, id: x.assignment_id || x.id, report: x.report, status: "Published" })),
+                ...sharedReports.filter((x) => x.player === profile.player).map((x) => ({ ...x, id: x.assignment_id || x.id, report: x.report, status: "Published", date: x.completed_at, game: x.fixture_summary, scout: x.scout })),
               ].map((x) => [x.id, x])).values()].length} {" "}
               published reports
             </span>
@@ -573,7 +571,7 @@ export default function ScoutingReportsPageFinal() {
               </div>
               {[...new Map([
                 ...items.filter((x) => x.player === profile.player),
-                ...sharedReports.filter((x) => x.player === profile.player).map((x) => ({ ...x, id: x.assignment_id || x.id, report: x.report, status: "Published" })),
+                ...sharedReports.filter((x) => x.player === profile.player).map((x) => ({ ...x, id: x.assignment_id || x.id, report: x.report, status: "Published", date: x.completed_at, game: x.fixture_summary, scout: x.scout })),
               ].map((x) => [x.id, x])).values()]
                 .map((x) => (
                   <button
@@ -581,7 +579,7 @@ export default function ScoutingReportsPageFinal() {
                     key={x.id}
                     onClick={() => openReport(x)}
                   >
-                    <span>{x.date || "—"}</span>
+                    <span>{x.completed_at || x.completedAt || x.date || "—"}</span>
                     <span>{x.game || "—"}</span>
                     <span>{x.scout || "—"}</span>
                     <span>{x.report?.potential || "—"}</span>
