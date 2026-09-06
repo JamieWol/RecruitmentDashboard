@@ -133,11 +133,13 @@ const defaultTags = [
   { id: "deprioritise", name: "Deprioritise", color: "#f2b807" },
 ];
 export default function ShortlistsPage() {
-  const { appState, updateAppState, profile: accountProfile } = useAuth();
+  const { appState, updateAppState, profile: accountProfile, user } = useAuth();
   const [databasePlayers, setDatabasePlayers] = useState([]);
   const [sharedReports, setSharedReports] = useState([]);
+  const [scouts, setScouts] = useState([]), [shareEnabled, setShareEnabled] = useState(false), [shareScout, setShareScout] = useState(""), [sharePermission, setSharePermission] = useState("view");
   useEffect(() => { if (appState) { setLists(appState.shortlists || []); setTags(appState.tags?.length ? appState.tags : defaultTags); } }, [appState]);
   useEffect(() => { if (accountProfile?.club) supabase.from("club_reports").select("player").eq("status", "Published").then(({ data }) => setSharedReports(data || [])); }, [accountProfile?.club]);
+  useEffect(() => { if (accountProfile?.club) supabase.from("profiles").select("id,full_name").eq("club", accountProfile.club).eq("approved", true).then(({ data }) => setScouts((data || []).filter((x) => x.id !== user?.id))); }, [accountProfile?.club, user?.id]);
   const [lists, setLists] = useState(() =>
     JSON.parse(localStorage.getItem("scoutingShortlists") || "[]"),
   );
@@ -213,13 +215,15 @@ export default function ShortlistsPage() {
     setLists(n);
     updateAppState({ assignments: appState?.assignments || [], shortlists: n, tags });
   };
-  const create = (e) => {
+  const create = async (e) => {
     e.preventDefault();
     if (!name.trim()) return;
     const l = { id: Date.now(), name, type, formation, players: [] };
     persist([...lists, l]);
+    if (shareEnabled && shareScout && user && accountProfile?.club) await supabase.from("shortlist_shares").insert({ shortlist_id: String(l.id), owner_id: user.id, member_id: shareScout, club: accountProfile.club, permission: sharePermission });
     setName("");
     setShow(false);
+    setShareEnabled(false); setShareScout(""); setSharePermission("view");
     setCurrent(l);
   };
   const add = (p, pos) => {
@@ -791,6 +795,8 @@ export default function ShortlistsPage() {
                 placeholder="Shortlist name"
               />
             </label>
+            <label className="sr-share-check"><input type="checkbox" checked={shareEnabled} onChange={(e) => setShareEnabled(e.target.checked)} /> Share shortlist with another scout</label>
+            {shareEnabled && <div className="sr-form-grid"><label className="sr-field"><span>Scout</span><select value={shareScout} onChange={(e) => setShareScout(e.target.value)}><option value="">Select scout</option>{scouts.map((s) => <option key={s.id} value={s.id}>{s.full_name || s.id}</option>)}</select></label><label className="sr-field"><span>Permission</span><select value={sharePermission} onChange={(e) => setSharePermission(e.target.value)}><option value="view">View only</option><option value="edit">View and edit</option></select></label></div>}
             <div className="sr-actions">
               <button
                 type="button"
