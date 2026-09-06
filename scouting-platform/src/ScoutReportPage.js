@@ -4,6 +4,8 @@ import * as XLSX from "xlsx";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { POSITION_MAP } from "./POSITION_MAP";
+import { supabase } from "./supabaseClient";
+import { useAuth } from "./AuthContext";
 import {
   RadarChart,
   Radar,
@@ -23,7 +25,9 @@ import {
 } from "recharts";
 
 function ScoutReportPage({ shadowSquad, setShadowSquad }) {
+  const { profile } = useAuth();
   const [players, setPlayers] = useState([]);
+  const [publishedReports, setPublishedReports] = useState([]);
   const exportRef = useRef(null);
   const [clipsLink, setClipsLink] = useState("");
   const [filteredPlayers, setFilteredPlayers] = useState([]);
@@ -32,6 +36,19 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
   const [photoFile, setPhotoFile] = useState(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoStatus, setPhotoStatus] = useState("");
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("scoutingReportPlayers") || "[]");
+      if (saved.length) processRows(saved);
+    } catch (error) { console.warn("Could not restore scouting data", error); }
+  // processRows is intentionally stable for restoring the locally saved player dataset.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (!profile?.club) return;
+    supabase.from("club_reports").select("player,report,status,scout,completed_at").eq("club", profile.club).eq("status", "Published")
+      .then(({ data }) => setPublishedReports(data || []));
+  }, [profile?.club]);
   const [metrics, setMetrics] = useState([]);
   const [scatterMetrics, setScatterMetrics] = useState({ x: "", y: "" });
   const [competitions, setCompetitions] = useState([]);
@@ -340,10 +357,14 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 
       const publicUrl = `${supabaseUrl}/storage/v1/object/public/player-photos/${path}`;
 
-      setPlayers((prev) => prev.map((p) => (
-        (p["Player Label"] === selectedPlayer["Player Label"] ||
-         p["Full Player Name"] === selectedPlayer["Full Player Name"]) ? { ...p, _photoUrl: publicUrl, Photo: publicUrl } : p
-      )));
+      setPlayers((prev) => {
+        const next = prev.map((p) => (
+          (p["Player Label"] === selectedPlayer["Player Label"] ||
+           p["Full Player Name"] === selectedPlayer["Full Player Name"]) ? { ...p, _photoUrl: publicUrl, Photo: publicUrl } : p
+        ));
+        localStorage.setItem("scoutingReportPlayers", JSON.stringify(next));
+        return next;
+      });
       setFilteredPlayers((prev) => prev.map((p) => (
         (p["Player Label"] === selectedPlayer["Player Label"] ||
          p["Full Player Name"] === selectedPlayer["Full Player Name"]) ? { ...p, _photoUrl: publicUrl, Photo: publicUrl } : p
@@ -561,6 +582,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     const ranked = sortRowsByScore(normalized, detected);
 
     setPlayers(normalized);
+    localStorage.setItem("scoutingReportPlayers", JSON.stringify(normalized));
     setFilteredPlayers(ranked);
     setMetrics(detected);
     setScatterMetrics({ x: detected[0] || "", y: detected[1] || "" });
@@ -758,9 +780,14 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
       const strengths = pcts.filter(p => p.value >= 75).map(p => p.metric);
       const weaknesses = pcts.filter(p => p.value <= 35).map(p => p.metric);
 
-      const clipsLink = player.ClipsLink || "#"; // default link or from CSV
+      const playerName = player["Player Name"] || player["Full Player Name"] || "";
+      const reports = publishedReports.filter((item) => String(item.player || "").trim().toLowerCase() === String(playerName).trim().toLowerCase());
+      const reportValues = reports.flatMap((item) => [item.report]).filter(Boolean);
+      const reportStrengths = [...new Set(reportValues.flatMap((report) => Array.isArray(report.strengths) ? report.strengths : []))];
+      const reportWeaknesses = [...new Set(reportValues.flatMap((report) => Array.isArray(report.weaknesses) ? report.weaknesses : []))];
+      const clipsLink = player.ClipsLink || "#";
 
-      return { strengths, weaknesses, clipsLink };
+      return { strengths: reportStrengths.length ? reportStrengths : strengths, weaknesses: reportWeaknesses.length ? reportWeaknesses : weaknesses, clipsLink, reportCount: reports.length };
     };
 
   return (
@@ -1338,6 +1365,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 
                             return (
                               <div>
+                                {summary.reportCount > 0 && <div style={{ color: "#555", marginBottom: 12 }}>{summary.reportCount} published scout report{summary.reportCount === 1 ? "" : "s"} combined</div>}
                                     {/* Strengths */}
                                     {summary.strengths.length > 0 && (
                                       <div
@@ -1392,7 +1420,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                                       </div>
                                     )}
 
-                                <div
+                                <div data-html2canvas-ignore="true"
                                   style={{
                                     marginTop: 18,
                                     background: "rgba(255,255,255,0.95)",
@@ -1499,9 +1527,6 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 }
 
 export default ScoutReportPage;
-
-
-
 
 
 
