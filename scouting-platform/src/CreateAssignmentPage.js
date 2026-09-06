@@ -3,12 +3,17 @@ import { useEffect } from "react";
 import { supabase } from "./supabaseClient";
 import { useAuth } from "./AuthContext";
 export default function CreateAssignmentPage() {
-  const { appState, updateAppState } = useAuth();
+  const { appState, updateAppState, profile } = useAuth();
   const [databasePlayers, setDatabasePlayers] = useState([]);
+  const [scouts, setScouts] = useState([]);
   const [mode, setMode] = useState(() => localStorage.getItem("editingAssignment") ? "player" : ""),
     [query, setQuery] = useState(""),
     [selected, setSelected] = useState(""),
     [newPlayer, setNewPlayer] = useState(false);
+  useEffect(() => {
+    if (!profile?.club) return;
+    supabase.from("profiles").select("id,full_name,club").eq("club", profile.club).eq("approved", true).then(({ data }) => setScouts(data || []));
+  }, [profile?.club]);
   useEffect(() => {
     if (!query.trim()) {
       setDatabasePlayers([]);
@@ -291,7 +296,10 @@ export default function CreateAssignmentPage() {
           <div className="sr-form-grid">
             <label className="sr-field">
               <span>Assign scout</span>
-              <input value={scout} onChange={(e) => setScout(e.target.value)} />
+              <select value={scout} onChange={(e) => setScout(e.target.value)}>
+                <option value="">Select scout</option>
+                {scouts.map((member) => <option key={member.id} value={member.full_name || member.id}>{member.full_name || member.id}</option>)}
+              </select>
             </label>
             <label className="sr-field">
               <span>Due date</span>
