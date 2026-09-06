@@ -12,11 +12,11 @@ import CreateAssignmentPage from "./CreateAssignmentPage";
 import "./App.css";
 
 function LoginGate() {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, profileError, loading } = useAuth();
   const [signup, setSignup] = useState(false), [email, setEmail] = useState(""), [password, setPassword] = useState(""), [name, setName] = useState(""), [error, setError] = useState("");
   if (loading) return <div className="sr-auth-screen">Loading…</div>;
   if (user && profile?.approved) return <AppRoutes />;
-  if (user) return <div className="sr-auth-screen"><h1>Awaiting admin approval</h1><p>Your account has been created. An administrator must assign your club before you can access the platform.</p><button className="sr-cyan" onClick={() => supabase.auth.signOut()}>Sign out</button></div>;
+  if (user) return <div className="sr-auth-screen"><div className="sr-pending-card"><h1>Awaiting admin approval</h1><p>{profileError || "Your account has been created. An administrator must assign your club before you can access the platform."}</p><small>Signed-in user ID: {user.id}</small><button className="sr-cyan" onClick={() => supabase.auth.signOut()}>Sign out</button></div></div>;
   const submit = async (e) => { e.preventDefault(); setError(""); const result = signup ? await supabase.auth.signUp({ email, password, options: { data: { full_name: name } } }) : await supabase.auth.signInWithPassword({ email, password }); if (result.error) setError(result.error.message); };
   return <main className="sr-auth-screen"><section className="sr-auth-landing"><div className="sr-auth-copy"><div className="sr-auth-brand">⚽ ScoutPro</div><h1>Football Recruitment<br />Organised Properly.</h1><p>Manage assignments, reports and shortlists securely with your scouting team.</p></div><form className="sr-form sr-auth-form" onSubmit={submit}><h2>{signup ? "Request access" : "Welcome back"}</h2>{signup && <input placeholder="Full name" value={name} onChange={e => setName(e.target.value)} required />}<input type="email" placeholder="Email address" value={email} onChange={e => setEmail(e.target.value)} required /><input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />{error && <p className="sr-auth-error">{error}</p>}<button className="sr-cyan">{signup ? "Request account" : "Sign in"}</button><button type="button" className="sr-outline" onClick={() => setSignup(!signup)}>{signup ? "Already have an account? Sign in" : "Create an account"}</button></form></section></main>;
 }

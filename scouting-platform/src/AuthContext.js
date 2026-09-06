@@ -9,10 +9,13 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [appState, setAppState] = useState(null);
+  const [profileError, setProfileError] = useState("");
   const loadProfile = async (user) => {
-    if (!user) { setProfile(null); setAppState(null); return; }
+    if (!user) { setProfile(null); setAppState(null); setProfileError(""); return; }
     const { data, error } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
-    if (error) { console.error("Could not load account profile", error); setProfile(null); return; }
+    if (error) { console.error("Could not load account profile", error); setProfile(null); setProfileError(error.message || String(error)); return; }
+    if (!data) { setProfile(null); setProfileError("No profile row was returned for this user."); return; }
+    setProfileError("");
     setProfile(data || null);
     if (data?.approved) {
       try { setAppState(await migrateAndLoadState(user)); } catch (error) { console.error("Could not load cloud data", error); }
@@ -29,6 +32,6 @@ export function AuthProvider({ children }) {
     loadProfile(session.user).finally(() => setLoading(false));
   }, [session]);
   const updateAppState = (next) => { setAppState(next); saveCloudState(session?.user, next).catch((error) => console.error("Could not save cloud data", error)); };
-  return <AuthContext.Provider value={{ session, user: session?.user || null, profile, appState, updateAppState, loading, refreshProfile: () => loadProfile(session?.user) }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ session, user: session?.user || null, profile, profileError, appState, updateAppState, loading, refreshProfile: () => loadProfile(session?.user) }}>{children}</AuthContext.Provider>;
 }
 export const useAuth = () => useContext(AuthContext);
