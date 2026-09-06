@@ -93,8 +93,9 @@ export default function ScoutingReportsPageFinal() {
   }, [user, accountProfile?.club]);
   useEffect(() => {
     if (!accountProfile?.club || !user) return;
-    supabase.from("club_assignments").select("*").eq("club", accountProfile.club).eq("assigned_to", user.id).then(({ data, error }) => {
-      if (!error && data?.length) setItems(data.map((row) => ({ ...row.assignment, id: row.id, status: row.status, club: row.club })));
+    supabase.from("club_assignments").select("*").eq("club", accountProfile.club).then(({ data, error }) => {
+      if (!error && data?.length) setItems(data.map((row) => ({ ...row.assignment, id: row.id, status: row.status, club: row.club, assigned_to: row.assigned_to, created_by: row.created_by })));
+      else if (!error) setItems([]);
     });
   }, [accountProfile?.club, user]);
   const [shortlistPicker, setShortlistPicker] = useState(false);
@@ -171,7 +172,8 @@ export default function ScoutingReportsPageFinal() {
     () => {
       const shared = sharedReports.map((x) => ({ ...x, id: x.assignment_id || x.id, report: x.report, status: "Published", club: x.club, date: x.completed_at, game: x.fixture_summary, scout: x.scout }));
       const clubItems = accountProfile?.club ? items.filter((x) => !x.club || x.club === accountProfile.club) : items;
-      const source = tab === "Published" ? [...clubItems.filter((x) => x.status === "Published"), ...shared] : clubItems;
+      const mine = clubItems.filter((x) => x.assigned_to === user?.id || x.scoutId === user?.id);
+      const source = tab === "Published" ? [...clubItems.filter((x) => x.status === "Published"), ...shared] : tab === "My Assignments" ? mine : clubItems;
       const uniqueSource = [...new Map(source.map((x) => [String(x.id), x])).values()];
       return uniqueSource
         .filter((x) =>
@@ -185,7 +187,7 @@ export default function ScoutingReportsPageFinal() {
             : x.status !== "Published",
         );
     },
-    [items, query, tab, sharedReports, accountProfile?.club],
+    [items, query, tab, sharedReports, accountProfile?.club, user?.id],
   );
   const openReport = (x) => {
     setActive(x);
@@ -771,7 +773,12 @@ export default function ScoutingReportsPageFinal() {
                 className="sr-trash"
                 onClick={(e) => {
                   e.stopPropagation();
-                  saveItems(items.filter((y) => y.id !== x.id));
+                  const removeAssignment = async () => {
+                    const { error } = await supabase.from("club_assignments").delete().eq("id", Number(x.id));
+                    if (error) { window.alert(`The assignment could not be deleted: ${error.message}`); return; }
+                    saveItems(items.filter((y) => y.id !== x.id));
+                  };
+                  removeAssignment();
                 }}
               >
                 Delete
