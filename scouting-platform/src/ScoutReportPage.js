@@ -76,9 +76,21 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 
       const pdf = new jsPDF("p", "mm", "a4");
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-      pdf.addImage(imgData, "PNG", 0, 10, pdfWidth, pdfHeight);
+      const pdfHeight = pdf.internal.pageSize.getHeight() - 20;
+      const sourcePageHeight = Math.floor((pdfHeight * canvas.width) / pdfWidth);
+      let sourceY = 0;
+      let page = 0;
+      while (sourceY < canvas.height) {
+        if (page > 0) pdf.addPage();
+        const slice = document.createElement("canvas");
+        slice.width = canvas.width;
+        slice.height = Math.min(sourcePageHeight, canvas.height - sourceY);
+        slice.getContext("2d").drawImage(canvas, 0, sourceY, canvas.width, slice.height, 0, 0, slice.width, slice.height);
+        const sliceHeight = (slice.height * pdfWidth) / slice.width;
+        pdf.addImage(slice.toDataURL("image/png"), "PNG", 0, 10, pdfWidth, sliceHeight);
+        sourceY += slice.height;
+        page += 1;
+      }
       pdf.save(`${selectedPlayer["Player Name"]}_Report.pdf`);
     };
 
@@ -1018,7 +1030,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 
           {/* Info Panel + Pie Charts */}
           <div style={{ marginTop:20, display:"grid", gridTemplateColumns:"300px 1fr", gap:40 }}>
-            <div style={{ background:"rgba(255,255,255,0.9)", padding:20, borderRadius:12, lineHeight:2.8 }}>
+            <div style={{ background:"rgba(255,255,255,0.9)", padding:20, borderRadius:12, lineHeight:2.8, borderRight:"2px solid #1f77b4" }}>
           
               <div>Team: <strong>{selectedPlayer.Team}</strong></div>
               <div>Position: <strong>{selectedPlayer["Primary Position"]}</strong></div>
@@ -1528,7 +1540,6 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 }
 
 export default ScoutReportPage;
-
 
 
 
