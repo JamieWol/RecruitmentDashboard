@@ -76,11 +76,19 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
       const margin = 8;
       const pageWidth = pdf.internal.pageSize.getWidth() - margin * 2;
       const pageHeight = pdf.internal.pageSize.getHeight() - margin * 2;
-      const scale = Math.min(pageWidth / canvas.width, pageHeight / canvas.height);
-      const imageWidth = canvas.width * scale;
-      const imageHeight = canvas.height * scale;
-      const imageData = canvas.toDataURL("image/png");
-      pdf.addImage(imageData, "PNG", (pdf.internal.pageSize.getWidth() - imageWidth) / 2, margin, imageWidth, imageHeight);
+      const sourcePageHeight = Math.ceil(canvas.height / 2);
+      for (let page = 0; page < 2; page += 1) {
+        if (page > 0) pdf.addPage();
+        const slice = document.createElement("canvas");
+        const sourceY = page * sourcePageHeight;
+        slice.width = canvas.width;
+        slice.height = Math.min(sourcePageHeight, canvas.height - sourceY);
+        slice.getContext("2d").drawImage(canvas, 0, sourceY, canvas.width, slice.height, 0, 0, slice.width, slice.height);
+        const scale = Math.min(pageWidth / slice.width, pageHeight / slice.height);
+        const imageWidth = slice.width * scale;
+        const imageHeight = slice.height * scale;
+        pdf.addImage(slice.toDataURL("image/png"), "PNG", (pdf.internal.pageSize.getWidth() - imageWidth) / 2, margin, imageWidth, imageHeight);
+      }
       pdf.save(`${selectedPlayer["Player Name"]}_Report.pdf`);
     };
 
@@ -1530,5 +1538,4 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 }
 
 export default ScoutReportPage;
-
 
