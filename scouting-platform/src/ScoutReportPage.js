@@ -72,7 +72,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
         backgroundColor: "#ffffff",
       });
 
-      const pdf = new jsPDF("p", "mm", "a4");
+      const pdf = new jsPDF("landscape", "mm", "a4");
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight() - 20;
       const sourcePageHeight = Math.floor((pdfHeight * canvas.width) / pdfWidth);
@@ -1028,7 +1028,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 
           {/* Info Panel + Pie Charts */}
           <div style={{ marginTop:20, display:"grid", gridTemplateColumns:"300px 1fr", gap:40 }}>
-            <div style={{ background:"rgba(255,255,255,0.9)", padding:20, borderRadius:12, lineHeight:2.8, borderRight:"2px solid #1f77b4" }}>
+            <div style={{ background:"rgba(255,255,255,0.9)", padding:20, borderRadius:12, lineHeight:2.8, border:"2px solid #1f77b4" }}>
           
               <div>Team: <strong>{selectedPlayer.Team}</strong></div>
               <div>Position: <strong>{selectedPlayer["Primary Position"]}</strong></div>
@@ -1059,7 +1059,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
             </div>
 
             {/* Metric Percentiles */}
-            <div style={{ background:"rgba(255,255,255,0.9)", padding:20, borderRadius:12 }}>
+            <div style={{ background:"rgba(255,255,255,0.9)", padding:20, borderRadius:12, border:"2px solid #1f77b4" }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10, gap:12 }}>
                 <h3 style={{ color:"#1f77b4", margin:0 }}>Metric Percentiles</h3>
 
@@ -1138,7 +1138,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
           <div
             style={{
               background: "rgba(255,255,255,0.95)",
-              border: "1px solid #ddd",
+              border: "2px solid #1f77b4",
               borderRadius: 12,
               padding: 16
             }}
@@ -1313,7 +1313,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
           <div
             style={{
               background: "rgba(255,255,255,0.95)",
-              border: "1px solid #ddd",
+              border: "2px solid #1f77b4",
               borderRadius: 12,
               padding: 16
             }}
@@ -1365,7 +1365,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                         <div
                           style={{
                             background: "rgba(255,255,255,0.95)",
-                            border: "1px solid #ddd",
+              border: "2px solid #1f77b4",
                             borderRadius: 8,
                             padding: 20,
                             lineHeight: 1.6,
@@ -1435,7 +1435,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                                   style={{
                                     marginTop: 18,
                                     background: "rgba(255,255,255,0.95)",
-                                    border: "1px solid #ddd",
+              border: "2px solid #1f77b4",
                                     borderRadius: 8,
                                     padding: 16,
                                   }}
@@ -1479,7 +1479,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                                   style={{
                                     marginTop: 18,
                                     background: "rgba(255,255,255,0.95)",
-                                    border: "1px solid #ddd",
+              border: "2px solid #1f77b4",
                                     borderRadius: 8,
                                     padding: 16,
                                   }}
@@ -1538,12 +1538,6 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 }
 
 export default ScoutReportPage;
-
-
-
-
-
-
 
 
 
