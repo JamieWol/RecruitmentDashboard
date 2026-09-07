@@ -76,7 +76,8 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
       const margin = 8;
       const pageWidth = pdf.internal.pageSize.getWidth() - margin * 2;
       const pageHeight = pdf.internal.pageSize.getHeight() - margin * 2;
-      const sourcePageHeight = Math.ceil(canvas.height / 2);
+      // Keep the final percentile row with the information/statistics page.
+      const sourcePageHeight = Math.ceil(canvas.height * 0.55);
       for (let page = 0; page < 2; page += 1) {
         if (page > 0) pdf.addPage();
         const slice = document.createElement("canvas");
@@ -1538,4 +1539,3 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 }
 
 export default ScoutReportPage;
-
