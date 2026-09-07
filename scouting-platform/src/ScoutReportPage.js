@@ -72,13 +72,15 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
         backgroundColor: "#ffffff",
       });
 
-      const pdf = new jsPDF("landscape", "mm", "a4");
+      const pdf = new jsPDF("portrait", "mm", "a4");
       const margin = 8;
       const pageWidth = pdf.internal.pageSize.getWidth() - margin * 2;
       const pageHeight = pdf.internal.pageSize.getHeight() - margin * 2;
-      // Keep the final percentile row with the information/statistics page.
-      const sourcePageHeight = Math.ceil(canvas.height * 0.55);
-      for (let page = 0; page < 2; page += 1) {
+      // Portrait reports are split into three readable pages so the content
+      // fits without shrinking the charts and percentile labels too far.
+      const pageCount = 3;
+      const sourcePageHeight = Math.ceil(canvas.height / pageCount);
+      for (let page = 0; page < pageCount; page += 1) {
         if (page > 0) pdf.addPage();
         const slice = document.createElement("canvas");
         const sourceY = page * sourcePageHeight;
