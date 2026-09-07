@@ -76,9 +76,9 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
       const margin = 8;
       const pageWidth = pdf.internal.pageSize.getWidth() - margin * 2;
       const pageHeight = pdf.internal.pageSize.getHeight() - margin * 2;
-      // Portrait reports are split into three readable pages so the content
-      // fits without shrinking the charts and percentile labels too far.
-      const pageCount = 3;
+      // Use two portrait pages so the report remains readable without the
+      // large blank areas created by three equal-height slices.
+      const pageCount = 2;
       const sourcePageHeight = Math.ceil(canvas.height / pageCount);
       for (let page = 0; page < pageCount; page += 1) {
         if (page > 0) pdf.addPage();

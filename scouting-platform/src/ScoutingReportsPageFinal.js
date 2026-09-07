@@ -136,7 +136,7 @@ export default function ScoutingReportsPageFinal() {
   ];
   const addProfileToShortlist = () => {
     const lists = appState?.shortlists || [];
-    const list = lists.find((x) => x.id === selectedShortlist);
+    const list = lists.find((x) => String(x.id) === String(selectedShortlist));
     if (!list) return;
     const id = profile.id || profile.playerId || profile.player;
     const player = {
@@ -154,7 +154,7 @@ export default function ScoutingReportsPageFinal() {
         player,
       ],
     };
-    updateAppState({ assignments: appState?.assignments || [], shortlists: lists.map((x) => (x.id === list.id ? next : x)), tags: appState?.tags || [] });
+    updateAppState({ assignments: appState?.assignments || [], shortlists: lists.map((x) => (String(x.id) === String(list.id) ? next : x)), tags: appState?.tags || [] });
     setShortlistPicker(false);
   };
   const shown = useMemo(
