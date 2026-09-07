@@ -135,9 +135,7 @@ export default function ScoutingReportsPageFinal() {
     "ST",
   ];
   const addProfileToShortlist = () => {
-    const lists = JSON.parse(
-      localStorage.getItem("scoutingShortlists") || "[]",
-    );
+    const lists = appState?.shortlists || [];
     const list = lists.find((x) => x.id === selectedShortlist);
     if (!list) return;
     const id = profile.id || profile.playerId || profile.player;
@@ -156,15 +154,12 @@ export default function ScoutingReportsPageFinal() {
         player,
       ],
     };
-    localStorage.setItem(
-      "scoutingShortlists",
-      JSON.stringify(lists.map((x) => (x.id === list.id ? next : x))),
-    );
+    updateAppState({ assignments: appState?.assignments || [], shortlists: lists.map((x) => (x.id === list.id ? next : x)), tags: appState?.tags || [] });
     setShortlistPicker(false);
   };
   const shown = useMemo(
     () => {
-      const shared = sharedReports.map((x) => ({ ...x, id: x.assignment_id || x.id, report: x.report, status: "Published", club: x.club, position: x.position || x.report?.playedPosition || "", date: x.completed_at, game: x.fixture_summary, scout: x.scout }));
+      const shared = sharedReports.map((x) => ({ ...x, id: x.assignment_id || x.id, report: x.report, status: "Published", club: x.player_club || "Club not added", position: x.position || x.report?.playedPosition || "", date: x.completed_at, game: x.fixture_summary, scout: x.scout }));
       const source = tab === "Published" ? shared : items;
       return [...new Map(source.map((x) => [String(x.id), x])).values()]
         .filter((x) =>
@@ -208,7 +203,7 @@ export default function ScoutingReportsPageFinal() {
     if (user && accountProfile?.club) {
       supabase.from("club_reports").upsert({
         id: Number(active.id), assignment_id: Number(active.id), player_id: active.playerId || null,
-        player: active.player, club: accountProfile.club, author_id: user.id, report, status: "Published",
+        player: active.player, club: accountProfile.club, player_club: active.club || "", author_id: user.id, report, status: "Published",
         updated_at: new Date().toISOString(), completed_at: active.completedAt || active.date || new Date().toISOString().slice(0, 10), scout: active.scout || "", fixture_summary: (active.games || []).length > 1 ? "Multiple" : (active.games?.[0] ? `${active.games[0].date || ""} · ${active.games[0].name || active.games[0]}` : active.game || ""),
       }, { onConflict: "id" }).then(({ error }) => { if (error) console.error("Could not publish shared report", error); });
     }
@@ -504,7 +499,7 @@ export default function ScoutingReportsPageFinal() {
             <span>
               {[...new Map([
                 ...items.filter((x) => x.player === profile.player && x.status === "Published"),
-                ...sharedReports.filter((x) => x.player === profile.player).map((x) => ({ ...x, id: x.assignment_id || x.id, report: x.report, status: "Published", date: x.completed_at, game: x.fixture_summary, scout: x.scout })),
+                ...sharedReports.filter((x) => x.player === profile.player).map((x) => ({ ...x, id: x.assignment_id || x.id, report: x.report, status: "Published", club: x.player_club || x.club, date: x.completed_at, game: x.fixture_summary, scout: x.scout })),
               ].map((x) => [x.id, x])).values()].length} {" "}
               published reports
             </span>
@@ -512,9 +507,7 @@ export default function ScoutingReportsPageFinal() {
           <button
             className="sr-outline"
             onClick={() => {
-              const lists = JSON.parse(
-                localStorage.getItem("scoutingShortlists") || "[]",
-              );
+              const lists = appState?.shortlists || [];
               setSelectedShortlist(lists[0]?.id || "");
               setShortlistPicker(true);
             }}
@@ -574,7 +567,7 @@ export default function ScoutingReportsPageFinal() {
               </div>
               {[...new Map([
                 ...items.filter((x) => x.player === profile.player),
-                ...sharedReports.filter((x) => x.player === profile.player).map((x) => ({ ...x, id: x.assignment_id || x.id, report: x.report, status: "Published", date: x.completed_at, game: x.fixture_summary, scout: x.scout })),
+                ...sharedReports.filter((x) => x.player === profile.player).map((x) => ({ ...x, id: x.assignment_id || x.id, report: x.report, status: "Published", club: x.player_club || x.club, date: x.completed_at, game: x.fixture_summary, scout: x.scout })),
               ].map((x) => [x.id, x])).values()]
                 .map((x) => (
                   <button
@@ -615,9 +608,7 @@ export default function ScoutingReportsPageFinal() {
                   onChange={(e) => setSelectedShortlist(e.target.value)}
                 >
                   <option value="">Select shortlist</option>
-                  {JSON.parse(
-                    localStorage.getItem("scoutingShortlists") || "[]",
-                  ).map((x) => (
+                  {(appState?.shortlists || []).map((x) => (
                     <option key={x.id} value={x.id}>
                       {x.name}
                     </option>

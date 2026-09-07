@@ -73,22 +73,14 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
       });
 
       const pdf = new jsPDF("landscape", "mm", "a4");
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight() - 20;
-      const sourcePageHeight = Math.floor((pdfHeight * canvas.width) / pdfWidth);
-      let sourceY = 0;
-      let page = 0;
-      while (sourceY < canvas.height) {
-        if (page > 0) pdf.addPage();
-        const slice = document.createElement("canvas");
-        slice.width = canvas.width;
-        slice.height = Math.min(sourcePageHeight, canvas.height - sourceY);
-        slice.getContext("2d").drawImage(canvas, 0, sourceY, canvas.width, slice.height, 0, 0, slice.width, slice.height);
-        const sliceHeight = (slice.height * pdfWidth) / slice.width;
-        pdf.addImage(slice.toDataURL("image/png"), "PNG", 0, 10, pdfWidth, sliceHeight);
-        sourceY += slice.height;
-        page += 1;
-      }
+      const margin = 8;
+      const pageWidth = pdf.internal.pageSize.getWidth() - margin * 2;
+      const pageHeight = pdf.internal.pageSize.getHeight() - margin * 2;
+      const scale = Math.min(pageWidth / canvas.width, pageHeight / canvas.height);
+      const imageWidth = canvas.width * scale;
+      const imageHeight = canvas.height * scale;
+      const imageData = canvas.toDataURL("image/png");
+      pdf.addImage(imageData, "PNG", (pdf.internal.pageSize.getWidth() - imageWidth) / 2, margin, imageWidth, imageHeight);
       pdf.save(`${selectedPlayer["Player Name"]}_Report.pdf`);
     };
 
@@ -1538,6 +1530,5 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 }
 
 export default ScoutReportPage;
-
 
 
