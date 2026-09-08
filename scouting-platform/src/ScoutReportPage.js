@@ -176,14 +176,6 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
       );
     }, []);
 
-    const getPlayerPhoto = (player) => {
-      if (player?._photoUrl) return player._photoUrl;
-      if (player?.Photo) return player.Photo;
-
-      const candidates = buildPhotoCandidates(player);
-      return candidates[0] || "/placeholder-player.png";
-    };
-
   useEffect(() => {
     if (!selectedPlayer) {
       setPhotoDataUrl("");
