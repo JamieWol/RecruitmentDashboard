@@ -80,7 +80,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
       // large blank areas created by three equal-height slices.
       const pageCount = 2;
       // Keep the profile, percentile panel, and charts together on page 1.
-      const sourcePageHeight = Math.ceil(canvas.height * 0.82);
+      const sourcePageHeight = Math.ceil(canvas.height * 0.76);
       for (let page = 0; page < pageCount; page += 1) {
         if (page > 0) pdf.addPage();
         const slice = document.createElement("canvas");
@@ -1151,7 +1151,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
               Pizza Chart
             </div>
 
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={240}>
               <RadarChart data={pizzaData}>
                 {/* Grid */}
                 <PolarGrid
@@ -1327,7 +1327,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                 {scatterMetrics.x} vs {scatterMetrics.y}
               </div>
 
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={240}>
                 <ScatterChart>
                   <CartesianGrid stroke="#ddd" />
                   <XAxis
