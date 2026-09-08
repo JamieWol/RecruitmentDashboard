@@ -78,11 +78,11 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
       const pageHeight = pdf.internal.pageSize.getHeight() - margin * 2;
       // Use two portrait pages so the report remains readable without the
       // large blank areas created by three equal-height slices.
-      const pageCount = 2;
+      const pageCount = 1;
       // Keep the profile, percentile panel, and charts together on page 1.
       // Use the available page height more fully so the summary can follow
       // the charts instead of leaving a large unused area on page 1.
-      const sourcePageHeight = Math.ceil(canvas.height * 0.94);
+      const sourcePageHeight = canvas.height;
       for (let page = 0; page < pageCount; page += 1) {
         if (page > 0) pdf.addPage();
         const slice = document.createElement("canvas");
@@ -153,9 +153,17 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
         player?.["Display Name"],
       ].filter(Boolean));
 
+      const originalCaseSlugs = rawCandidates.map((value) => String(value)
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .trim()
+        .replace(/[^a-zA-Z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, ""));
       const bases = uniquePreserveOrder([
         ...rawCandidates.map(slugify),
         ...rawCandidates.map(slugifyLegacy),
+        ...originalCaseSlugs,
+        ...originalCaseSlugs.map((value) => value.toUpperCase()),
       ].filter(Boolean));
 
       const variants = uniquePreserveOrder(
@@ -807,6 +815,8 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
       return getPlayerBackground(player);
     };
 
+  const selectedPhotoCandidates = selectedPlayer ? buildPhotoCandidates(selectedPlayer) : [];
+
   return (
     <div style={{
       padding: 24,
@@ -1001,7 +1011,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
               }}
             >
              <img
-               src={photoDataUrl || getPlayerPhoto(selectedPlayer)}
+               src={photoDataUrl || selectedPhotoCandidates[0] || "/placeholder-player.png"}
                alt={selectedPlayer["Player Name"]}
                crossOrigin="anonymous"
                style={{
@@ -1011,8 +1021,15 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                  display: "block"
                }}
                onError={(e) => {
-                 e.currentTarget.onerror = null; // prevent infinite loop
-                 e.currentTarget.src = "/placeholder-player.png";
+                 const image = e.currentTarget;
+                 const nextIndex = Number(image.dataset.photoIndex || "0") + 1;
+                 if (selectedPhotoCandidates[nextIndex]) {
+                   image.dataset.photoIndex = String(nextIndex);
+                   image.src = selectedPhotoCandidates[nextIndex];
+                 } else {
+                   image.onerror = null;
+                   image.src = "/placeholder-player.png";
+                 }
                }}
              />
 
@@ -1446,7 +1463,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                                 {/* Clips */}
 
                                 <div
-                                  style={{
+                                  style={{ order: 3,
                                     marginTop: 14,
                                     display: "flex",
                                     alignItems: "center",
