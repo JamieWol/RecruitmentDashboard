@@ -80,7 +80,9 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
       // large blank areas created by three equal-height slices.
       const pageCount = 2;
       // Keep the profile, percentile panel, and charts together on page 1.
-      const sourcePageHeight = Math.ceil(canvas.height * 0.84);
+      // Use the available page height more fully so the summary can follow
+      // the charts instead of leaving a large unused area on page 1.
+      const sourcePageHeight = Math.ceil(canvas.height * 0.94);
       for (let page = 0; page < pageCount; page += 1) {
         if (page > 0) pdf.addPage();
         const slice = document.createElement("canvas");
