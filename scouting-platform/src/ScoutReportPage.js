@@ -1153,7 +1153,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
               Pizza Chart
             </div>
 
-            <ResponsiveContainer width="100%" height={240}>
+            <ResponsiveContainer width="100%" height={300}>
               <RadarChart data={pizzaData}>
                 {/* Grid */}
                 <PolarGrid
@@ -1329,7 +1329,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                 {scatterMetrics.x} vs {scatterMetrics.y}
               </div>
 
-              <ResponsiveContainer width="100%" height={240}>
+              <ResponsiveContainer width="100%" height={300}>
                 <ScatterChart>
                   <CartesianGrid stroke="#ddd" />
                   <XAxis
@@ -1365,15 +1365,15 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                       {/* AI Scout Summary */}
                       <div style={{ marginTop: 35, marginLeft: 8, }}>
                         <h3 style={{ color: "#1f77b4", marginBottom: 15 }}>
-                          Scout Summary – Strengths & Weaknesses
+                          Scout Summary
                         </h3>
 
                         <div
                           style={{
-                            background: "rgba(255,255,255,0.95)",
-              border: "2px solid #1f77b4",
-                            borderRadius: 8,
-                            padding: 20,
+                            background: "transparent",
+                            border: "0",
+                            borderRadius: 0,
+                            padding: 0,
                             lineHeight: 1.6,
                           }}
                         >
@@ -1381,64 +1381,9 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                             const summary = generateScoutSummaryData(selectedPlayer);
 
                             return (
-                              <div>
+                              <div style={{ display: "flex", flexDirection: "column" }}>
                                 {summary.reportCount > 0 && <div style={{ color: "#555", marginBottom: 12 }}>{summary.reportCount} published scout report{summary.reportCount === 1 ? "" : "s"} combined</div>}
-                                    {/* Strengths */}
-                                    {summary.strengths.length > 0 && (
-                                      <div
-                                        style={{
-                                          display: "flex",
-                                          alignItems: "flex-start",
-                                          marginBottom: 10,
-                                        }}
-                                      >
-                                        <span
-                                          style={{
-                                            marginRight: 10,
-                                            fontSize: 22,
-                                            fontWeight: 700,
-                                            lineHeight: "22px",
-                                            color: "#2ecc71", // GREEN
-                                            flexShrink: 0,
-                                          }}
-                                        >
-                                         ＋
-                                        </span>
-                                        <div style={{ color: "#000", lineHeight: 1.6 }}>
-                                          {summary.strengths.join(", ")}
-                                        </div>
-                                      </div>
-                                    )}
-
-                                    {/* Weaknesses */}
-                                    {summary.weaknesses.length > 0 && (
-                                      <div
-                                        style={{
-                                          display: "flex",
-                                          alignItems: "flex-start",
-                                          marginBottom: 10,
-                                        }}
-                                      >
-                                        <span
-                                          style={{
-                                            marginRight: 10,
-                                            fontSize: 22,
-                                            fontWeight: 700,
-                                            lineHeight: "22px",
-                                            color: "#e74c3c", // RED
-                                            flexShrink: 0,
-                                          }}
-                                        >
-                                          −
-                                        </span>
-                                        <div style={{ color: "#000", lineHeight: 1.6 }}>
-                                          {summary.weaknesses.join(", ")}
-                                        </div>
-                                      </div>
-                                    )}
-
-                                <div data-html2canvas-ignore="true"
-                                  style={{
+                                <div data-html2canvas-ignore="true" style={{ order: 2,
                                     marginTop: 18,
                                     background: "rgba(255,255,255,0.95)",
               border: "2px solid #1f77b4",
@@ -1482,7 +1427,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                                 </div>
 
                                 <div
-                                  style={{
+                                  style={{ order: 1,
                                     marginTop: 18,
                                     background: "rgba(255,255,255,0.95)",
               border: "2px solid #1f77b4",
