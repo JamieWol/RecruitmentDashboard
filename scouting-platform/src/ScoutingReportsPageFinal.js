@@ -142,20 +142,25 @@ export default function ScoutingReportsPageFinal() {
     const list = lists.find((x) => String(x.id) === String(selectedShortlist));
     if (!list) return;
     const id = String(playerData?.id || playerData?.player_id || profile.playerId || profile.player);
+    const role = String(selectedPosition).split("-")[0];
+    const usedSlots = (list.players || []).filter((x) => String(x.slot || "").split("-")[0] === role).map((x) => Number(String(x.slot).split("-")[1])).filter(Number.isFinite);
+    let slotIndex = 0;
+    while (usedSlots.includes(slotIndex)) slotIndex += 1;
+    const slot = `${role}-${slotIndex}`;
     const playerClub = dataValue("club", "Club", "team", "Team");
     const player = {
       ...profile,
       id,
       player: playerData?.Name || playerData?.name || profile.player,
       club: playerClub === "—" ? profile.club || "" : playerClub,
-      slot: selectedPosition,
+      slot,
       tags: [],
     };
     const next = {
       ...list,
       players: [
         ...(list.players || []).filter(
-          (x) => !(x.id === id && x.slot === selectedPosition),
+          (x) => !(String(x.id) === id && x.slot === slot),
         ),
         player,
       ],
@@ -636,8 +641,8 @@ export default function ScoutingReportsPageFinal() {
                   value={selectedPosition}
                   onChange={(e) => setSelectedPosition(e.target.value)}
                 >
-                  {shortlistPositions.map((x, i) => (
-                    <option key={`${x}-${i}`} value={`${x}-${i}`}>
+                  {shortlistPositions.map((x) => (
+                    <option key={x} value={`${x}-0`}>
                       {x}
                     </option>
                   ))}

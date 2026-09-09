@@ -337,9 +337,13 @@ export default function ShortlistsPage() {
     const slots = [...(formationRows[value] || [])].flatMap((row, i) =>
       row.map((pos, j) => `${pos}-${j}`),
     );
+    const counters = {};
     const players = current.players.map((p) => {
       const label = p.slot.split("-")[0];
-      const slot = slots.find((s) => s.split("-")[0] === label) || slots[0];
+      const matches = slots.filter((s) => s.split("-")[0] === label);
+      const index = counters[label] || 0;
+      counters[label] = index + 1;
+      const slot = matches[index] || matches[matches.length - 1] || slots[0];
       return { ...p, slot };
     });
     const n = { ...current, formation: value, players };
@@ -374,6 +378,19 @@ export default function ShortlistsPage() {
       ...current,
       players: [...current.players.filter((x) => x.slot !== pos), ...ordered],
     };
+    persist(lists.map((x) => (x.id === current.id ? n : x)), n);
+    setCurrent(n);
+    setDragging(null);
+  };
+  const moveToPosition = (targetPos) => {
+    if (!dragging || dragging.pos === targetPos) return;
+    const moved = current.players.find((p) => p.id === dragging.id && p.slot === dragging.pos);
+    if (!moved) return;
+    const role = targetPos.split("-")[0];
+    const used = current.players.filter((p) => p.slot.split("-")[0] === role).map((p) => Number(p.slot.split("-")[1])).filter(Number.isFinite);
+    let index = 0;
+    while (used.includes(index)) index += 1;
+    const n = { ...current, players: current.players.map((p) => p === moved ? { ...p, slot: `${role}-${index}` } : p) };
     persist(lists.map((x) => (x.id === current.id ? n : x)), n);
     setCurrent(n);
     setDragging(null);
@@ -484,7 +501,7 @@ export default function ShortlistsPage() {
         x.player.toLowerCase().includes(search.toLowerCase()),
       );
     return (
-      <div className="sr-zone" key={pos}>
+      <div className="sr-zone" key={pos} onDragOver={(e) => e.preventDefault()} onDrop={() => moveToPosition(pos)}>
         <div className="sr-zone-head">
           <strong>{pos}</strong>
           <span>{players.length} Players</span>
