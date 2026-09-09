@@ -138,12 +138,15 @@ export default function ScoutingReportsPageFinal() {
     const lists = appState?.shortlists || [];
     const list = lists.find((x) => String(x.id) === String(selectedShortlist));
     if (!list) return;
-    const id = profile.id || profile.playerId || profile.player;
+    const id = String(profile.id || profile.playerId || profile.player);
+    const playerClub = dataValue("club", "Club", "team", "Team");
     const player = {
       ...profile,
       id,
       player: profile.player,
+      club: playerClub === "—" ? profile.club || "" : playerClub,
       slot: selectedPosition,
+      tags: [],
     };
     const next = {
       ...list,
@@ -229,7 +232,6 @@ export default function ScoutingReportsPageFinal() {
   };
   const clubName = dataValue("club", "Club", "team", "Team");
   const clubBadge = dataValue("badgeUrl", "club_badge_url", "clubBadgeUrl", "badge_url");
-  const transfermarktUrl = dataValue("Transfermarkt Link", "transfermarkt_url", "transfermarktUrl");
   const reportFoot = [...items]
     .reverse()
     .find((x) => x.player === profile?.player && x.report?.foot)?.report?.foot;
@@ -559,10 +561,6 @@ export default function ScoutingReportsPageFinal() {
                   </span>
                 </div>
               ))}
-              <div className="sr-detail-row">
-                <strong>Transfermarkt:</strong>
-                <span>{transfermarktUrl === "—" ? "—" : <a href={transfermarktUrl} target="_blank" rel="noreferrer">Open player page</a>}</span>
-              </div>
             </div>
           </section>
           <section className="sr-profile-reports">

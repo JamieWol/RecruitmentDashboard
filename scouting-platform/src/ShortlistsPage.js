@@ -771,6 +771,20 @@ export default function ShortlistsPage() {
         {newPlayerModal}
       </main>
     );
+  const openShortlist = (list) => {
+    const rows = list.type === "Flex" ? flexRows : (formationRows[list.formation] || formationRows["4-3-3"]);
+    const positions = rows.flat();
+    const counters = {};
+    const players = (list.players || []).map((player) => {
+      const role = String(player.slot || "").split("-")[0];
+      if (positions.includes(role)) return player;
+      const fallbackRole = positions[0] || "CF";
+      const index = counters[fallbackRole] || 0;
+      counters[fallbackRole] = index + 1;
+      return { ...player, slot: `${fallbackRole}-${index}` };
+    });
+    setCurrent({ ...list, players });
+  };
   return (
     <main className="sr-page">
       <section className="sr-dashboard-head">
@@ -786,7 +800,7 @@ export default function ShortlistsPage() {
           <button
             className="sr-list-card sr-list-card-button"
             key={l.id}
-            onClick={() => setCurrent(l)}
+            onClick={() => openShortlist(l)}
           >
             <h2>{l.name}</h2>
             <p>{l.type === "Flex" ? "Flex formation" : l.formation}</p>
