@@ -34,11 +34,15 @@ const photoSlug = (name, lower = false) =>
     .join("_");
 const playerPhoto = (name, lower = true) =>
   `${photoBase}${photoSlug(name, lower)}.png`;
-const photoAccent = (name) => `${photoBase}${String(name || "").trim().split(/\s+/).filter(Boolean).map((x) => x.replace(/[^\\p{L}\\p{N}]+/gu, "_")).join("_")}.png`;
+const photoCandidates = (name) => {
+  const raw = String(name || "").trim();
+  const display = raw.split(/\s+/).length > 2 ? `${raw.split(/\s+/)[0]} ${raw.split(/\s+/).at(-1)}` : raw;
+  const bases = [...new Set([raw, display].map((value) => value.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_+|_+$/g, "")).filter(Boolean))];
+  return [...new Set(bases.flatMap((base) => [base, base.toLowerCase(), base.toUpperCase(), `_${base}`, `_${base.toLowerCase()}`, `__${base}`]).map((base) => `${photoBase}${base}.png`))];
+};
 const retryPhoto = (e, name) => {
   const image = e.currentTarget;
-  const original = playerPhoto(name, false);
-  const candidates = [photoAccent(name), original, original.replace(/[^/]+\.png$/, (file) => file.toUpperCase())];
+  const candidates = photoCandidates(name);
   const next = Number(image.dataset.photoFallback || 0) + 1;
   if (candidates[next - 1]) { image.dataset.photoFallback = String(next); image.src = candidates[next - 1]; }
   else image.style.display = "none";

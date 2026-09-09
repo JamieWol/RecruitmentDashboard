@@ -118,11 +118,15 @@ const shortlistPhoto = (name, lower = true) =>
         [lower ? "toLowerCase" : "toString"](),
     )
     .join("_")}.png`;
-const shortlistPhotoAccent = (name) => `https://syjsmvvsvvprxibqoizw.supabase.co/storage/v1/object/public/player-photos/player-photos/${String(name || "").trim().split(/\s+/).filter(Boolean).map((x) => x.replace(/[^\\p{L}\\p{N}]+/gu, "_")).join("_")}.png`;
+const shortlistPhotoCandidates = (name) => {
+  const raw = String(name || "").trim();
+  const display = raw.split(/\s+/).length > 2 ? `${raw.split(/\s+/)[0]} ${raw.split(/\s+/).at(-1)}` : raw;
+  const bases = [...new Set([raw, display].map((value) => value.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_+|_+$/g, "")).filter(Boolean))];
+  return [...new Set(bases.flatMap((base) => [base, base.toLowerCase(), base.toUpperCase(), `_${base}`, `_${base.toLowerCase()}`, `__${base}`]).map((base) => `${"https://syjsmvvsvvprxibqoizw.supabase.co/storage/v1/object/public/player-photos/player-photos/"}${base}.png`))];
+};
 const retryShortlistPhoto = (e, name) => {
   const image = e.currentTarget;
-  const original = shortlistPhoto(name, false);
-  const candidates = [shortlistPhotoAccent(name), original, original.replace(/[^/]+\.png$/, (file) => file.toUpperCase())];
+  const candidates = shortlistPhotoCandidates(name);
   const next = Number(image.dataset.photoFallback || 0) + 1;
   if (candidates[next - 1]) { image.dataset.photoFallback = String(next); image.src = candidates[next - 1]; }
   else image.style.display = "none";
