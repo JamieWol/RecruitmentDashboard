@@ -34,11 +34,14 @@ const photoSlug = (name, lower = false) =>
     .join("_");
 const playerPhoto = (name, lower = true) =>
   `${photoBase}${photoSlug(name, lower)}.png`;
+const photoAccent = (name) => `${photoBase}${String(name || "").trim().split(/\s+/).filter(Boolean).map((x) => x.replace(/[^\\p{L}\\p{N}]+/gu, "_")).join("_")}.png`;
 const retryPhoto = (e, name) => {
-  if (e.currentTarget.dataset.fallback !== "1") {
-    e.currentTarget.dataset.fallback = "1";
-    e.currentTarget.src = playerPhoto(name, false);
-  } else e.currentTarget.style.display = "none";
+  const image = e.currentTarget;
+  const original = playerPhoto(name, false);
+  const candidates = [photoAccent(name), original, original.replace(/[^/]+\.png$/, (file) => file.toUpperCase())];
+  const next = Number(image.dataset.photoFallback || 0) + 1;
+  if (candidates[next - 1]) { image.dataset.photoFallback = String(next); image.src = candidates[next - 1]; }
+  else image.style.display = "none";
 };
 export default function ScoutingReportsPageFinal() {
   const nav = useNavigate();

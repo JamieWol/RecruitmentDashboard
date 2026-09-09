@@ -118,11 +118,14 @@ const shortlistPhoto = (name, lower = true) =>
         [lower ? "toLowerCase" : "toString"](),
     )
     .join("_")}.png`;
+const shortlistPhotoAccent = (name) => `https://syjsmvvsvvprxibqoizw.supabase.co/storage/v1/object/public/player-photos/player-photos/${String(name || "").trim().split(/\s+/).filter(Boolean).map((x) => x.replace(/[^\\p{L}\\p{N}]+/gu, "_")).join("_")}.png`;
 const retryShortlistPhoto = (e, name) => {
-  if (e.currentTarget.dataset.fallback !== "1") {
-    e.currentTarget.dataset.fallback = "1";
-    e.currentTarget.src = shortlistPhoto(name, false);
-  } else e.currentTarget.style.display = "none";
+  const image = e.currentTarget;
+  const original = shortlistPhoto(name, false);
+  const candidates = [shortlistPhotoAccent(name), original, original.replace(/[^/]+\.png$/, (file) => file.toUpperCase())];
+  const next = Number(image.dataset.photoFallback || 0) + 1;
+  if (candidates[next - 1]) { image.dataset.photoFallback = String(next); image.src = candidates[next - 1]; }
+  else image.style.display = "none";
 };
 const defaultTags = [
   { id: "elite", name: "Elite", color: "#62dcff" },

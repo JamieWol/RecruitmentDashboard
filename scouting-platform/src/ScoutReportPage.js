@@ -819,6 +819,11 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     const playerName = selectedPlayer["Player Name"] || selectedPlayer["Full Player Name"];
     const playerId = String(selectedPlayer["Player Id"] || selectedPlayer.playerId || selectedPlayer.player_id || playerName);
     const playerClub = selectedPlayer.Team || selectedPlayer.Club || selectedPlayer.club || selectedPlayer.Squad || "";
+    const role = String(selectedPosition).split("-")[0];
+    const usedSlots = (list.players || []).filter((item) => String(item.slot || "").split("-")[0] === role).map((item) => Number(String(item.slot).split("-")[1])).filter((index) => Number.isFinite(index));
+    let slotIndex = 0;
+    while (usedSlots.includes(slotIndex)) slotIndex += 1;
+    const slot = `${role}-${slotIndex}`;
     // Shortlists store the compact player shape used by ShortlistsPage. Keep
     // the original report data too, but explicitly set these fields last so
     // the player can be found and rendered after the cloud state reloads.
@@ -827,7 +832,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
       id: playerId,
       player: playerName,
       club: playerClub,
-      slot: selectedPosition,
+      slot,
       tags: [],
     };
     const next = { ...list, players: [...(list.players || []).filter((item) => !(String(item.id) === String(playerId) && item.slot === selectedPosition)), player] };
@@ -839,7 +844,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
       <section className="sr-form sr-shortlist-picker" onClick={(e) => e.stopPropagation()}>
         <div className="sr-form-head"><h2>Add to Shortlist</h2><button type="button" className="sr-close" onClick={() => setShortlistPicker(false)}>×</button></div>
         <label className="sr-field"><span>Shortlist</span><select value={selectedShortlist} onChange={(e) => setSelectedShortlist(e.target.value)}><option value="">Select shortlist</option>{(appState?.shortlists || []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-        <label className="sr-field"><span>Position</span><select value={selectedPosition} onChange={(e) => setSelectedPosition(e.target.value)}>{shortlistPositions.map((position, index) => <option key={`${position}-${index}`} value={`${position}-${index}`}>{position}</option>)}</select></label>
+        <label className="sr-field"><span>Position</span><select value={selectedPosition} onChange={(e) => setSelectedPosition(e.target.value)}>{shortlistPositions.map((position) => <option key={position} value={`${position}-0`}>{position}</option>)}</select></label>
         <button type="button" className="sr-cyan" disabled={!selectedShortlist} onClick={addProfileToShortlist}>Add Player</button>
       </section>
     </div>
