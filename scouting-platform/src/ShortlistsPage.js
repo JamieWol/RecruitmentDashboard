@@ -794,14 +794,11 @@ export default function ShortlistsPage() {
     );
   const openShortlist = (list) => {
     const rows = list.type === "Flex" ? flexRows : (formationRows[list.formation] || formationRows["4-3-3"]);
-    const positions = rows.flat();
-    const counters = {};
+    const positions = rows.flatMap((row) => row.map((position, index) => `${position}-${index}`));
     const players = (list.players || []).map((player) => {
       const role = String(player.slot || "").split("-")[0];
       if (positions.includes(player.slot)) return player;
       const fallbackRole = positions.find((slot) => slot.split("-")[0] === role) || positions[0] || "CF-0";
-      const index = counters[fallbackRole] || 0;
-      counters[fallbackRole] = index + 1;
       return { ...player, slot: fallbackRole };
     });
     setCurrent({ ...list, players });
