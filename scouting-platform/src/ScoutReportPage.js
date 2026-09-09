@@ -3,7 +3,6 @@ import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
-import { POSITION_MAP } from "./POSITION_MAP";
 import { supabase } from "./supabaseClient";
 import { useAuth } from "./AuthContext";
 import {
