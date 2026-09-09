@@ -391,11 +391,7 @@ export default function ShortlistsPage() {
     if (!dragging || dragging.pos === targetPos) return;
     const moved = current.players.find((p) => p.id === dragging.id && p.slot === dragging.pos);
     if (!moved) return;
-    const role = targetPos.split("-")[0];
-    const used = current.players.filter((p) => p.slot.split("-")[0] === role).map((p) => Number(p.slot.split("-")[1])).filter(Number.isFinite);
-    let index = 0;
-    while (used.includes(index)) index += 1;
-    const n = { ...current, players: current.players.map((p) => p === moved ? { ...p, slot: `${role}-${index}` } : p) };
+    const n = { ...current, players: current.players.map((p) => p === moved ? { ...p, slot: targetPos } : p) };
     persist(lists.map((x) => (x.id === current.id ? n : x)), n);
     setCurrent(n);
     setDragging(null);
@@ -802,11 +798,11 @@ export default function ShortlistsPage() {
     const counters = {};
     const players = (list.players || []).map((player) => {
       const role = String(player.slot || "").split("-")[0];
-      if (positions.includes(role)) return player;
-      const fallbackRole = positions[0] || "CF";
+      if (positions.includes(player.slot)) return player;
+      const fallbackRole = positions.find((slot) => slot.split("-")[0] === role) || positions[0] || "CF-0";
       const index = counters[fallbackRole] || 0;
       counters[fallbackRole] = index + 1;
-      return { ...player, slot: `${fallbackRole}-${index}` };
+      return { ...player, slot: fallbackRole };
     });
     setCurrent({ ...list, players });
   };
