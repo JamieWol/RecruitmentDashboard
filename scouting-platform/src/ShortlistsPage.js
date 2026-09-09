@@ -343,12 +343,13 @@ export default function ShortlistsPage() {
       row.map((pos, j) => `${pos}-${j}`),
     );
     const counters = {};
+    let fallbackCursor = 0;
     const players = current.players.map((p) => {
       const label = p.slot.split("-")[0];
       const matches = slots.filter((s) => s.split("-")[0] === label);
       const index = counters[label] || 0;
       counters[label] = index + 1;
-      const slot = matches[index] || matches[matches.length - 1] || slots[0];
+      const slot = matches[index] || matches[matches.length - 1] || slots[fallbackCursor++ % slots.length] || "CF-0";
       return { ...p, slot };
     });
     const n = { ...current, formation: value, players };
@@ -795,10 +796,11 @@ export default function ShortlistsPage() {
   const openShortlist = (list) => {
     const rows = list.type === "Flex" ? flexRows : (formationRows[list.formation] || formationRows["4-3-3"]);
     const positions = rows.flatMap((row) => row.map((position, index) => `${position}-${index}`));
+    let fallbackCursor = 0;
     const players = (list.players || []).map((player) => {
       const role = String(player.slot || "").split("-")[0];
       if (positions.includes(player.slot)) return player;
-      const fallbackRole = positions.find((slot) => slot.split("-")[0] === role) || positions[0] || "CF-0";
+      const fallbackRole = positions.find((slot) => slot.split("-")[0] === role) || positions[fallbackCursor++ % positions.length] || "CF-0";
       return { ...player, slot: fallbackRole };
     });
     setCurrent({ ...list, players });
