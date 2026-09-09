@@ -944,64 +944,6 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
               setShortlistPicker(true);
               return;
 
-                const playerName = selectedPlayer["Player Name"];
-
-                if (!playerName) {
-                  alert("Invalid player data");
-                  return;
-                }
-
-                setShadowSquad(prev => {
-                  // Prevent duplicates
-                  if (prev.some(p => p.playerName === playerName)) {
-                    alert("Player already in Shadow Squad");
-                    return prev;
-                  }
-
-                  const rawPosition = selectedPlayer["Primary Position"];
-                  const mapped = POSITION_MAP[rawPosition] || "CF";
-
-                  // 🔥 AUTO-ASSIGN TO FORMATION SLOTS
-                  let finalPosition = mapped;
-
-                  if (mapped === "CM") {
-                    const cm1Taken = prev.some(p => p.position === "CM1");
-                    finalPosition = cm1Taken ? "CM2" : "CM1";
-                  }
-
-                  if (mapped === "LW" || mapped === "RW") {
-                    const lwTaken = prev.some(p => p.position === "LW");
-                    finalPosition = lwTaken ? "RW" : "LW";
-                  }
-
-                  if (mapped === "CF" || mapped === "ST") {
-                    finalPosition = "CF";
-                  }
-
-                  const playerToAdd = {
-                    id: selectedPlayer["Player Id"] || playerName,
-
-                    playerName,
-                    team:
-                      selectedPlayer["Team"] ||
-                      selectedPlayer["Club"] ||
-                      selectedPlayer["Current Team"] ||
-                      selectedPlayer["Squad"] ||   // 👈 add this if needed
-                      "Unknown",
-
-                    position: finalPosition,        // ✅ FORMATION-SAFE
-                    fullPosition: rawPosition,
-
-                    reportUrl: selectedPlayer["Report URL"] || "",
-
-                    raw: selectedPlayer,
-                  };
-
-                  console.log("✅ Added to Shadow Squad:", playerToAdd);
-
-                  return [...prev, playerToAdd];
-                });
-
             }}
           >
             ➕ Add to Shortlist
