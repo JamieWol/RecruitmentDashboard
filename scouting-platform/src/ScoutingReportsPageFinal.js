@@ -227,6 +227,9 @@ export default function ScoutingReportsPageFinal() {
     );
     return key ? source[key] : "—";
   };
+  const clubName = dataValue("club", "Club", "team", "Team");
+  const clubBadge = dataValue("badgeUrl", "club_badge_url", "clubBadgeUrl", "badge_url");
+  const transfermarktUrl = dataValue("Transfermarkt Link", "transfermarkt_url", "transfermarktUrl");
   const reportFoot = [...items]
     .reverse()
     .find((x) => x.player === profile?.player && x.report?.foot)?.report?.foot;
@@ -473,7 +476,7 @@ export default function ScoutingReportsPageFinal() {
             <div className="sr-kicker">PLAYER PROFILE</div>
             <h1>{profile.player}</h1>
             <p>
-              {profile.club || "Club not added"} ·{" "}
+              {clubName} ·{" "}
               {profile.position || "Position not added"}
             </p>
           </div>
@@ -495,7 +498,10 @@ export default function ScoutingReportsPageFinal() {
           </div>
           <div>
             <h2>{profile.player}</h2>
-            <p>{profile.club || "Club not added"}</p>
+            <p className="sr-player-club">
+              {clubBadge !== "—" && <img src={clubBadge} alt="" onError={(e) => { e.currentTarget.style.display = "none"; }} />}
+              <span>{clubName}</span>
+            </p>
             <span>
               {[...new Map([
                 ...items.filter((x) => x.player === profile.player && x.status === "Published"),
@@ -521,6 +527,7 @@ export default function ScoutingReportsPageFinal() {
             <div className="sr-detail-list">
               {[
                 ["Name", ["Name", "name"]],
+                ["Club", ["club", "Club", "team", "Team"]],
                 ["DOB", ["DOB", "Date of Birth", "date_of_birth"]],
                 ["Age", ["Age", "age"]],
                 ["Nationality", ["Nationality", "nationality"]],
@@ -552,6 +559,10 @@ export default function ScoutingReportsPageFinal() {
                   </span>
                 </div>
               ))}
+              <div className="sr-detail-row">
+                <strong>Transfermarkt:</strong>
+                <span>{transfermarktUrl === "—" ? "—" : <a href={transfermarktUrl} target="_blank" rel="noreferrer">Open player page</a>}</span>
+              </div>
             </div>
           </section>
           <section className="sr-profile-reports">

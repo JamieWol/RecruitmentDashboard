@@ -817,8 +817,19 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     const list = lists.find((item) => String(item.id) === String(selectedShortlist));
     if (!list) return;
     const playerName = selectedPlayer["Player Name"] || selectedPlayer["Full Player Name"];
-    const playerId = selectedPlayer["Player Id"] || selectedPlayer.playerId || playerName;
-    const player = { ...selectedPlayer, id: playerId, player: playerName, slot: selectedPosition, tags: [] };
+    const playerId = String(selectedPlayer["Player Id"] || selectedPlayer.playerId || selectedPlayer.player_id || playerName);
+    const playerClub = selectedPlayer.Team || selectedPlayer.Club || selectedPlayer.club || selectedPlayer.Squad || "";
+    // Shortlists store the compact player shape used by ShortlistsPage. Keep
+    // the original report data too, but explicitly set these fields last so
+    // the player can be found and rendered after the cloud state reloads.
+    const player = {
+      ...selectedPlayer,
+      id: playerId,
+      player: playerName,
+      club: playerClub,
+      slot: selectedPosition,
+      tags: [],
+    };
     const next = { ...list, players: [...(list.players || []).filter((item) => !(String(item.id) === String(playerId) && item.slot === selectedPosition)), player] };
     updateAppState({ assignments: appState?.assignments || [], shortlists: lists.map((item) => String(item.id) === String(list.id) ? next : item), tags: appState?.tags || [] });
     setShortlistPicker(false);
