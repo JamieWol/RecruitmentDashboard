@@ -138,12 +138,12 @@ export default function ScoutingReportsPageFinal() {
     const lists = appState?.shortlists || [];
     const list = lists.find((x) => String(x.id) === String(selectedShortlist));
     if (!list) return;
-    const id = String(profile.id || profile.playerId || profile.player);
+    const id = String(playerData?.id || playerData?.player_id || profile.playerId || profile.player);
     const playerClub = dataValue("club", "Club", "team", "Team");
     const player = {
       ...profile,
       id,
-      player: profile.player,
+      player: playerData?.Name || playerData?.name || profile.player,
       club: playerClub === "—" ? profile.club || "" : playerClub,
       slot: selectedPosition,
       tags: [],
@@ -232,9 +232,12 @@ export default function ScoutingReportsPageFinal() {
   };
   const clubName = dataValue("club", "Club", "team", "Team");
   const clubBadge = dataValue("badgeUrl", "club_badge_url", "clubBadgeUrl", "badge_url");
-  const reportFoot = [...items]
+  const reportFoot = [
+    ...items.filter((x) => x.player === profile?.player),
+    ...sharedReports.filter((x) => x.player === profile?.player),
+  ]
     .reverse()
-    .find((x) => x.player === profile?.player && x.report?.foot)?.report?.foot;
+    .find((x) => x.report?.foot)?.report?.foot;
   const grades = (
     <div className="sr-grade-row">
       <label className="sr-field">
@@ -479,7 +482,7 @@ export default function ScoutingReportsPageFinal() {
             <h1>{profile.player}</h1>
             <p>
               {clubName} ·{" "}
-              {profile.position || "Position not added"}
+              {dataValue("Playing Position", "Primary Position", "Position", "playing_position", "primary_position", "position")}
             </p>
           </div>
           <button className="sr-cyan" onClick={() => nav("/create-assignment")}>
