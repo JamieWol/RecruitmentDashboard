@@ -25,7 +25,7 @@ import {
 } from "recharts";
 
 function ScoutReportPage({ shadowSquad, setShadowSquad }) {
-  const { profile } = useAuth();
+  const { profile, appState, updateAppState } = useAuth();
   const [players, setPlayers] = useState([]);
   const [publishedReports, setPublishedReports] = useState([]);
   const exportRef = useRef(null);
@@ -36,6 +36,9 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
   const [photoFile, setPhotoFile] = useState(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoStatus, setPhotoStatus] = useState("");
+  const [shortlistPicker, setShortlistPicker] = useState(false);
+  const [selectedShortlist, setSelectedShortlist] = useState("");
+  const [selectedPosition, setSelectedPosition] = useState("CF-0");
   useEffect(() => {
     if (!profile?.club) return;
     supabase.from("club_reports").select("player,report,status,scout,completed_at").eq("club", profile.club).eq("status", "Published")
@@ -808,9 +811,34 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     };
 
   const selectedPhotoCandidates = selectedPlayer ? buildPhotoCandidates(selectedPlayer) : [];
+  const shortlistPositions = ["GK", "LB", "LCB", "CB", "RCB", "RB", "LWB", "RWB", "DM", "LCM", "CM", "RCM", "LW", "AM", "RW", "CF", "ST"];
+  const addProfileToShortlist = () => {
+    if (!selectedPlayer || !selectedShortlist) return;
+    const lists = appState?.shortlists || [];
+    const list = lists.find((item) => String(item.id) === String(selectedShortlist));
+    if (!list) return;
+    const playerName = selectedPlayer["Player Name"] || selectedPlayer["Full Player Name"];
+    const playerId = selectedPlayer["Player Id"] || selectedPlayer.playerId || playerName;
+    const player = { ...selectedPlayer, id: playerId, player: playerName, slot: selectedPosition, tags: [] };
+    const next = { ...list, players: [...(list.players || []).filter((item) => !(String(item.id) === String(playerId) && item.slot === selectedPosition)), player] };
+    updateAppState({ assignments: appState?.assignments || [], shortlists: lists.map((item) => String(item.id) === String(list.id) ? next : item), tags: appState?.tags || [] });
+    setShortlistPicker(false);
+  };
+  const shortlistModal = shortlistPicker && (
+    <div className="sr-modal" onClick={() => setShortlistPicker(false)}>
+      <section className="sr-form sr-shortlist-picker" onClick={(e) => e.stopPropagation()}>
+        <div className="sr-form-head"><h2>Add to Shortlist</h2><button type="button" className="sr-close" onClick={() => setShortlistPicker(false)}>×</button></div>
+        <label className="sr-field"><span>Shortlist</span><select value={selectedShortlist} onChange={(e) => setSelectedShortlist(e.target.value)}><option value="">Select shortlist</option>{(appState?.shortlists || []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        <label className="sr-field"><span>Position</span><select value={selectedPosition} onChange={(e) => setSelectedPosition(e.target.value)}>{shortlistPositions.map((position, index) => <option key={`${position}-${index}`} value={`${position}-${index}`}>{position}</option>)}</select></label>
+        <button type="button" className="sr-cyan" disabled={!selectedShortlist} onClick={addProfileToShortlist}>Add Player</button>
+      </section>
+    </div>
+  );
 
   return (
-    <div style={{
+    <>
+      {shortlistModal}
+      <div style={{
       padding: 24,
       fontFamily: "Arial",
       background: "url('/scouting-world.png') center/cover no-repeat, linear-gradient(to bottom, #cceeff, #ffffff)",
@@ -911,6 +939,10 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                 alert("Select a player first");
                 return;
               }
+              const lists = appState?.shortlists || [];
+              setSelectedShortlist(String(lists[0]?.id || ""));
+              setShortlistPicker(true);
+              return;
 
                 const playerName = selectedPlayer["Player Name"];
 
@@ -972,7 +1004,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 
             }}
           >
-            ➕ Add to Shadow Squad
+            ➕ Add to Shortlist
           </button>
 
       {/* Player Report */}
@@ -1190,8 +1222,8 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                     const league = payload.find(p => p.dataKey === "league")?.value;
                     const player = payload.find(p => p.dataKey === "player")?.value;
 
-                    return (
-                      <div
+  return (
+    <div
                         style={{
                           background: "#fff",
                           border: "1.5px solid #000",
@@ -1493,7 +1525,8 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
       <style>
         {`.no-export { display: block; } @media print { .no-export { display: none !important; } }`}
       </style>
-    </div>
+      </div>
+    </>
   );
 }
 
