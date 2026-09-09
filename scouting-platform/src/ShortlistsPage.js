@@ -121,7 +121,8 @@ const shortlistPhoto = (name, lower = true) =>
 const shortlistPhotoCandidates = (name) => {
   const raw = String(name || "").trim();
   const display = raw.split(/\s+/).length > 2 ? `${raw.split(/\s+/)[0]} ${raw.split(/\s+/).at(-1)}` : raw;
-  const bases = [...new Set([raw, display].map((value) => value.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_+|_+$/g, "")).filter(Boolean))];
+  const rawBases = [raw, display].map((value) => value.replace(/[^\p{L}\p{N}]+/gu, "_").replace(/^_+|_+$/g, ""));
+  const bases = [...new Set([...rawBases, ...rawBases.map((value) => value.normalize("NFD").replace(/[̀-ͯ]/g, ""))].filter(Boolean))];
   return [...new Set(bases.flatMap((base) => [base, base.toLowerCase(), base.toUpperCase(), `_${base}`, `_${base.toLowerCase()}`, `__${base}`]).map((base) => `${"https://syjsmvvsvvprxibqoizw.supabase.co/storage/v1/object/public/player-photos/player-photos/"}${base}.png`))];
 };
 const retryShortlistPhoto = (e, name) => {
@@ -542,7 +543,7 @@ export default function ShortlistsPage() {
               >
                 <img
                   className="sr-shortlist-player-photo"
-                  src={shortlistPhoto(p.player)}
+                  src={p.Photo || p.photo || p._photoUrl || shortlistPhoto(p.player)}
                   alt=""
                   onError={(e) => retryShortlistPhoto(e, p.player)}
                 />
