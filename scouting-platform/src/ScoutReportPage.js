@@ -604,6 +604,11 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     });
 
     const normalized = normalizeRows(parsed);
+    try {
+      sessionStorage.setItem("scoutReportUploadedData", JSON.stringify(normalized));
+    } catch (error) {
+      // Keep the report page usable if browser storage is unavailable or full.
+    }
     const detected = inferMetricColumns(normalized);
 
     const ranked = sortRowsByScore(normalized, detected);
@@ -650,6 +655,17 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
       },
     });
   };
+
+  useEffect(() => {
+    try {
+      const savedData = sessionStorage.getItem("scoutReportUploadedData");
+      if (savedData) processRows(JSON.parse(savedData));
+    } catch (error) {
+      sessionStorage.removeItem("scoutReportUploadedData");
+    }
+  // Restore the session-only dataset once when this page opens.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const applyFilters = () => {
     const f = players.filter((p) =>
