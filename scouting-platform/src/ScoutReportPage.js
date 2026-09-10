@@ -1044,8 +1044,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                 {selectedPlayer.Team}
               </div>
             </div>
-            <div data-pdf-clips="true" style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
-              <input type="text" placeholder="Insert Player Clips Here" value={clipsLink} onChange={(e) => setClipsLink(e.target.value)} style={{ border: "1px solid #ccc", borderRadius: 4, padding: "7px 9px", fontSize: 14, width: 220 }} />
+            <div data-pdf-clips="true" style={{ marginLeft: "auto", display: "flex", alignItems: "center" }}>
               {clipsLink.trim() ? (
                 <a
                   data-pdf-clips-link="true"
@@ -1053,12 +1052,31 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                   target="_blank"
                   rel="noreferrer"
                   aria-label="Open player clips"
+                  title="Click to open clips. Right-click to edit the link."
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    const nextLink = window.prompt("Enter the player clips URL", clipsLink);
+                    if (nextLink !== null) setClipsLink(nextLink.trim());
+                  }}
                   style={{ color: "#fff", textDecoration: "none", cursor: "pointer", display: "block" }}
                 >
                   <img src="/youtube-clips-icon.png" alt="Open player clips" style={{ width: 44, height: 44, display: "block" }} />
                 </a>
               ) : (
-                <img src="/youtube-clips-icon.png" alt="Player clips" style={{ width: 44, height: 44, display: "block" }} />
+                <button
+                  type="button"
+                  data-pdf-clips-link="true"
+                  aria-label="Add player clips link"
+                  title="Right-click to add a clips link"
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    const nextLink = window.prompt("Enter the player clips URL");
+                    if (nextLink !== null) setClipsLink(nextLink.trim());
+                  }}
+                  style={{ border: 0, padding: 0, background: "transparent", cursor: "context-menu" }}
+                >
+                  <img src="/youtube-clips-icon.png" alt="Add player clips link" style={{ width: 44, height: 44, display: "block" }} />
+                </button>
               )}
             </div>
           </div>
