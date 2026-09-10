@@ -65,6 +65,7 @@ export default function ScoutingReportsPageFinal() {
   });
   const [active, setActive] = useState(null);
   const [sharedReports, setSharedReports] = useState([]);
+  const [sharedAssignments, setSharedAssignments] = useState([]);
   const [playerData, setPlayerData] = useState(null);
   useEffect(() => {
     const selectedPlayer = profile || active;
@@ -90,8 +91,29 @@ export default function ScoutingReportsPageFinal() {
   const [report, setReport] = useState(empty);
   const [editing, setEditing] = useState(false);
   useEffect(() => {
-    if (appState) setItems((appState.assignments || []).filter((assignment) => !assignment.scoutId || assignment.scoutId === user?.id));
-  }, [appState, user?.id]);
+    const localAssignments = appState?.assignments || [];
+    const combined = [...localAssignments, ...sharedAssignments].filter((assignment) => assignment?.status !== "Published");
+    setItems([...new Map(combined.map((assignment) => [String(assignment.id), assignment])).values()]);
+  }, [appState, sharedAssignments]);
+  useEffect(() => {
+    if (!user || !accountProfile?.club) return;
+    supabase
+      .from("club_assignments")
+      .select("id, assigned_to, assignment, status")
+      .eq("club", accountProfile.club)
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("Could not load shared assignments", error);
+          return;
+        }
+        setSharedAssignments((data || []).map((row) => ({
+          ...(row.assignment || {}),
+          id: row.assignment?.id || row.id,
+          scoutId: row.assigned_to || row.assignment?.scoutId,
+          status: row.status || row.assignment?.status || "Not Started",
+        })));
+      });
+  }, [user, accountProfile?.club]);
   useEffect(() => {
     if (!user || !accountProfile?.club) return;
     supabase.from("club_reports").select("*").eq("club", accountProfile.club).eq("status", "Published").then(({ data, error }) => {
@@ -178,6 +200,7 @@ export default function ScoutingReportsPageFinal() {
       const shared = sharedReports.map((x) => ({ ...x, id: x.assignment_id || x.id, report: x.report, status: "Published", club: x.player_club || "Club not added", position: x.position || x.report?.playedPosition || "", date: x.completed_at, game: x.fixture_summary, scout: x.scout }));
       const source = tab === "Published" ? shared : items;
       return [...new Map(source.map((x) => [String(x.id), x])).values()]
+        .filter((x) => tab !== "My Assignments" || !x.scoutId || x.scoutId === user?.id)
         .filter((x) =>
           `${x.player} ${x.club} ${x.scout}`
             .toLowerCase()
@@ -189,7 +212,7 @@ export default function ScoutingReportsPageFinal() {
             : x.status !== "Published",
         );
     },
-    [items, query, tab, sharedReports],
+    [items, query, tab, sharedReports, user?.id],
   );
   const openReport = (x) => {
     setActive(x);
