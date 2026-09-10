@@ -150,7 +150,7 @@ export default function CreateAssignmentPage() {
   return (
     <main className="sr-page sr-wizard">
       <button className="sr-back" onClick={() => window.history.back()}>
-        ‹ Back to Scouting Reports
+        ‹ Back to Reports & Assignments
       </button>
       <div className="sr-wizard-title">
         <div className="sr-kicker">ASSIGNMENT MANAGEMENT</div>

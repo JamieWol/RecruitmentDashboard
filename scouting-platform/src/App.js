@@ -43,7 +43,7 @@ function Header() {
   const links = [
     { label: "Home", path: "/" },
     { label: "Scout Report", path: "/scout-report" },
-    { label: "Scouting Reports", path: "/scouting-reports" },
+    { label: "Reports & Assignments", path: "/scouting-reports" },
     { label: "Shortlists", path: "/shortlists" },
     { label: "Shadow Squads", path: "/shadow-squads" },
   ];
