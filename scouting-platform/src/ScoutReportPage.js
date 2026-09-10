@@ -40,6 +40,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
   const [shortlistPicker, setShortlistPicker] = useState(false);
   const [selectedShortlist, setSelectedShortlist] = useState("");
   const [selectedPosition, setSelectedPosition] = useState("CF-0");
+  const inactivityTimerRef = useRef(null);
   useEffect(() => {
     if (!profile?.club) return;
     supabase.from("club_reports").select("player,report,status,scout,completed_at").eq("club", profile.club).eq("status", "Published")
@@ -604,11 +605,6 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     });
 
     const normalized = normalizeRows(parsed);
-    try {
-      sessionStorage.setItem("scoutReportUploadedData", JSON.stringify(normalized));
-    } catch (error) {
-      // Keep the report page usable if browser storage is unavailable or full.
-    }
     const detected = inferMetricColumns(normalized);
 
     const ranked = sortRowsByScore(normalized, detected);
@@ -657,14 +653,25 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
   };
 
   useEffect(() => {
-    try {
-      const savedData = sessionStorage.getItem("scoutReportUploadedData");
-      if (savedData) processRows(JSON.parse(savedData));
-    } catch (error) {
-      sessionStorage.removeItem("scoutReportUploadedData");
-    }
-  // Restore the session-only dataset once when this page opens.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    const resetAfterInactivity = () => {
+      setPlayers([]);
+      setFilteredPlayers([]);
+      setMetrics([]);
+      setCompetitions([]);
+      setSelectedPlayer(null);
+      setScatterMetrics({ x: "", y: "" });
+    };
+    const restartTimer = () => {
+      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+      inactivityTimerRef.current = setTimeout(resetAfterInactivity, 30 * 60 * 1000);
+    };
+    const activityEvents = ["click", "keydown", "mousemove", "scroll"];
+    activityEvents.forEach((eventName) => window.addEventListener(eventName, restartTimer));
+    restartTimer();
+    return () => {
+      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+      activityEvents.forEach((eventName) => window.removeEventListener(eventName, restartTimer));
+    };
   }, []);
 
   const applyFilters = () => {
