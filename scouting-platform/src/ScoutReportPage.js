@@ -16,6 +16,8 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
+  ReferenceArea,
+  ReferenceLine,
   Tooltip,
   PieChart,
   Pie,
@@ -795,6 +797,14 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
       : [];
 
   const uniquePositions = Array.from(new Set(filteredPlayers.map((p) => p["Primary Position"]).filter(Boolean)));
+  const scatterPlotData = filteredPlayers.map((player) => {
+    const xPercentile = percentilesForPlayer(player).find((item) => item.metric === scatterMetrics.x)?.value ?? 0;
+    const yPercentile = percentilesForPlayer(player).find((item) => item.metric === scatterMetrics.y)?.value ?? 0;
+    return { ...player, scatterX: xPercentile, scatterY: yPercentile };
+  });
+  const selectedScatterPlayer = selectedPlayer
+    ? { ...selectedPlayer, scatterX: percentilesForPlayer(selectedPlayer).find((item) => item.metric === scatterMetrics.x)?.value ?? 0, scatterY: percentilesForPlayer(selectedPlayer).find((item) => item.metric === scatterMetrics.y)?.value ?? 0 }
+    : null;
 
     const generateScoutSummaryData = (player) => {
       if (!player) return { strengths: [], weaknesses: [], clipsLink: "#" };
@@ -1386,28 +1396,46 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 
               <ResponsiveContainer width="100%" height={500}>
                 <ScatterChart>
-                  <CartesianGrid stroke="#ddd" />
+                  <defs>
+                    <linearGradient id="scatterGreen" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stopColor="#f4f6c2" />
+                      <stop offset="100%" stopColor="#69b98b" />
+                    </linearGradient>
+                    <linearGradient id="scatterRed" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stopColor="#f5f6c5" />
+                      <stop offset="100%" stopColor="#d96b73" />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid stroke="#d8d8d8" />
                   <XAxis
-                    dataKey={scatterMetrics.x}
+                    dataKey="scatterX"
                     type="number"
-                    label={{ value: scatterMetrics.x, position:"bottom", offset:-8, fontWeight:"bold", fontSize:14 }}
+                    domain={[0, 100]}
+                    tickFormatter={(value) => `${value}%`}
+                    label={{ value: `${scatterMetrics.x} Percentile`, position:"bottom", offset:-8, fontWeight:"bold", fontSize:14 }}
                   />
                   <YAxis
-                    dataKey={scatterMetrics.y}
+                    dataKey="scatterY"
                     type="number"
-                    label={{ value: scatterMetrics.y, angle:-90, position:"left", offset:-2, fontWeight:"bold", fontSize:14 }}
+                    domain={[0, 100]}
+                    tickFormatter={(value) => `${value}%`}
+                    label={{ value: `${scatterMetrics.y} Percentile`, angle:-90, position:"left", offset:-2, fontWeight:"bold", fontSize:14 }}
                   />
+                  <ReferenceArea x1={0} x2={50} y1={50} y2={100} fill="url(#scatterGreen)" fillOpacity={0.55} label={{ value: "Strong in Turnovers Only", position: "insideTopLeft", fill: "#c28d00", fontWeight: 700 }} />
+                  <ReferenceArea x1={50} x2={100} y1={50} y2={100} fill="#77c38d" fillOpacity={0.55} label={{ value: "Strong In Both", position: "insideTopRight", fill: "#16852a", fontWeight: 700 }} />
+                  <ReferenceArea x1={0} x2={50} y1={0} y2={50} fill="url(#scatterRed)" fillOpacity={0.55} label={{ value: "Weak In Both", position: "insideBottomLeft", fill: "#f22", fontWeight: 700 }} />
+                  <ReferenceArea x1={50} x2={100} y1={0} y2={50} fill="#f4f2b8" fillOpacity={0.6} label={{ value: "Strong in Key Passes Only", position: "insideBottomRight", fill: "#c28d00", fontWeight: 700 }} />
+                  <ReferenceLine x={50} stroke="#222" strokeDasharray="6 4" />
+                  <ReferenceLine y={50} stroke="#222" strokeDasharray="6 4" />
                   <Tooltip content={<CustomScatterTooltip />} cursor={{ strokeDasharray: "3 3" }} />
                   <Scatter
-                    data={filteredPlayers}
-                    dataKeyX={scatterMetrics.x}
-                    dataKeyY={scatterMetrics.y}
+                    data={scatterPlotData}
+                    dataKey="scatterY"
                     fill="#555555"
                   />
                   <Scatter
-                    data={[selectedPlayer]}
-                    dataKeyX={scatterMetrics.x}
-                    dataKeyY={scatterMetrics.y}
+                    data={selectedScatterPlayer ? [selectedScatterPlayer] : []}
+                    dataKey="scatterY"
                     fill="#ff7f0e"
                     shape="circle"
                   />
