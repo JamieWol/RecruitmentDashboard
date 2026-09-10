@@ -1061,8 +1061,8 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                   style={{ color: "#fff", textDecoration: "none", cursor: "pointer", display: "block" }}
                 >
                   <span style={{ position: "relative", display: "block" }}>
-                    <img src="/youtube-clips-icon.png" alt="Open player clips" style={{ width: 58, height: 58, display: "block" }} />
-                    <img src="/click-hand-icon.png" alt="" aria-hidden="true" style={{ position: "absolute", width: 25, height: 25, right: -7, bottom: -7, objectFit: "contain" }} />
+                    <img src="/youtube-clips-icon.png" alt="Open player clips" style={{ width: 76, height: 76, display: "block" }} />
+                    <img src="/click-hand-icon-transparent.png" alt="" aria-hidden="true" style={{ position: "absolute", width: 42, height: 42, right: -10, bottom: -10, objectFit: "contain" }} />
                   </span>
                 </a>
               ) : (
@@ -1079,8 +1079,8 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                   style={{ border: 0, padding: 0, background: "transparent", cursor: "context-menu" }}
                 >
                   <span style={{ position: "relative", display: "block" }}>
-                    <img src="/youtube-clips-icon.png" alt="Add player clips link" style={{ width: 58, height: 58, display: "block" }} />
-                    <img src="/click-hand-icon.png" alt="" aria-hidden="true" style={{ position: "absolute", width: 25, height: 25, right: -7, bottom: -7, objectFit: "contain" }} />
+                    <img src="/youtube-clips-icon.png" alt="Add player clips link" style={{ width: 76, height: 76, display: "block" }} />
+                    <img src="/click-hand-icon-transparent.png" alt="" aria-hidden="true" style={{ position: "absolute", width: 42, height: 42, right: -10, bottom: -10, objectFit: "contain" }} />
                   </span>
                 </button>
               )}
