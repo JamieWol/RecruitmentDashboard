@@ -1261,7 +1261,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
             }}
           >
             <div style={{ textAlign: "center", fontWeight: 700, marginBottom: 10 }}>
-              Pizza Chart
+              {selectedPlayer["Player Name"]} — Pizza Chart
             </div>
 
             <ResponsiveContainer width="100%" height={500}>
@@ -1390,6 +1390,10 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 
                 {/* Legend */}
                 <Legend
+                  payload={[
+                    { value: selectedPlayer["Player Name"], type: "square", color: "#1a78cf" },
+                    { value: "League Average", type: "square", color: "#ffd700" }
+                  ]}
                   verticalAlign="bottom"
                   align="center"
                   iconType="none"
@@ -1473,10 +1477,10 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                     tick={{ fontSize: 10 }}
                     label={{ value: scatterMetrics.y, angle:-90, position:"left", offset:-2, fontWeight:"bold", fontSize:14 }}
                   />
-                  <ReferenceArea x1={0} x2={50} y1={50} y2={100} fill="url(#scatterGreen)" fillOpacity={0.32} label={{ value: `Strong in ${scatterMetrics.y} Only`, position: "insideTop", fill: "#c28d00", fontWeight: 700, fontSize: 11 }} />
-                  <ReferenceArea x1={50} x2={100} y1={50} y2={100} fill="#75bb88" fillOpacity={0.32} label={{ value: "Strong In Both", position: "insideTop", fill: "#16852a", fontWeight: 700, fontSize: 11 }} />
-                  <ReferenceArea x1={0} x2={50} y1={0} y2={50} fill="url(#scatterRed)" fillOpacity={0.38} label={{ value: "Weak In Both", position: "insideTop", fill: "#f22", fontWeight: 700, fontSize: 11 }} />
-                  <ReferenceArea x1={50} x2={100} y1={0} y2={50} fill="url(#scatterYellow)" fillOpacity={0.42} label={{ value: `Strong in ${scatterMetrics.x} Only`, position: "insideTop", fill: "#c28d00", fontWeight: 700, fontSize: 11 }} />
+                  <ReferenceArea x1={0} x2={50} y1={50} y2={100} fill="url(#scatterGreen)" fillOpacity={0.32} />
+                  <ReferenceArea x1={50} x2={100} y1={50} y2={100} fill="#75bb88" fillOpacity={0.32} />
+                  <ReferenceArea x1={0} x2={50} y1={0} y2={50} fill="url(#scatterRed)" fillOpacity={0.38} />
+                  <ReferenceArea x1={50} x2={100} y1={0} y2={50} fill="url(#scatterYellow)" fillOpacity={0.42} />
                   <ReferenceLine x={50} stroke="#222" strokeDasharray="6 4" />
                   <ReferenceLine y={50} stroke="#222" strokeDasharray="6 4" />
                   <Tooltip content={<CustomScatterTooltip />} cursor={{ strokeDasharray: "3 3" }} />
@@ -1484,15 +1488,19 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                     data={scatterPlotData}
                     dataKey="scatterY"
                     fill="#555555"
-                    label={{ dataKey: "Player Name", position: "top", fontSize: 10, fill: "#222" }}
+                    label={{ dataKey: "Player Name", position: "right", fontSize: 10, fill: "#222" }}
                   />
                   <Scatter
                     data={selectedScatterPlayer ? [selectedScatterPlayer] : []}
                     dataKey="scatterY"
                     fill="#ff7f0e"
                     shape="circle"
-                    label={{ dataKey: "Player Name", position: "top", fontSize: 10, fill: "#222", fontWeight: 700 }}
+                    label={{ dataKey: "Player Name", position: "right", fontSize: 10, fill: "#222", fontWeight: 700 }}
                   />
+                  <ReferenceArea x1={0} x2={50} y1={50} y2={100} fill="none" label={{ value: `Strong in ${scatterMetrics.y} Only`, position: "insideTop", fill: "#c28d00", fontWeight: 700, fontSize: 11 }} />
+                  <ReferenceArea x1={50} x2={100} y1={50} y2={100} fill="none" label={{ value: "Strong In Both", position: "insideTop", fill: "#16852a", fontWeight: 700, fontSize: 11 }} />
+                  <ReferenceArea x1={0} x2={50} y1={0} y2={50} fill="none" label={{ value: "Weak In Both", position: "insideTop", fill: "#f22", fontWeight: 700, fontSize: 11 }} />
+                  <ReferenceArea x1={50} x2={100} y1={0} y2={50} fill="none" label={{ value: `Strong in ${scatterMetrics.x} Only`, position: "insideTop", fill: "#c28d00", fontWeight: 700, fontSize: 11 }} />
                 </ScatterChart>
               </ResponsiveContainer>
             </div>
