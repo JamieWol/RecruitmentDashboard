@@ -675,10 +675,12 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     activityEvents.forEach((eventName) => window.addEventListener(eventName, restartTimer));
     restartTimer();
 
-    const navigationEntry = performance.getEntriesByType("navigation")[0];
-    const isBrowserRefresh = navigationEntry?.type === "reload";
-    if (isBrowserRefresh) {
+    const currentPageLoadId = String(performance.timeOrigin || "");
+    const previousPageLoadId = sessionStorage.getItem("scoutReportPageLoadId");
+    const isNewBrowserLoad = currentPageLoadId && previousPageLoadId !== currentPageLoadId;
+    if (isNewBrowserLoad) {
       sessionStorage.removeItem("scoutReportUploadedData");
+      sessionStorage.setItem("scoutReportPageLoadId", currentPageLoadId);
     } else {
       try {
         const savedData = sessionStorage.getItem("scoutReportUploadedData");
