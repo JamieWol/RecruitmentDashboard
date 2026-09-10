@@ -19,6 +19,7 @@ import {
   ReferenceArea,
   ReferenceLine,
   Tooltip,
+  LabelList,
   PieChart,
   Pie,
   Cell,
@@ -779,16 +780,6 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     return null;
   };
 
-  const scatterPlayerLabel = ({ x, y, value, viewBox }) => {
-    if (x === undefined || y === undefined || !value) return null;
-    const text = String(value);
-    const estimatedWidth = text.length * 5.5;
-    const minX = (viewBox?.x ?? 0) + 4;
-    const maxX = (viewBox?.x ?? 0) + (viewBox?.width ?? 0) - estimatedWidth - 4;
-    const labelX = Math.max(minX, Math.min(x + 8, maxX));
-    return <text x={labelX} y={y + 4} fontSize={10} fill="#222" fontWeight={value === selectedPlayer?.["Player Name"] ? 700 : 400}>{text}</text>;
-  };
-
   const attackingMetrics = metrics.filter(m => /goal|assist|shot|key pass|xg/i.test(m));
   const defendingMetrics = metrics.filter(m => /tackle|intercept|clearance|block|aerial|pressures/i.test(m));
   const ballCarryingMetrics = metrics.filter(m => /dribble|carry|progressive|pass/i.test(m));
@@ -1504,15 +1495,17 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                     data={scatterPlotData}
                     dataKey="scatterY"
                     fill="#555555"
-                    label={{ content: scatterPlayerLabel }}
-                  />
+                  >
+                    <LabelList dataKey="Player Name" position="right" fontSize={10} fill="#222" />
+                  </Scatter>
                   <Scatter
                     data={selectedScatterPlayer ? [selectedScatterPlayer] : []}
                     dataKey="scatterY"
                     fill="#ff7f0e"
                     shape="circle"
-                    label={{ content: scatterPlayerLabel }}
-                  />
+                  >
+                    <LabelList dataKey="Player Name" position="right" fontSize={10} fill="#222" />
+                  </Scatter>
                   <ReferenceArea x1={0} x2={50} y1={50} y2={100} fill="none" label={{ value: `Strong in ${scatterMetrics.y} Only`, position: "insideTop", fill: "#c28d00", fontWeight: 700, fontSize: 11 }} />
                   <ReferenceArea x1={50} x2={100} y1={50} y2={100} fill="none" label={{ value: "Strong In Both", position: "insideTop", fill: "#16852a", fontWeight: 700, fontSize: 11 }} />
                   <ReferenceArea x1={0} x2={50} y1={0} y2={50} fill="none" label={{ value: "Weak In Both", position: "insideTop", fill: "#f22", fontWeight: 700, fontSize: 11 }} />
