@@ -93,10 +93,26 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
         slice.height = Math.min(sourcePageHeight, canvas.height - sourceY);
         slice.getContext("2d").drawImage(canvas, 0, sourceY, canvas.width, slice.height, 0, 0, slice.width, slice.height);
         const scale = Math.min(pageWidth / slice.width, pageHeight / slice.height);
-        const imageWidth = slice.width * scale;
-        const imageHeight = slice.height * scale;
-        pdf.addImage(slice.toDataURL("image/png"), "PNG", (pdf.internal.pageSize.getWidth() - imageWidth) / 2, margin, imageWidth, imageHeight);
-      }
+    const imageWidth = slice.width * scale;
+    const imageHeight = slice.height * scale;
+    const imageX = (pdf.internal.pageSize.getWidth() - imageWidth) / 2;
+    pdf.addImage(slice.toDataURL("image/png"), "PNG", imageX, margin, imageWidth, imageHeight);
+
+    const clipsIcon = exportRef.current.querySelector("[data-pdf-clips-link]");
+    if (clipsIcon && clipsLink.trim()) {
+      const rootRect = exportRef.current.getBoundingClientRect();
+      const iconRect = clipsIcon.getBoundingClientRect();
+      const toPdfX = (value) => imageX + (value / rootRect.width) * imageWidth;
+      const toPdfY = (value) => margin + (value / rootRect.height) * imageHeight;
+      pdf.link(
+        toPdfX(iconRect.left - rootRect.left),
+        toPdfY(iconRect.top - rootRect.top),
+        (iconRect.width / rootRect.width) * imageWidth,
+        (iconRect.height / rootRect.height) * imageHeight,
+        { url: clipsLink.trim() }
+      );
+    }
+  }
       pdf.save(`${selectedPlayer["Player Name"]}_Report.pdf`);
     };
 
@@ -1028,6 +1044,23 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                 {selectedPlayer.Team}
               </div>
             </div>
+            <div data-pdf-clips="true" style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
+              {clipsLink.trim() ? (
+                <a
+                  data-pdf-clips-link="true"
+                  href={clipsLink.trim()}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Open player clips"
+                  style={{ color: "#fff", textDecoration: "none", fontSize: 18, cursor: "pointer" }}
+                >
+                  <img src="/youtube-clips-icon.png" alt="Open player clips" style={{ width: 28, height: 28, display: "block" }} />
+                </a>
+              ) : (
+                <img src="/youtube-clips-icon.png" alt="Player clips" style={{ width: 28, height: 28, display: "block" }} />
+              )}
+              <input type="text" placeholder="Insert Player Clips Here" value={clipsLink} onChange={(e) => setClipsLink(e.target.value)} style={{ border: "1px solid #ccc", borderRadius: 4, padding: "7px 9px", fontSize: 14, width: 220 }} />
+            </div>
           </div>
 
           {/* Info Panel + Pie Charts */}
@@ -1086,7 +1119,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 
                   <div style={{ display:"flex", alignItems:"center", gap:5 }}>
                     <div style={{ width:30, height:10, background:"#ffd700", borderRadius:3 }} />
-                    <span style={{ fontSize:12 }}>League Avg</span>
+                    <span style={{ fontSize:12 }}>League Average</span>
                   </div>
                 </div>
               </div>
@@ -1198,7 +1231,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                         </div>
 
                         <div style={{ color: "#000", fontWeight: 600 }}>
-                          League Avg: {league}%
+                          League Average: {league}%
                         </div>
                       </div>
                     );
@@ -1212,7 +1245,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                   strokeWidth={3}
                   fill="#ffd700"
                   fillOpacity={1}
-                  name="League Avg"
+                  name="League Average"
                   label={({ x, y, value }) => (
                     <g>
                       <rect
@@ -1281,7 +1314,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                   align="center"
                   iconType="none"
                   formatter={(value) => {
-                    const color = value === "League Avg" ? "#ffd700" : "#1a78cf";
+                    const color = value === "League Average" ? "#ffd700" : "#1a78cf";
                     return (
                       <span
                         style={{
@@ -1327,7 +1360,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                 {scatterMetrics.x} vs {scatterMetrics.y}
               </div>
 
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={500}>
                 <ScatterChart>
                   <CartesianGrid stroke="#ddd" />
                   <XAxis
@@ -1441,34 +1474,6 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                                   </p>
                                 </div>
 
-                                {/* Clips */}
-
-                                <div
-                                  style={{ order: 3,
-                                    marginTop: 14,
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 6,
-                                  }}
-                                >
-                                  <span role="img" aria-label="clips" style={{ fontSize: 18 }}>
-                                    🎬
-                                  </span>
-                                    <input
-                                      type="text"
-                                      placeholder="Insert Player Clips Here"
-                                      value={clipsLink}
-                                      onChange={(e) => setClipsLink(e.target.value)}
-                                      style={{
-                                        border: "1px solid #ccc",
-                                        borderRadius: 4,
-                                        padding: "4px 8px",
-                                        fontSize: 14,
-                                        width: 220,
-                                      }}
-                                    />
-
-                                </div>
                               </div>
                             );
                           })() : (
