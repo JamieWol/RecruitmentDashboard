@@ -1151,8 +1151,8 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
               Pizza Chart
             </div>
 
-            <ResponsiveContainer width="100%" height={300}>
-              <RadarChart data={pizzaData}>
+            <ResponsiveContainer width="100%" height={500}>
+              <RadarChart data={pizzaData} cx="50%" cy="45%" outerRadius="68%">
                 {/* Grid */}
                 <PolarGrid
                   gridType="polygon"
