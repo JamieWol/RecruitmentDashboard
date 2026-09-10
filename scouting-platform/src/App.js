@@ -45,7 +45,6 @@ function Header() {
     { label: "Scout Report", path: "/scout-report" },
     { label: "Reports & Assignments", path: "/scouting-reports" },
     { label: "Shortlists", path: "/shortlists" },
-    { label: "Shadow Squads", path: "/shadow-squads" },
   ];
 
   return (
