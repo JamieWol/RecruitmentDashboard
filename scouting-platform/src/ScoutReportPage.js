@@ -1399,11 +1399,11 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                   <defs>
                     <linearGradient id="scatterGreen" x1="0" y1="0" x2="1" y2="1">
                       <stop offset="0%" stopColor="#f4f6c2" />
-                      <stop offset="100%" stopColor="#69b98b" />
+                      <stop offset="100%" stopColor="#79bd8c" />
                     </linearGradient>
                     <linearGradient id="scatterRed" x1="0" y1="0" x2="1" y2="1">
-                      <stop offset="0%" stopColor="#f5f6c5" />
-                      <stop offset="100%" stopColor="#d96b73" />
+                      <stop offset="0%" stopColor="#f5d99d" />
+                      <stop offset="100%" stopColor="#cf6f78" />
                     </linearGradient>
                   </defs>
                   <CartesianGrid stroke="#d8d8d8" />
@@ -1412,19 +1412,19 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                     type="number"
                     domain={[0, 100]}
                     tickFormatter={(value) => `${value}%`}
-                    label={{ value: `${scatterMetrics.x} Percentile`, position:"bottom", offset:-8, fontWeight:"bold", fontSize:14 }}
+                    label={{ value: scatterMetrics.x, position:"bottom", offset:-8, fontWeight:"bold", fontSize:14 }}
                   />
                   <YAxis
                     dataKey="scatterY"
                     type="number"
                     domain={[0, 100]}
                     tickFormatter={(value) => `${value}%`}
-                    label={{ value: `${scatterMetrics.y} Percentile`, angle:-90, position:"left", offset:-2, fontWeight:"bold", fontSize:14 }}
+                    label={{ value: scatterMetrics.y, angle:-90, position:"left", offset:-2, fontWeight:"bold", fontSize:14 }}
                   />
-                  <ReferenceArea x1={0} x2={50} y1={50} y2={100} fill="url(#scatterGreen)" fillOpacity={0.55} label={{ value: "Strong in Turnovers Only", position: "insideTopLeft", fill: "#c28d00", fontWeight: 700 }} />
-                  <ReferenceArea x1={50} x2={100} y1={50} y2={100} fill="#77c38d" fillOpacity={0.55} label={{ value: "Strong In Both", position: "insideTopRight", fill: "#16852a", fontWeight: 700 }} />
-                  <ReferenceArea x1={0} x2={50} y1={0} y2={50} fill="url(#scatterRed)" fillOpacity={0.55} label={{ value: "Weak In Both", position: "insideBottomLeft", fill: "#f22", fontWeight: 700 }} />
-                  <ReferenceArea x1={50} x2={100} y1={0} y2={50} fill="#f4f2b8" fillOpacity={0.6} label={{ value: "Strong in Key Passes Only", position: "insideBottomRight", fill: "#c28d00", fontWeight: 700 }} />
+                  <ReferenceArea x1={0} x2={50} y1={50} y2={100} fill="url(#scatterGreen)" fillOpacity={0.62} label={{ value: "Strong in Turnovers Only", position: "center", fill: "#c28d00", fontWeight: 700, fontSize: 11 }} />
+                  <ReferenceArea x1={50} x2={100} y1={50} y2={100} fill="#75bb88" fillOpacity={0.62} label={{ value: "Strong In Both", position: "center", fill: "#16852a", fontWeight: 700, fontSize: 11 }} />
+                  <ReferenceArea x1={0} x2={50} y1={0} y2={50} fill="url(#scatterRed)" fillOpacity={0.62} label={{ value: "Weak In Both", position: "center", fill: "#f22", fontWeight: 700, fontSize: 11 }} />
+                  <ReferenceArea x1={50} x2={100} y1={0} y2={50} fill="#f5f1b8" fillOpacity={0.72} label={{ value: "Strong in Key Passes Only", position: "center", fill: "#c28d00", fontWeight: 700, fontSize: 11 }} />
                   <ReferenceLine x={50} stroke="#222" strokeDasharray="6 4" />
                   <ReferenceLine y={50} stroke="#222" strokeDasharray="6 4" />
                   <Tooltip content={<CustomScatterTooltip />} cursor={{ strokeDasharray: "3 3" }} />
