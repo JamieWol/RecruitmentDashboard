@@ -605,6 +605,11 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     });
 
     const normalized = normalizeRows(parsed);
+    try {
+      sessionStorage.setItem("scoutReportUploadedData", JSON.stringify(normalized));
+    } catch (error) {
+      // Keep the report page usable if browser storage is unavailable or full.
+    }
     const detected = inferMetricColumns(normalized);
 
     const ranked = sortRowsByScore(normalized, detected);
@@ -654,6 +659,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 
   useEffect(() => {
     const resetAfterInactivity = () => {
+      sessionStorage.removeItem("scoutReportUploadedData");
       setPlayers([]);
       setFilteredPlayers([]);
       setMetrics([]);
@@ -668,10 +674,25 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     const activityEvents = ["click", "keydown", "mousemove", "scroll"];
     activityEvents.forEach((eventName) => window.addEventListener(eventName, restartTimer));
     restartTimer();
+
+    const navigationEntry = performance.getEntriesByType("navigation")[0];
+    const isBrowserRefresh = navigationEntry?.type === "reload";
+    if (isBrowserRefresh) {
+      sessionStorage.removeItem("scoutReportUploadedData");
+    } else {
+      try {
+        const savedData = sessionStorage.getItem("scoutReportUploadedData");
+        if (savedData) processRows(JSON.parse(savedData));
+      } catch (error) {
+        sessionStorage.removeItem("scoutReportUploadedData");
+      }
+    }
     return () => {
       if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
       activityEvents.forEach((eventName) => window.removeEventListener(eventName, restartTimer));
     };
+  // Restore uploaded data once when returning to this page in the same tab.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const applyFilters = () => {
