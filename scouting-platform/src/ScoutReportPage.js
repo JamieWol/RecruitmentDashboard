@@ -779,6 +779,16 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     return null;
   };
 
+  const scatterPlayerLabel = ({ x, y, value, viewBox }) => {
+    if (x === undefined || y === undefined || !value) return null;
+    const text = String(value);
+    const estimatedWidth = text.length * 5.5;
+    const minX = (viewBox?.x ?? 0) + 4;
+    const maxX = (viewBox?.x ?? 0) + (viewBox?.width ?? 0) - estimatedWidth - 4;
+    const labelX = Math.max(minX, Math.min(x + 8, maxX));
+    return <text x={labelX} y={y + 4} fontSize={10} fill="#222" fontWeight={value === selectedPlayer?.["Player Name"] ? 700 : 400}>{text}</text>;
+  };
+
   const attackingMetrics = metrics.filter(m => /goal|assist|shot|key pass|xg/i.test(m));
   const defendingMetrics = metrics.filter(m => /tackle|intercept|clearance|block|aerial|pressures/i.test(m));
   const ballCarryingMetrics = metrics.filter(m => /dribble|carry|progressive|pass/i.test(m));
@@ -1394,6 +1404,12 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                     { value: selectedPlayer["Player Name"], type: "square", color: "#1a78cf" },
                     { value: "League Average", type: "square", color: "#ffd700" }
                   ]}
+                  content={() => (
+                    <div style={{ display: "flex", justifyContent: "center", gap: 18, marginTop: 10, fontSize: 12, fontWeight: 600, color: "#000" }}>
+                      <span><span style={{ display: "inline-block", width: 14, height: 14, marginRight: 6, verticalAlign: "-2px", background: "#1a78cf", border: "1px solid #000" }} />{selectedPlayer["Player Name"]}</span>
+                      <span><span style={{ display: "inline-block", width: 14, height: 14, marginRight: 6, verticalAlign: "-2px", background: "#ffd700", border: "1px solid #000" }} />League Average</span>
+                    </div>
+                  )}
                   verticalAlign="bottom"
                   align="center"
                   iconType="none"
@@ -1488,14 +1504,14 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                     data={scatterPlotData}
                     dataKey="scatterY"
                     fill="#555555"
-                    label={{ dataKey: "Player Name", position: "right", fontSize: 10, fill: "#222" }}
+                    label={{ content: scatterPlayerLabel }}
                   />
                   <Scatter
                     data={selectedScatterPlayer ? [selectedScatterPlayer] : []}
                     dataKey="scatterY"
                     fill="#ff7f0e"
                     shape="circle"
-                    label={{ dataKey: "Player Name", position: "right", fontSize: 10, fill: "#222", fontWeight: 700 }}
+                    label={{ content: scatterPlayerLabel }}
                   />
                   <ReferenceArea x1={0} x2={50} y1={50} y2={100} fill="none" label={{ value: `Strong in ${scatterMetrics.y} Only`, position: "insideTop", fill: "#c28d00", fontWeight: 700, fontSize: 11 }} />
                   <ReferenceArea x1={50} x2={100} y1={50} y2={100} fill="none" label={{ value: "Strong In Both", position: "insideTop", fill: "#16852a", fontWeight: 700, fontSize: 11 }} />
