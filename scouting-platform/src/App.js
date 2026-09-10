@@ -4,7 +4,6 @@ import { AuthProvider, useAuth } from "./AuthContext";
 import { supabase } from "./supabaseClient";
 import LandingPage from "./LandingPage";
 import ScoutReportPage from "./ScoutReportPage";
-import ShadowSquadsPage from "./ShadowSquadsPage";
 import RecruitmentDashboardPage from "./RecruitmentDashboardPage";
 import ScoutingReportsPage from "./ScoutingReportsPageFinal";
 import ShortlistsPage from "./ShortlistsPage";
@@ -23,7 +22,7 @@ function LoginGate() {
 
 function AppRoutes() {
   const [shadowSquad, setShadowSquad] = useState([]);
-  return <><Header /><div style={{ paddingTop: 80 }}><Routes><Route path="/" element={<LandingPage />} /><Route path="/scout-report" element={<ScoutReportPage shadowSquad={shadowSquad} setShadowSquad={setShadowSquad} />} /><Route path="/scouting-reports" element={<ScoutingReportsPage />} /><Route path="/shortlists" element={<ShortlistsPage />} /><Route path="/create-assignment" element={<CreateAssignmentPage />} /><Route path="/shadow-squads" element={<ShadowSquadsPage shadowSquad={shadowSquad} setShadowSquad={setShadowSquad} />} /><Route path="/recruitment-dashboard" element={<RecruitmentDashboardPage />} /></Routes></div></>;
+  return <><Header /><div style={{ paddingTop: 80 }}><Routes><Route path="/" element={<LandingPage />} /><Route path="/scout-report" element={<ScoutReportPage shadowSquad={shadowSquad} setShadowSquad={setShadowSquad} />} /><Route path="/scouting-reports" element={<ScoutingReportsPage />} /><Route path="/shortlists" element={<ShortlistsPage />} /><Route path="/create-assignment" element={<CreateAssignmentPage />} /><Route path="/recruitment-dashboard" element={<RecruitmentDashboardPage />} /></Routes></div></>;
 }
 
 // ------------------- HEADER COMPONENT -------------------
