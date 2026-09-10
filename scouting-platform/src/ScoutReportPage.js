@@ -1044,7 +1044,8 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                 {selectedPlayer.Team}
               </div>
             </div>
-            <div data-pdf-clips="true" style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
+            <div data-pdf-clips="true" style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
+              <input type="text" placeholder="Insert Player Clips Here" value={clipsLink} onChange={(e) => setClipsLink(e.target.value)} style={{ border: "1px solid #ccc", borderRadius: 4, padding: "7px 9px", fontSize: 14, width: 220 }} />
               {clipsLink.trim() ? (
                 <a
                   data-pdf-clips-link="true"
@@ -1052,14 +1053,13 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                   target="_blank"
                   rel="noreferrer"
                   aria-label="Open player clips"
-                  style={{ color: "#fff", textDecoration: "none", fontSize: 18, cursor: "pointer" }}
+                  style={{ color: "#fff", textDecoration: "none", cursor: "pointer", display: "block" }}
                 >
-                  <img src="/youtube-clips-icon.png" alt="Open player clips" style={{ width: 28, height: 28, display: "block" }} />
+                  <img src="/youtube-clips-icon.png" alt="Open player clips" style={{ width: 44, height: 44, display: "block" }} />
                 </a>
               ) : (
-                <img src="/youtube-clips-icon.png" alt="Player clips" style={{ width: 28, height: 28, display: "block" }} />
+                <img src="/youtube-clips-icon.png" alt="Player clips" style={{ width: 44, height: 44, display: "block" }} />
               )}
-              <input type="text" placeholder="Insert Player Clips Here" value={clipsLink} onChange={(e) => setClipsLink(e.target.value)} style={{ border: "1px solid #ccc", borderRadius: 4, padding: "7px 9px", fontSize: 14, width: 220 }} />
             </div>
           </div>
 
