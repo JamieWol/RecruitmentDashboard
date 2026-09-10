@@ -1462,6 +1462,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                     type="number"
                     domain={[0, 100]}
                     tickFormatter={(value) => `${value}%`}
+                    tick={{ fontSize: 10 }}
                     label={{ value: scatterMetrics.x, position:"bottom", offset:-8, fontWeight:"bold", fontSize:14 }}
                   />
                   <YAxis
@@ -1469,6 +1470,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                     type="number"
                     domain={[0, 100]}
                     tickFormatter={(value) => `${value}%`}
+                    tick={{ fontSize: 10 }}
                     label={{ value: scatterMetrics.y, angle:-90, position:"left", offset:-2, fontWeight:"bold", fontSize:14 }}
                   />
                   <ReferenceArea x1={0} x2={50} y1={50} y2={100} fill="url(#scatterGreen)" fillOpacity={0.32} label={{ value: `Strong in ${scatterMetrics.y} Only`, position: "insideTop", fill: "#c28d00", fontWeight: 700, fontSize: 11 }} />
@@ -1482,12 +1484,14 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                     data={scatterPlotData}
                     dataKey="scatterY"
                     fill="#555555"
+                    label={{ dataKey: "Player Name", position: "top", fontSize: 10, fill: "#222" }}
                   />
                   <Scatter
                     data={selectedScatterPlayer ? [selectedScatterPlayer] : []}
                     dataKey="scatterY"
                     fill="#ff7f0e"
                     shape="circle"
+                    label={{ dataKey: "Player Name", position: "top", fontSize: 10, fill: "#222", fontWeight: 700 }}
                   />
                 </ScatterChart>
               </ResponsiveContainer>
