@@ -1060,7 +1060,10 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                   }}
                   style={{ color: "#fff", textDecoration: "none", cursor: "pointer", display: "block" }}
                 >
-                  <img src="/youtube-clips-icon.png" alt="Open player clips" style={{ width: 44, height: 44, display: "block" }} />
+                  <span style={{ position: "relative", display: "block" }}>
+                    <img src="/youtube-clips-icon.png" alt="Open player clips" style={{ width: 58, height: 58, display: "block" }} />
+                    <img src="/click-hand-icon.png" alt="" aria-hidden="true" style={{ position: "absolute", width: 25, height: 25, right: -7, bottom: -7, objectFit: "contain" }} />
+                  </span>
                 </a>
               ) : (
                 <button
@@ -1075,7 +1078,10 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                   }}
                   style={{ border: 0, padding: 0, background: "transparent", cursor: "context-menu" }}
                 >
-                  <img src="/youtube-clips-icon.png" alt="Add player clips link" style={{ width: 44, height: 44, display: "block" }} />
+                  <span style={{ position: "relative", display: "block" }}>
+                    <img src="/youtube-clips-icon.png" alt="Add player clips link" style={{ width: 58, height: 58, display: "block" }} />
+                    <img src="/click-hand-icon.png" alt="" aria-hidden="true" style={{ position: "absolute", width: 25, height: 25, right: -7, bottom: -7, objectFit: "contain" }} />
+                  </span>
                 </button>
               )}
             </div>
