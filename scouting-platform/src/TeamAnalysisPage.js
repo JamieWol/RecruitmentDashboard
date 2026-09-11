@@ -26,6 +26,13 @@ const styleGroup = (metric) => {
   if (/xg|expected|carry|dribble|possession|pass/.test(label)) return "Build-up & Possession";
   return "Attacking Output";
 };
+class ChartBoundary extends React.Component {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  render() {
+    return this.state.failed ? <div style={{ padding: 24, color: "#667" }}>Chart unavailable for this upload.</div> : this.props.children;
+  }
+}
 
 export default function TeamAnalysisPage() {
   const [rows, setRows] = useState([]);
@@ -140,7 +147,7 @@ export default function TeamAnalysisPage() {
                 })}
               </div>
             </section>
-            <section style={{ order: 3, marginTop: 24, background: "#fff", color: "#123", border: "2px solid #2080bd", borderRadius: 14, padding: "20px 28px" }}><div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 28 }}><div><h2 style={{ color: "#1680bd", margin: "0 0 4px" }}><span>Team</span><span style={{ marginLeft: "0.3em" }}>Style</span></h2><p style={{ color: "#667", marginTop: 0 }}>Profile based on the uploaded metric percentiles.</p><ResponsiveContainer width="100%" height={300}><RadarChart data={styleData} cx="50%" cy="50%" outerRadius="68%"><PolarGrid /><PolarAngleAxis dataKey="style" tick={{ fontSize: 12, fill: "#123" }} /><Radar name="Team style" dataKey="score" stroke="#1680bd" fill="#1680bd" fillOpacity={0.45} /></RadarChart></ResponsiveContainer></div><div><h2 style={{ color: "#1680bd", margin: "0 0 4px" }}><span>Style</span><span style={{ marginLeft: "0.3em" }}>Areas</span></h2><p style={{ color: "#667", marginTop: 0 }}>Overall scores by playing area.</p><ResponsiveContainer width="100%" height={300}><BarChart data={styleData} layout="vertical" margin={{ left: 20, right: 20 }}><CartesianGrid strokeDasharray="3 3" /><XAxis type="number" domain={[0, 100]} hide /><YAxis type="category" dataKey="style" width={145} tick={{ fontSize: 11, fill: "#123" }} /><Bar dataKey="score" fill="#1680bd" radius={[0, 5, 5, 0]} /></BarChart></ResponsiveContainer></div></div></section>
+            <ChartBoundary><section style={{ order: 3, marginTop: 24, background: "#fff", color: "#123", border: "2px solid #2080bd", borderRadius: 14, padding: "20px 28px" }}><div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 28 }}><div><h2 style={{ color: "#1680bd", margin: "0 0 4px" }}><span>Team</span><span style={{ marginLeft: "0.3em" }}>Style</span></h2><p style={{ color: "#667", marginTop: 0 }}>Profile based on the uploaded metric percentiles.</p><ResponsiveContainer width="100%" height={300}><RadarChart data={styleData} cx="50%" cy="50%" outerRadius="68%"><PolarGrid /><PolarAngleAxis dataKey="style" tick={{ fontSize: 12, fill: "#123" }} /><Radar name="Team style" dataKey="score" stroke="#1680bd" fill="#1680bd" fillOpacity={0.45} /></RadarChart></ResponsiveContainer></div><div><h2 style={{ color: "#1680bd", margin: "0 0 4px" }}><span>Style</span><span style={{ marginLeft: "0.3em" }}>Areas</span></h2><p style={{ color: "#667", marginTop: 0 }}>Overall scores by playing area.</p><ResponsiveContainer width="100%" height={300}><BarChart data={styleData} layout="vertical" margin={{ left: 20, right: 20 }}><CartesianGrid strokeDasharray="3 3" /><XAxis type="number" domain={[0, 100]} hide /><YAxis type="category" dataKey="style" width={145} tick={{ fontSize: 11, fill: "#123" }} /><Bar dataKey="score" fill="#1680bd" radius={[0, 5, 5, 0]} /></BarChart></ResponsiveContainer></div></div></section></ChartBoundary>
             </div>
           </>
         )}
