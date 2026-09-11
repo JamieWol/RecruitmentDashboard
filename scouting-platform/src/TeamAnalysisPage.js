@@ -41,8 +41,9 @@ export default function TeamAnalysisPage() {
     const values = rows.map((row) => number(row[metric])).filter((value) => value !== null);
     const value = number(selected?.[metric]);
     const average = values.length ? values.reduce((sum, item) => sum + item, 0) / values.length : 0;
+    const maximum = values.length ? Math.max(...values) : 0;
     const percentile = value === null || !values.length ? 0 : (values.filter((item) => item <= value).length / values.length) * 100;
-    return { metric, percentile: Math.round(percentile), teamValue: value ?? 0, leagueAverage: Number(average.toFixed(2)) };
+    return { metric, percentile: Math.round(percentile), teamValue: value ?? 0, leagueAverage: Number(average.toFixed(2)), leagueAveragePct: maximum ? Math.round((average / maximum) * 100) : 0 };
   });
 
   const upload = (event) => {
@@ -86,7 +87,7 @@ export default function TeamAnalysisPage() {
 
   return (
     <main style={{ minHeight: "calc(100vh - 80px)", background: "linear-gradient(135deg,#062c63 0%,#063d74 100%)", color: "#fff", padding: "42px clamp(22px,5vw,72px) 70px", boxSizing: "border-box" }}>
-      <div ref={dashboardRef} style={{ maxWidth: 1400, margin: "0 auto" }}>
+      <div style={{ maxWidth: 1400, margin: "0 auto" }}>
         <div style={{ color: "#6bd7fa", fontSize: 14, letterSpacing: 1 }}>SCOUTPRO PLATFORM</div>
         <h1 style={{ margin: "10px 0", fontSize: 48, fontWeight: 800, color: "#62dcff", textTransform: "uppercase", fontFamily: 'Impact,"Arial Narrow",sans-serif' }}>Team Analysis</h1>
         <p style={{ color: "#d7e8f8", fontSize: 18 }}>Upload league team data to compare performance across every available playing metric.</p>
@@ -105,9 +106,10 @@ export default function TeamAnalysisPage() {
               </label>
               <div style={{ color: "#d7e8f8", paddingBottom: 12 }}>{teams.length} teams · {metrics.length} detected metrics</div>
             </section>
+            <div ref={dashboardRef} style={{ background: "#062c63", padding: 18, borderRadius: 16 }}>
             <section style={{ marginTop: 28, display: "grid", gridTemplateColumns: "minmax(260px, .8fr) minmax(420px, 1.8fr)", gap: 24 }}>
               <div style={{ background: "#fff", color: "#123", borderRadius: 14, padding: 24, border: "2px solid #2080bd" }}><h2 style={{ marginTop: 0, color: "#000" }}>{normalise(selected?.[teamKey])}</h2><p style={{ color: "#1f77b4", fontWeight: 700 }}>Team information</p><p><strong>Games Played:</strong> {gamesKey ? normalise(selected?.[gamesKey]) || "-" : "-"}</p><p>{metrics.length} metrics available for comparison.</p><p>{rows.length} league records uploaded.</p></div>
-              <div style={{ background: "#fff", color: "#123", borderRadius: 14, padding: 18, border: "2px solid #2080bd" }}><h2 style={{ color: "#000", margin: "4px 8px 12px" }}>Team Percentiles</h2><ResponsiveContainer width="100%" height={420}><BarChart data={chartData} layout="vertical" margin={{ left: 20, right: 20 }}><CartesianGrid strokeDasharray="3 3" /><XAxis type="number" domain={[0, 100]} tickFormatter={(value) => `${value}%`} /><YAxis type="category" dataKey="metric" width={150} tick={{ fontSize: 11 }} /><Tooltip formatter={(value) => `${value}%`} /><Bar dataKey="percentile" name="Team percentile">{chartData.map((item) => <Cell key={item.metric} fill={scoreColour(item.percentile)} />)}</Bar></BarChart></ResponsiveContainer></div>
+              <div style={{ background: "#fff", color: "#123", borderRadius: 14, padding: 18, border: "2px solid #2080bd" }}><h2 style={{ color: "#000", margin: "4px 8px 12px" }}>Team Percentiles</h2><ResponsiveContainer width="100%" height={Math.max(420, chartData.length * 36)}><BarChart data={chartData} layout="vertical" barCategoryGap="22%" margin={{ left: 20, right: 20 }}><CartesianGrid strokeDasharray="3 3" /><XAxis type="number" domain={[0, 100]} tickFormatter={(value) => `${value}%`} /><YAxis type="category" dataKey="metric" width={150} tick={{ fontSize: 11 }} /><Tooltip formatter={(value, name) => [`${value}%`, name === "leagueAveragePct" ? "League Average" : "Team percentile"]} /><Bar dataKey="percentile" name="Team percentile" barSize={14}>{chartData.map((item) => <Cell key={item.metric} fill={scoreColour(item.percentile)} />)}</Bar><Bar dataKey="leagueAveragePct" name="League Average" fill="#c7cbd1" barSize={14} /></BarChart></ResponsiveContainer><div style={{ display: "flex", justifyContent: "center", gap: 20, marginTop: 8, fontSize: 12, fontWeight: 700 }}><span><i style={{ display: "inline-block", width: 13, height: 13, background: "#1f77b4", marginRight: 6, verticalAlign: "-2px" }} />Team percentile</span><span><i style={{ display: "inline-block", width: 13, height: 13, background: "#c7cbd1", marginRight: 6, verticalAlign: "-2px" }} />League Average</span></div></div>
             </section>
             <section style={{ marginTop: 28, background: "#fff", color: "#123", border: "2px solid #2080bd", borderRadius: 14, padding: "24px 28px" }}>
               <h2 style={{ color: "#000", margin: "0 0 22px" }}>Team Scorecard</h2>
@@ -122,6 +124,7 @@ export default function TeamAnalysisPage() {
                 {[['#15c77a','Top 25%'],['#ff9f1a','50%+'],['#ff4740','Below 25%'],['#ffd21c','League Average']].map(([colour, label]) => <span key={label} style={{ display: "flex", alignItems: "center", gap: 7 }}><i style={{ width: 14, height: 14, borderRadius: 4, background: colour, display: "inline-block" }} />{label}</span>)}
               </div>
             </section>
+            </div>
           </>
         )}
       </div>
