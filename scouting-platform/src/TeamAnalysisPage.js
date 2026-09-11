@@ -68,6 +68,8 @@ export default function TeamAnalysisPage() {
     const matching = chartData.filter((item) => styleGroup(item.metric) === style || (style === "Pressing & Regains" && /pressure|regain/i.test(item.metric)));
     return { style, score: matching.length ? Math.round(matching.reduce((sum, item) => sum + item.percentile, 0) / matching.length) : 0, leagueAverage: matching.length ? Math.round(matching.reduce((sum, item) => sum + item.leagueAveragePct, 0) / matching.length) : 0 };
   });
+  const metricColumns = ["In Possession", "Out Of Possession", "Set-Pieces"];
+  const renderMetric = (item) => <div key={item.metric} style={{ marginBottom: 14, breakInside: "avoid" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "end", gap: 10 }}><div><strong style={{ display: "block", fontSize: 14, color: "#fff" }}>{item.metric}</strong><small style={{ color: "#d2e5fa" }}>{item.teamValue}</small></div><strong style={{ color: "#fff", fontSize: 13 }}>{item.percentile}%</strong></div><div style={{ height: 11, marginTop: 4, borderRadius: 8, background: "#365b80", overflow: "hidden" }}><div style={{ width: `${item.percentile}%`, height: "100%", background: scoreColour(item.percentile), borderRadius: 8 }} /></div><div style={{ height: 11, marginTop: 4, borderRadius: 8, background: "#284d73", overflow: "hidden" }}><div style={{ width: `${item.leagueAveragePct}%`, height: "100%", background: "#ffd21c", borderRadius: 8 }} /><span style={{ position: "relative", display: "block", marginTop: -11, textAlign: "center", fontSize: 9, fontWeight: 800, color: "#111" }}>{item.leagueAveragePct}%</span></div></div>;
 
   const upload = (event) => {
     const file = event.target.files?.[0];
@@ -119,7 +121,7 @@ export default function TeamAnalysisPage() {
 
   return (
     <main style={{ minHeight: "calc(100vh - 80px)", background: "linear-gradient(135deg,#062c63 0%,#063d74 100%)", color: "#fff", padding: "42px clamp(22px,5vw,72px) 70px", boxSizing: "border-box" }}>
-      <style>{`[style*="column-count"]{column-count:3!important;column-gap:24px!important}`}</style>
+      <style>{`[style*="column-count"]{display:none!important}[data-grouped-metrics]{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}@media(max-width:800px){[data-grouped-metrics]{grid-template-columns:1fr}}`}</style>
       <div style={{ maxWidth: 1400, margin: "0 auto" }}>
         <div style={{ color: "#6bd7fa", fontSize: 14, letterSpacing: 1 }}>SCOUTPRO PLATFORM</div>
         <h1 style={{ margin: "10px 0", fontSize: 48, fontWeight: 800, color: "#62dcff", textTransform: "uppercase", fontFamily: 'Impact,"Arial Narrow",sans-serif' }}>Team Analysis</h1>
@@ -151,6 +153,7 @@ export default function TeamAnalysisPage() {
                 })}
               </div>
             </section>
+            <section data-grouped-metrics style={{ order: 2.5, marginTop: 24, background: "#173f70", color: "#fff", border: "2px solid #6a96bd", borderRadius: 14, padding: "24px 28px" }}><h2 style={{ gridColumn: "1 / -1", color: "#62dcff", margin: "0 0 8px" }}><span>Metric</span><span style={{ marginLeft: "0.3em" }}>Percentiles</span></h2>{metricColumns.map((group) => <div key={group}><h3 style={{ color: "#fff", fontSize: 18, margin: "0 0 16px", borderBottom: "1px solid #6a96bd", paddingBottom: 8 }}>{group}</h3>{chartData.filter((item) => metricGroup(item.metric) === group).map(renderMetric)}</div>)}</section>
             <ChartBoundary><section style={{ order: 3, marginTop: 24, background: "#173f70", color: "#fff", border: "2px solid #6a96bd", borderRadius: 14, padding: "20px 28px" }}><h2 style={{ color: "#62dcff", margin: "0 0 4px", textAlign: "center" }}><span>Team</span><span style={{ marginLeft: "0.3em" }}>Style</span></h2><p style={{ color: "#d2e5fa", marginTop: 0, textAlign: "center" }}>Team profile compared with the league average.</p><ResponsiveContainer width="100%" height={300}><RadarChart data={styleData} cx="50%" cy="50%" outerRadius="68%"><PolarGrid stroke="#6a96bd" /><PolarAngleAxis dataKey="style" tick={{ fontSize: 12, fill: "#d2e5fa" }} /><Radar name="League Average" dataKey="leagueAverage" stroke="#ffd21c" fill="#ffd21c" fillOpacity={0.28} /><Radar name={normalise(selected?.[teamKey]) || "Team"} dataKey="score" stroke="#62dcff" fill="#62dcff" fillOpacity={0.5} /></RadarChart></ResponsiveContainer><div style={{ display: "flex", justifyContent: "center", gap: 24, fontSize: 13, fontWeight: 700 }}><span><i style={{ display: "inline-block", width: 13, height: 13, borderRadius: 4, background: "#62dcff", marginRight: 6, verticalAlign: "-2px" }} />{normalise(selected?.[teamKey]) || "Team"}</span><span><i style={{ display: "inline-block", width: 13, height: 13, borderRadius: 4, background: "#ffd21c", marginRight: 6, verticalAlign: "-2px" }} />League Average</span></div></section></ChartBoundary>
             </div>
           </>
