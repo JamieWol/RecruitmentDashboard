@@ -3,7 +3,7 @@ import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 const normalise = (value) => String(value ?? "").trim();
 const number = (value) => {
@@ -11,6 +11,12 @@ const number = (value) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 const scoreColour = (score) => score >= 75 ? "#15c77a" : score >= 50 ? "#ff9f1a" : score >= 25 ? "#ffd21c" : "#ff4740";
+const metricGroup = (metric) => {
+  const label = metric.toLowerCase();
+  if (/set.?piece|corner|free.?kick|dead.?ball/.test(label)) return "Set-Pieces";
+  if (/tackle|intercept|clearance|pressure|regain|defensive|duel|block|conceded|aerial|defend|offside/.test(label)) return "Out Of Possession";
+  return "In Possession";
+};
 
 export default function TeamAnalysisPage() {
   const [rows, setRows] = useState([]);
@@ -101,21 +107,16 @@ export default function TeamAnalysisPage() {
             </section>
             <section style={{ marginTop: 28, display: "grid", gridTemplateColumns: "minmax(260px, .8fr) minmax(420px, 1.8fr)", gap: 24 }}>
               <div style={{ background: "#fff", color: "#123", borderRadius: 14, padding: 24, border: "2px solid #2080bd" }}><h2 style={{ marginTop: 0, color: "#000" }}>{normalise(selected?.[teamKey])}</h2><p style={{ color: "#1f77b4", fontWeight: 700 }}>Team information</p><p><strong>Games Played:</strong> {gamesKey ? normalise(selected?.[gamesKey]) || "-" : "-"}</p><p>{metrics.length} metrics available for comparison.</p><p>{rows.length} league records uploaded.</p></div>
-              <div style={{ background: "#fff", color: "#123", borderRadius: 14, padding: 18, border: "2px solid #2080bd" }}><h2 style={{ color: "#000", margin: "4px 8px 12px" }}>Team Percentiles</h2><ResponsiveContainer width="100%" height={420}><BarChart data={chartData} layout="vertical" margin={{ left: 20, right: 20 }}><CartesianGrid strokeDasharray="3 3" /><XAxis type="number" domain={[0, 100]} tickFormatter={(value) => `${value}%`} /><YAxis type="category" dataKey="metric" width={150} tick={{ fontSize: 11 }} /><Tooltip formatter={(value) => `${value}%`} /><Bar dataKey="percentile" fill="#1f77b4" name="Team percentile" /></BarChart></ResponsiveContainer></div>
+              <div style={{ background: "#fff", color: "#123", borderRadius: 14, padding: 18, border: "2px solid #2080bd" }}><h2 style={{ color: "#000", margin: "4px 8px 12px" }}>Team Percentiles</h2><ResponsiveContainer width="100%" height={420}><BarChart data={chartData} layout="vertical" margin={{ left: 20, right: 20 }}><CartesianGrid strokeDasharray="3 3" /><XAxis type="number" domain={[0, 100]} tickFormatter={(value) => `${value}%`} /><YAxis type="category" dataKey="metric" width={150} tick={{ fontSize: 11 }} /><Tooltip formatter={(value) => `${value}%`} /><Bar dataKey="percentile" name="Team percentile">{chartData.map((item) => <Cell key={item.metric} fill={scoreColour(item.percentile)} />)}</Bar></BarChart></ResponsiveContainer></div>
             </section>
             <section style={{ marginTop: 28, background: "#fff", color: "#123", border: "2px solid #2080bd", borderRadius: 14, padding: "24px 28px" }}>
               <h2 style={{ color: "#000", margin: "0 0 22px" }}>Team Scorecard</h2>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 22 }}>
-                {chartData.slice().sort((a, b) => b.percentile - a.percentile).slice(0, 8).map((item) => (
-                  <div key={item.metric} style={{ textAlign: "center" }}>
-                    <svg viewBox="0 0 120 120" width="112" height="112" role="img" aria-label={`${item.metric}: ${item.percentile}%`}>
-                      <circle cx="60" cy="60" r="48" fill="none" stroke="#e5e9ef" strokeWidth="10" />
-                      <circle cx="60" cy="60" r="48" fill="none" stroke={scoreColour(item.percentile)} strokeWidth="10" strokeLinecap="round" strokeDasharray={`${item.percentile * 3.016} 301.6`} transform="rotate(-90 60 60)" />
-                      <text x="60" y="66" textAnchor="middle" fontSize="24" fontWeight="800" fill="#123">{item.percentile}%</text>
-                    </svg>
-                    <div style={{ fontWeight: 700, fontSize: 13, lineHeight: 1.2 }}>{item.metric}</div>
-                  </div>
-                ))}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(180px,1fr))", gap: 30, maxWidth: 760, margin: "0 auto" }}>
+                {["In Possession", "Out Of Possession", "Set-Pieces"].map((group) => {
+                  const groupMetrics = chartData.filter((item) => metricGroup(item.metric) === group);
+                  const score = groupMetrics.length ? Math.round(groupMetrics.reduce((sum, item) => sum + item.percentile, 0) / groupMetrics.length) : 0;
+                  return <div key={group} style={{ textAlign: "center" }}><svg viewBox="0 0 140 140" width="150" height="150" role="img" aria-label={`${group}: ${score}%`}><circle cx="70" cy="70" r="56" fill="none" stroke="#e5e9ef" strokeWidth="12" /><circle cx="70" cy="70" r="56" fill="none" stroke={scoreColour(score)} strokeWidth="12" strokeLinecap="round" strokeDasharray={`${score * 3.518} 351.8`} transform="rotate(-90 70 70)" /><text x="70" y="78" textAnchor="middle" fontSize="27" fontWeight="800" fill="#123">{score}%</text></svg><div style={{ fontWeight: 800, fontSize: 17 }}>{group}</div><div style={{ color: "#667", fontSize: 12, marginTop: 5 }}>{groupMetrics.length} metrics combined</div></div>;
+                })}
               </div>
               <div style={{ display: "flex", justifyContent: "center", gap: 22, flexWrap: "wrap", marginTop: 22, fontSize: 13, fontWeight: 700 }}>
                 {[['#15c77a','Top 25%'],['#ff9f1a','50%+'],['#ff4740','Below 25%'],['#ffd21c','League Average']].map(([colour, label]) => <span key={label} style={{ display: "flex", alignItems: "center", gap: 7 }}><i style={{ width: 14, height: 14, borderRadius: 4, background: colour, display: "inline-block" }} />{label}</span>)}
