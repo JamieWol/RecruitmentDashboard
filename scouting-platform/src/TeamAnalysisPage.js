@@ -39,6 +39,7 @@ class ChartBoundary extends React.Component {
 export default function TeamAnalysisPage() {
   const [rows, setRows] = useState([]);
   const [selectedTeam, setSelectedTeam] = useState("");
+  const [selectedMetrics, setSelectedMetrics] = useState([]);
   const [error, setError] = useState("");
   const dashboardRef = useRef(null);
 
@@ -53,10 +54,12 @@ export default function TeamAnalysisPage() {
     return keys.filter((key) => key !== teamKey && !/^(name|player|league|competition|position|country|season|id|rank|games?|games played|matches?|appearances?)$/i.test(key) && rows.filter((row) => number(row[key]) !== null).length >= Math.max(3, Math.floor(rows.length * 0.6)));
   }, [rows, teamKey]);
 
+  const activeMetrics = selectedMetrics.length ? metrics.filter((metric) => selectedMetrics.includes(metric)) : metrics;
+
   const selected = rows.find((row) => normalise(row[teamKey]) === selectedTeam) || rows[0] || null;
   const selectedTeamName = displayName(selected?.[teamKey]);
   const gamesKey = Object.keys(selected || {}).find((key) => /^(games?|games played|matches?|appearances?)$/i.test(key));
-  const chartData = metrics.map((metric) => {
+  const chartData = activeMetrics.map((metric) => {
     const values = rows.map((row) => number(row[metric])).filter((value) => value !== null);
     const value = number(selected?.[metric]);
     const average = values.length ? values.reduce((sum, item) => sum + item, 0) / values.length : 0;
@@ -86,6 +89,7 @@ export default function TeamAnalysisPage() {
       const keys = Object.keys(clean[0] || {});
       const detectedTeamKey = keys.find((key) => /^(team|club|squad|side|team name|club name)$/i.test(key)) || keys[0] || "Team";
       setSelectedTeam(normalise(clean[0]?.[detectedTeamKey]) || "");
+      setSelectedMetrics([]);
     };
     if (/\.xlsx?$/.test(file.name.toLowerCase())) {
       file.arrayBuffer().then((buffer) => {
@@ -133,13 +137,30 @@ export default function TeamAnalysisPage() {
         </section>
         {!rows.length ? <div style={{ padding: "90px 20px", textAlign: "center", color: "#d7e8f8", fontSize: 20 }}>Upload a league team spreadsheet to build the dashboard.</div> : (
           <>
-            <section style={{ marginTop: 28, display: "flex", gap: 16, alignItems: "end", flexWrap: "wrap" }}>
+            <section style={{ marginTop: 28, display: "grid", gap: 16 }}>
+              <div style={{ display: "flex", gap: 16, alignItems: "end", flexWrap: "wrap" }}>
               <label style={{ display: "grid", gap: 8, fontWeight: 700 }}>Team
                 <select value={selectedTeam} onChange={(event) => setSelectedTeam(event.target.value)} style={{ minWidth: 280, padding: 12, borderRadius: 8, fontSize: 16 }}>
                   {teams.map((team) => <option key={team}>{team}</option>)}
                 </select>
               </label>
-              <div style={{ color: "#d7e8f8", paddingBottom: 12 }}>{teams.length} teams · {metrics.length} detected metrics</div>
+              <div style={{ color: "#d7e8f8", paddingBottom: 12 }}>{teams.length} teams · {activeMetrics.length} of {metrics.length} metrics selected</div>
+              </div>
+              <div style={{ padding: 18, borderRadius: 12, background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.28)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+                  <strong>Select metrics to include</strong>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button type="button" onClick={() => setSelectedMetrics([])} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #b9eaff", background: "#62dcff", color: "#063d63", fontWeight: 700 }}>Use all</button>
+                    <button type="button" onClick={() => setSelectedMetrics(metrics.filter((metric) => metricGroup(metric) === "In Possession"))} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #b9eaff", background: "transparent", color: "#fff", fontWeight: 700 }}>In Possession only</button>
+                  </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 16 }}>
+                  {["In Possession", "Out Of Possession", "Set-Pieces"].map((group) => <div key={group}>
+                    <div style={{ color: "#62dcff", fontWeight: 800, marginBottom: 8 }}>{group}</div>
+                    <div style={{ display: "grid", gap: 6 }}>{metrics.filter((metric) => metricGroup(metric) === group).map((metric) => <label key={metric} style={{ display: "flex", gap: 7, alignItems: "center", color: "#fff", fontSize: 13 }}><input type="checkbox" checked={!selectedMetrics.length || selectedMetrics.includes(metric)} onChange={() => setSelectedMetrics((current) => { const base = current.length ? current : [...metrics]; return base.includes(metric) ? base.filter((item) => item !== metric) : [...base, metric]; })} />{metric}</label>)}</div>
+                  </div>)}
+                </div>
+              </div>
             </section>
             <div ref={dashboardRef} style={{ background: "#062c63", padding: 18, borderRadius: 16, width: "100%", boxSizing: "border-box", display: "flex", flexDirection: "column" }}>
             <section style={{ marginTop: 28, padding: "22px 28px", borderRadius: 14, background: "linear-gradient(110deg,#0b3c73,#155b91)", border: "2px solid #78b4d8", textAlign: "center" }}><h2 style={{ margin: "0 0 7px", color: "#fff", fontSize: 32 }}><span>{selectedTeamName}</span><span style={{ marginLeft: "0.35em" }}>Team&nbsp;Analysis</span></h2><div style={{ color: "#d2e5fa", fontSize: 14 }}>{gamesKey ? `Games Played: ${normalise(selected?.[gamesKey]) || "-"}` : ""} · {metrics.length} metrics available</div></section>
