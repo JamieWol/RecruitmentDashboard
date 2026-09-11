@@ -6,6 +6,7 @@ import jsPDF from "jspdf";
 import { PolarAngleAxis, PolarGrid, Radar, RadarChart, ResponsiveContainer } from "recharts";
 
 const normalise = (value) => String(value ?? "").trim();
+const displayName = (value) => normalise(value).replace(/([a-z])([A-Z])/g, "$1 $2");
 const number = (value) => {
   const parsed = Number(String(value ?? "").replace(/%/g, "").replace(/,/g, ""));
   return Number.isFinite(parsed) ? parsed : null;
@@ -53,6 +54,7 @@ export default function TeamAnalysisPage() {
   }, [rows, teamKey]);
 
   const selected = rows.find((row) => normalise(row[teamKey]) === selectedTeam) || rows[0] || null;
+  const selectedTeamName = displayName(selected?.[teamKey]);
   const gamesKey = Object.keys(selected || {}).find((key) => /^(games?|games played|matches?|appearances?)$/i.test(key));
   const chartData = metrics.map((metric) => {
     const values = rows.map((row) => number(row[metric])).filter((value) => value !== null);
@@ -117,6 +119,7 @@ export default function TeamAnalysisPage() {
 
   return (
     <main style={{ minHeight: "calc(100vh - 80px)", background: "linear-gradient(135deg,#062c63 0%,#063d74 100%)", color: "#fff", padding: "42px clamp(22px,5vw,72px) 70px", boxSizing: "border-box" }}>
+      <style>{`[style*="column-count"]{column-count:3!important;column-gap:24px!important}`}</style>
       <div style={{ maxWidth: 1400, margin: "0 auto" }}>
         <div style={{ color: "#6bd7fa", fontSize: 14, letterSpacing: 1 }}>SCOUTPRO PLATFORM</div>
         <h1 style={{ margin: "10px 0", fontSize: 48, fontWeight: 800, color: "#62dcff", textTransform: "uppercase", fontFamily: 'Impact,"Arial Narrow",sans-serif' }}>Team Analysis</h1>
@@ -137,7 +140,7 @@ export default function TeamAnalysisPage() {
               <div style={{ color: "#d7e8f8", paddingBottom: 12 }}>{teams.length} teams · {metrics.length} detected metrics</div>
             </section>
             <div ref={dashboardRef} style={{ background: "#062c63", padding: 18, borderRadius: 16, width: "100%", boxSizing: "border-box", display: "flex", flexDirection: "column" }}>
-            <section style={{ marginTop: 28, padding: "22px 28px", borderRadius: 14, background: "linear-gradient(110deg,#0b3c73,#155b91)", border: "2px solid #78b4d8", textAlign: "center" }}><h2 style={{ margin: "0 0 7px", color: "#fff", fontSize: 32 }}><span>{normalise(selected?.[teamKey])}</span><span style={{ marginLeft: "0.3em" }}>Team Analysis</span></h2><div style={{ color: "#d2e5fa", fontSize: 14 }}>{gamesKey ? `Games Played: ${normalise(selected?.[gamesKey]) || "-"}` : ""} · {metrics.length} metrics available</div></section>
+            <section style={{ marginTop: 28, padding: "22px 28px", borderRadius: 14, background: "linear-gradient(110deg,#0b3c73,#155b91)", border: "2px solid #78b4d8", textAlign: "center" }}><h2 style={{ margin: "0 0 7px", color: "#fff", fontSize: 32 }}><span>{selectedTeamName}</span><span style={{ marginLeft: "0.35em" }}>Team&nbsp;Analysis</span></h2><div style={{ color: "#d2e5fa", fontSize: 14 }}>{gamesKey ? `Games Played: ${normalise(selected?.[gamesKey]) || "-"}` : ""} · {metrics.length} metrics available</div></section>
             <section style={{ order: 2, marginTop: 24, background: "#173f70", color: "#fff", borderRadius: 14, padding: "24px 28px", border: "2px solid #6a96bd" }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap", marginBottom: 22 }}><h2 style={{ color: "#62dcff", margin: 0 }}><span>Metric</span><span style={{ marginLeft: "0.3em" }}>Percentiles</span></h2><div style={{ display: "flex", gap: 18, flexWrap: "wrap", fontSize: 12, fontWeight: 700 }}><span><i style={{ display: "inline-block", width: 13, height: 13, borderRadius: 4, background: "#15c77a", marginRight: 6, verticalAlign: "-2px" }} />Top 25%</span><span><i style={{ display: "inline-block", width: 13, height: 13, borderRadius: 4, background: "#ff9f1a", marginRight: 6, verticalAlign: "-2px" }} />50%</span><span><i style={{ display: "inline-block", width: 13, height: 13, borderRadius: 4, background: "#ff4740", marginRight: 6, verticalAlign: "-2px" }} />Below 25%</span><span><i style={{ display: "inline-block", width: 13, height: 13, borderRadius: 4, background: "#ffd21c", marginRight: 6, verticalAlign: "-2px" }} />League Average</span></div></div><div style={{ columnCount: 2, columnGap: 30 }}>{chartData.map((item) => <div key={item.metric} style={{ display: "grid", gridTemplateColumns: "150px minmax(0,1fr)", alignItems: "center", gap: 12, marginBottom: 14, breakInside: "avoid" }}><div><strong style={{ display: "block", fontSize: 14, color: "#fff" }}>{item.metric}</strong><small style={{ color: "#d2e5fa" }}>{item.teamValue}</small></div><div><div style={{ display: "flex", justifyContent: "flex-end", fontSize: 12, fontWeight: 800, color: "#fff", marginBottom: 4 }}><span>{item.percentile}%</span></div><div style={{ height: 11, borderRadius: 8, background: "#365b80", overflow: "hidden" }}><div style={{ width: `${item.percentile}%`, height: "100%", borderRadius: 8, background: scoreColour(item.percentile) }} /></div><div style={{ height: 11, marginTop: 4, borderRadius: 8, background: "#284d73", overflow: "hidden" }}><div style={{ width: `${item.leagueAveragePct}%`, height: "100%", borderRadius: 8, background: "#ffd21c" }} /><span style={{ position: "relative", display: "block", marginTop: -11, textAlign: "center", fontSize: 9, fontWeight: 800, color: "#111" }}>{item.leagueAveragePct}%</span></div></div></div>)}</div></section>
             <section style={{ order: 1, marginTop: 28, background: "#173f70", color: "#fff", border: "2px solid #6a96bd", borderRadius: 14, padding: "24px 28px" }}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(180px,1fr))", gap: 30, maxWidth: 760, margin: "0 auto" }}>
