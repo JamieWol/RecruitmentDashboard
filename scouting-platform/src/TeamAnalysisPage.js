@@ -16,13 +16,13 @@ const scoreColour = (score) => score >= 75 ? "#15c77a" : score >= 50 ? "#ff9f1a"
 const metricGroup = (metric) => {
   const label = metric.toLowerCase();
   if (/set.?piece|corner|free.?kick|dead.?ball|throw.?in|dfk/.test(label)) return "Set-Pieces";
-  if (/tackle|intercept|clearance|pressure|regain|defensive|duel|block|conceded|aerial|defend|offside/.test(label)) return "Out Of Possession";
+  if (/tackle|intercept|clearance|pressure|regain|defensive|duel|block|conceded|faced|against|aerial|defend|offside/.test(label)) return "Out Of Possession";
   return "In Possession";
 };
 const styleGroup = (metric) => {
   const label = String(metric || "").toLowerCase();
   if (/set.?piece|corner|free.?kick|dead.?ball|throw.?in|dfk/.test(label)) return "Set-Pieces";
-  if (/tackle|intercept|clearance|pressure|regain|defensive|duel|block|conceded|aerial|defend|offside/.test(label)) return "Defensive Work";
+  if (/tackle|intercept|clearance|pressure|regain|defensive|duel|block|conceded|faced|against|aerial|defend|offside/.test(label)) return "Defensive Work";
   if (/xg|expected goals|assist|chance|key pass|scoring contribution|touch(es)? in box|creation/.test(label)) return "Chance Creation";
   if (/goal|finish|conversion|shot/.test(label)) return "Finishing";
   if (/xg|expected|carry|dribble|possession|pass/.test(label)) return "Build-up & Possession";
@@ -125,7 +125,7 @@ export default function TeamAnalysisPage() {
 
   return (
     <main style={{ minHeight: "calc(100vh - 80px)", background: "linear-gradient(135deg,#062c63 0%,#063d74 100%)", color: "#fff", padding: "42px clamp(22px,5vw,72px) 70px", boxSizing: "border-box" }}>
-      <style>{`[data-old-metric-section]{display:none!important}[data-grouped-metrics]{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}@media(max-width:800px){[data-grouped-metrics]{grid-template-columns:1fr}}`}</style>
+      <style>{`[data-old-metric-section]{display:none!important}[data-grouped-metrics]{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;order:3!important}[data-grouped-metrics] span{color:#fff!important}section[style*="order: 3"]{order:2!important}@media(max-width:800px){[data-grouped-metrics]{grid-template-columns:1fr}}`}</style>
       <div style={{ maxWidth: 1400, margin: "0 auto" }}>
         <div style={{ color: "#6bd7fa", fontSize: 14, letterSpacing: 1 }}>SCOUTPRO PLATFORM</div>
         <h1 style={{ margin: "10px 0", fontSize: 48, fontWeight: 800, color: "#62dcff", textTransform: "uppercase", fontFamily: 'Impact,"Arial Narrow",sans-serif' }}>Team Analysis</h1>
