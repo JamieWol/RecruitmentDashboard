@@ -256,10 +256,26 @@ export default function ScoutingReportsPageFinal() {
     }
   };
   const saveReport = () => {
+    const completedAt = new Date().toISOString().slice(0, 10);
     const n = items.map((x) =>
-      x.id === active.id ? { ...x, report, status: "Published", completedAt: new Date().toISOString().slice(0, 10) } : x,
+      x.id === active.id ? { ...x, report, status: "Published", completedAt } : x,
     );
     saveItems(n);
+    const publishedImmediately = {
+      id: Number(active.id),
+      assignment_id: Number(active.id),
+      player: active.player,
+      player_club: active.club || "",
+      report,
+      status: "Published",
+      completed_at: completedAt,
+      scout: active.scout || "",
+    };
+    setSharedReports((current) => [
+      ...current.filter((item) => String(item.assignment_id || item.id) !== String(active.id)),
+      publishedImmediately,
+    ]);
+    setTab("Published");
     if (user && accountProfile?.club) {
       supabase.from("club_reports").upsert({
         id: Number(active.id), assignment_id: Number(active.id), player_id: active.playerId || null,
