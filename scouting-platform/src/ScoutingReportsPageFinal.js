@@ -90,11 +90,17 @@ export default function ScoutingReportsPageFinal() {
   }, [profile, active]);
   const [report, setReport] = useState(empty);
   const [editing, setEditing] = useState(false);
+  const publishedAssignmentIds = useMemo(
+    () => new Set(sharedReports.map((x) => String(x.assignment_id || x.id))),
+    [sharedReports],
+  );
   useEffect(() => {
     const localAssignments = appState?.assignments || [];
-    const combined = [...localAssignments, ...sharedAssignments].filter((assignment) => assignment?.status !== "Published");
+    const combined = [...localAssignments, ...sharedAssignments]
+      .filter((assignment) => String(assignment?.status || "").toLowerCase() !== "published")
+      .filter((assignment) => !publishedAssignmentIds.has(String(assignment?.id)));
     setItems([...new Map(combined.map((assignment) => [String(assignment.id), assignment])).values()]);
-  }, [appState, sharedAssignments]);
+  }, [appState, sharedAssignments, publishedAssignmentIds]);
   useEffect(() => {
     if (!user || !accountProfile?.club) return;
     supabase
@@ -109,6 +115,7 @@ export default function ScoutingReportsPageFinal() {
         setSharedAssignments((data || []).map((row) => ({
           ...(row.assignment || {}),
           id: row.assignment?.id || row.id,
+          sharedAssignmentId: row.id,
           scoutId: row.assigned_to || row.assignment?.scoutId,
           status: row.status || row.assignment?.status || "Not Started",
         })));
@@ -144,6 +151,20 @@ export default function ScoutingReportsPageFinal() {
   const saveItems = (n) => {
     setItems(n);
     updateAppState({ assignments: n, shortlists: appState?.shortlists || [], tags: appState?.tags || [] });
+  };
+  const deleteAssignment = async (assignment) => {
+    const assignmentId = String(assignment?.id);
+    const next = items.filter((item) => String(item?.id) !== assignmentId);
+    saveItems(next);
+    setSharedAssignments((current) => current.filter((item) => String(item?.id) !== assignmentId));
+    if (user && accountProfile?.club) {
+      const { error } = await supabase
+        .from("club_assignments")
+        .delete()
+        .eq("club", accountProfile.club)
+        .eq("id", Number(assignment?.sharedAssignmentId || assignment?.id));
+      if (error) console.error("Could not delete shared assignment", error);
+    }
   };
   const shortlistPositions = [
     "GK",
@@ -244,7 +265,18 @@ export default function ScoutingReportsPageFinal() {
         id: Number(active.id), assignment_id: Number(active.id), player_id: active.playerId || null,
         player: active.player, club: accountProfile.club, player_club: active.club || "", author_id: user.id, report, status: "Published",
         updated_at: new Date().toISOString(), completed_at: active.completedAt || active.date || new Date().toISOString().slice(0, 10), scout: active.scout || "", fixture_summary: (active.games || []).length > 1 ? "Multiple" : (active.games?.[0] ? `${active.games[0].date || ""} · ${active.games[0].name || active.games[0]}` : active.game || ""),
-      }, { onConflict: "id" }).then(({ error }) => { if (error) console.error("Could not publish shared report", error); });
+      }, { onConflict: "id" }).then(async ({ error }) => {
+        if (error) {
+          console.error("Could not publish shared report", error);
+          return;
+        }
+        const { error: assignmentError } = await supabase
+          .from("club_assignments")
+          .update({ status: "Published", assignment: { ...active, report, status: "Published" } })
+          .eq("club", accountProfile.club)
+          .eq("id", Number(active.id));
+        if (assignmentError) console.error("Could not mark shared assignment published", assignmentError);
+      });
     }
     setActive(null);
     setProfile(n.find((x) => x.id === active.id) || profile);
@@ -788,7 +820,7 @@ export default function ScoutingReportsPageFinal() {
                 className="sr-trash"
                 onClick={(e) => {
                   e.stopPropagation();
-                  saveItems(items.filter((y) => y.id !== x.id));
+                  deleteAssignment(x);
                 }}
               >
                 Delete
