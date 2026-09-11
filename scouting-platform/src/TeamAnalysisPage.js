@@ -18,7 +18,7 @@ const metricGroup = (metric) => {
   return "In Possession";
 };
 const styleGroup = (metric) => {
-  const label = metric.toLowerCase();
+  const label = String(metric || "").toLowerCase();
   if (/set.?piece|corner|free.?kick|dead.?ball/.test(label)) return "Set-Pieces";
   if (/tackle|intercept|clearance|pressure|regain|defensive|duel|block|conceded|aerial|defend|offside/.test(label)) return "Defensive Work";
   if (/goal|finish|conversion|shot/.test(label)) return "Finishing";
@@ -64,9 +64,16 @@ export default function TeamAnalysisPage() {
     if (!file) return;
     setError("");
     const done = (data) => {
-      const clean = (data || []).filter((row) => Object.values(row || {}).some((value) => normalise(value)));
+      const clean = (data || []).filter((row) => row && typeof row === "object" && Object.values(row).some((value) => normalise(value)));
+      if (!clean.length) {
+        setRows([]);
+        setError("No readable team data was found in that file.");
+        return;
+      }
       setRows(clean);
-      setSelectedTeam(normalise(clean[0]?.[Object.keys(clean[0] || {})[0]]) || "");
+      const keys = Object.keys(clean[0] || {});
+      const detectedTeamKey = keys.find((key) => /^(team|club|squad|side|team name|club name)$/i.test(key)) || keys[0] || "Team";
+      setSelectedTeam(normalise(clean[0]?.[detectedTeamKey]) || "");
     };
     if (/\.xlsx?$/.test(file.name.toLowerCase())) {
       file.arrayBuffer().then((buffer) => {
