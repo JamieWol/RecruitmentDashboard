@@ -21,8 +21,8 @@ const styleGroup = (metric) => {
   const label = String(metric || "").toLowerCase();
   if (/set.?piece|corner|free.?kick|dead.?ball/.test(label)) return "Set-Pieces";
   if (/tackle|intercept|clearance|pressure|regain|defensive|duel|block|conceded|aerial|defend|offside/.test(label)) return "Defensive Work";
+  if (/xg|expected goals|assist|chance|key pass|scoring contribution|touch(es)? in box|creation/.test(label)) return "Chance Creation";
   if (/goal|finish|conversion|shot/.test(label)) return "Finishing";
-  if (/assist|chance|key pass|scoring|touch|creation/.test(label)) return "Chance Creation";
   if (/xg|expected|carry|dribble|possession|pass/.test(label)) return "Build-up & Possession";
   return "Attacking Output";
 };
