@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import html2canvas from "html2canvas";
@@ -52,7 +52,7 @@ const metricGroup = (metric) => {
   if (/set.?piece|corner|free.?kick|dead.?ball|throw.?in|dfk/.test(label))
     return "Set-Pieces";
   if (
-    /tackle|intercept|clearance|pressure|regain|defensive|duel|block|conceded|faced|against|ppda|aerial|defend|offside/.test(
+    /tackle|intercept|clearance|pressure|regain|defensive|duel|block|conceded|faced|against|ppda|aerial|defend|offside|aggressive actions/.test(
       label,
     )
   )
@@ -64,7 +64,7 @@ const styleGroup = (metric) => {
   if (/set.?piece|corner|free.?kick|dead.?ball|throw.?in|dfk/.test(label))
     return "Set-Pieces";
   if (
-    /tackle|intercept|clearance|pressure|regain|defensive|duel|block|conceded|faced|against|ppda|aerial|defend|offside/.test(
+    /tackle|intercept|clearance|pressure|regain|defensive|duel|block|conceded|faced|against|ppda|aerial|defend|offside|aggressive actions/.test(
       label,
     )
   )
@@ -101,8 +101,45 @@ export default function TeamAnalysisPage() {
   const [selectedTeam, setSelectedTeam] = useState("");
   const [comparisonTeam, setComparisonTeam] = useState("");
   const [selectedMetrics, setSelectedMetrics] = useState([]);
+  const [comparisonMetrics, setComparisonMetrics] = useState([]);
   const [error, setError] = useState("");
   const dashboardRef = useRef(null);
+  const hydrated = useRef(false);
+  const storageKey = "scoutpro-team-analysis-session";
+  const inactivityMs = 30 * 60 * 1000;
+
+  useEffect(() => {
+    const navigation = performance.getEntriesByType?.("navigation")?.[0];
+    const wasRefresh = navigation?.type === "reload";
+    if (wasRefresh) window.sessionStorage.removeItem(storageKey);
+    const saved = wasRefresh ? null : window.sessionStorage.getItem(storageKey);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Date.now() - Number(parsed.lastActive || 0) < inactivityMs) {
+          setRows(parsed.rows || []);
+          setSelectedTeam(parsed.selectedTeam || "");
+          setSelectedMetrics(parsed.selectedMetrics || []);
+          setComparisonMetrics(parsed.comparisonMetrics || []);
+        } else window.sessionStorage.removeItem(storageKey);
+      } catch { window.sessionStorage.removeItem(storageKey); }
+    }
+    hydrated.current = true;
+    const markActive = () => {
+      const current = window.sessionStorage.getItem(storageKey);
+      if (current) {
+        try { window.sessionStorage.setItem(storageKey, JSON.stringify({ ...JSON.parse(current), lastActive: Date.now() })); } catch { /* ignore invalid session state */ }
+      }
+    };
+    const events = ["mousemove", "keydown", "click", "touchstart"];
+    events.forEach((event) => window.addEventListener(event, markActive));
+    return () => events.forEach((event) => window.removeEventListener(event, markActive));
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated.current || !rows.length) return;
+    window.sessionStorage.setItem(storageKey, JSON.stringify({ rows, selectedTeam, selectedMetrics, comparisonMetrics, lastActive: Date.now() }));
+  }, [rows, selectedTeam, selectedMetrics, comparisonMetrics]);
 
   const teamKey = useMemo(() => {
     const keys = Object.keys(rows[0] || {});
@@ -149,6 +186,9 @@ export default function TeamAnalysisPage() {
   const activeMetrics = selectedMetrics.length
     ? metrics.filter((metric) => selectedMetrics.includes(metric))
     : metrics;
+  const comparisonActiveMetrics = comparisonMetrics.length
+    ? activeMetrics.filter((metric) => comparisonMetrics.includes(metric))
+    : activeMetrics;
 
   const selected =
     teamRows.find((row) => normalise(row[teamKey]) === selectedTeam) ||
@@ -218,7 +258,7 @@ export default function TeamAnalysisPage() {
     teamRows.find((row) => normalise(row[teamKey]) !== selectedTeam) ||
     null;
   const comparisonTeamName = displayName(comparison?.[teamKey]);
-  const comparisonData = activeMetrics.map((metric) => {
+  const comparisonData = comparisonActiveMetrics.map((metric) => {
     const first = number(selected?.[metric]) ?? 0;
     const second = number(comparison?.[metric]) ?? 0;
     const scale = Math.max(
@@ -347,6 +387,7 @@ export default function TeamAnalysisPage() {
       setSelectedTeam(normalise(uploadedTeams[0]?.[detectedTeamKey]) || "");
       setComparisonTeam(normalise(uploadedTeams[1]?.[detectedTeamKey]) || "");
       setSelectedMetrics([]);
+      setComparisonMetrics([]);
     };
     if (/\.xlsx?$/.test(file.name.toLowerCase())) {
       file
@@ -541,6 +582,15 @@ export default function TeamAnalysisPage() {
                   {teams.length} teams · {activeMetrics.length} of{" "}
                   {metrics.length} metrics selected
                 </div>
+                <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,.28)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
+                    <strong>Comparison chart metrics</strong>
+                    <button type="button" onClick={() => setComparisonMetrics([])} style={{ padding: "5px 9px", borderRadius: 6, border: "1px solid #b9eaff", background: "#62dcff", color: "#063d63", fontWeight: 700 }}>Use all selected metrics</button>
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 16px" }}>
+                    {activeMetrics.map((metric) => <label key={metric} style={{ display: "flex", gap: 6, alignItems: "center", color: "#fff", fontSize: 13 }}><input type="checkbox" checked={!comparisonMetrics.length || comparisonMetrics.includes(metric)} onChange={() => setComparisonMetrics((current) => { const base = current.length ? current : [...activeMetrics]; return base.includes(metric) ? base.filter((item) => item !== metric) : [...base, metric]; })} />{metric}</label>)}
+                  </div>
+                </div>
               </div>
               <div
                 style={{
@@ -687,7 +737,7 @@ export default function TeamAnalysisPage() {
                   {gamesKey
                     ? `Games Played: ${normalise(selected?.[gamesKey]) || "-"}`
                     : ""}{" "}
-                  · {metrics.length} metrics available
+                  · {metrics.length} metrics available · All metrics per 90
                 </div>
               </section>
               <section
