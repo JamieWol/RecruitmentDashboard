@@ -119,6 +119,7 @@ export default function TeamAnalysisPage() {
         if (Date.now() - Number(parsed.lastActive || 0) < inactivityMs) {
           setRows(parsed.rows || []);
           setSelectedTeam(parsed.selectedTeam || "");
+          setComparisonTeam(parsed.comparisonTeam || "");
           setSelectedMetrics(parsed.selectedMetrics || []);
           setComparisonMetrics(parsed.comparisonMetrics || []);
         } else window.localStorage.removeItem(storageKey);
@@ -149,8 +150,8 @@ export default function TeamAnalysisPage() {
 
   useEffect(() => {
     if (!hydrated.current || !rows.length) return;
-    window.localStorage.setItem(storageKey, JSON.stringify({ rows, selectedTeam, selectedMetrics, comparisonMetrics, lastActive: Date.now() }));
-  }, [rows, selectedTeam, selectedMetrics, comparisonMetrics]);
+    window.localStorage.setItem(storageKey, JSON.stringify({ rows, selectedTeam, comparisonTeam, selectedMetrics, comparisonMetrics, lastActive: Date.now() }));
+  }, [rows, selectedTeam, comparisonTeam, selectedMetrics, comparisonMetrics]);
 
   const teamKey = useMemo(() => {
     const keys = Object.keys(rows[0] || {});
@@ -399,6 +400,7 @@ export default function TeamAnalysisPage() {
       setComparisonTeam(normalise(uploadedTeams[1]?.[detectedTeamKey]) || "");
       setSelectedMetrics([]);
       setComparisonMetrics([]);
+      window.localStorage.setItem(storageKey, JSON.stringify({ rows: clean, selectedTeam: normalise(uploadedTeams[0]?.[detectedTeamKey]) || "", comparisonTeam: normalise(uploadedTeams[1]?.[detectedTeamKey]) || "", selectedMetrics: [], comparisonMetrics: [], lastActive: Date.now() }));
     };
     if (/\.xlsx?$/.test(file.name.toLowerCase())) {
       file
@@ -741,7 +743,7 @@ export default function TeamAnalysisPage() {
                   textAlign: "center",
                 }}
               >
-                <h2 style={{ margin: "0 0 7px", color: "#fff", fontSize: 32 }}>
+                <h2 style={{ margin: "0 0 7px", color: "#fff", fontSize: 26, whiteSpace: "nowrap", wordSpacing: "0.18em" }}>
                   <><span>{selectedTeamName}</span><span style={{ marginLeft: "0.4em", whiteSpace: "nowrap" }}>Team Analysis</span></>
                 </h2>
                 <div style={{ color: "#d2e5fa", fontSize: 14 }}>
