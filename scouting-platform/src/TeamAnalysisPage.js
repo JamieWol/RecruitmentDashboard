@@ -13,6 +13,7 @@ const number = (value) => {
 };
 const lowerIsBetter = (metric) => /conceded|faced|against|ppda|turnovers lost|errors?/.test(String(metric || "").toLowerCase());
 const scoreColour = (score) => score >= 75 ? "#15c77a" : score >= 50 ? "#ff9f1a" : score >= 25 ? "#ffd21c" : "#ff4740";
+const rankColour = (rank) => rank <= 6 ? "#15c77a" : rank <= 13 ? "#ffd21c" : rank <= 19 ? "#ff9f1a" : "#ff4740";
 const metricGroup = (metric) => {
   const label = metric.toLowerCase();
   if (/set.?piece|corner|free.?kick|dead.?ball|throw.?in|dfk/.test(label)) return "Set-Pieces";
@@ -49,7 +50,8 @@ export default function TeamAnalysisPage() {
     return keys.find((key) => /^(team|club|squad|side|team name|club name)$/i.test(key)) || keys[0] || "Team";
   }, [rows]);
 
-  const teams = useMemo(() => [...new Set(rows.map((row) => normalise(row[teamKey])).filter(Boolean))], [rows, teamKey]);
+  const teamRows = useMemo(() => rows.filter((row) => !/^(league average|league avg|average|avg)$/i.test(normalise(row[teamKey]))), [rows, teamKey]);
+  const teams = useMemo(() => [...new Set(teamRows.map((row) => normalise(row[teamKey])).filter(Boolean))], [teamRows, teamKey]);
   const metrics = useMemo(() => {
     const keys = Object.keys(rows[0] || {});
     return keys.filter((key) => key !== teamKey && !/^(name|player|league|competition|position|country|season|id|rank|games?|games played|matches?|appearances?)$/i.test(key) && rows.filter((row) => number(row[key]) !== null).length >= Math.max(3, Math.floor(rows.length * 0.6)));
@@ -57,11 +59,11 @@ export default function TeamAnalysisPage() {
 
   const activeMetrics = selectedMetrics.length ? metrics.filter((metric) => selectedMetrics.includes(metric)) : metrics;
 
-  const selected = rows.find((row) => normalise(row[teamKey]) === selectedTeam) || rows[0] || null;
+  const selected = teamRows.find((row) => normalise(row[teamKey]) === selectedTeam) || teamRows[0] || null;
   const selectedTeamName = displayName(selected?.[teamKey]);
   const gamesKey = Object.keys(selected || {}).find((key) => /^(games?|games played|matches?|appearances?)$/i.test(key));
   const chartData = activeMetrics.map((metric) => {
-    const values = rows.map((row) => number(row[metric])).filter((value) => value !== null);
+    const values = teamRows.map((row) => number(row[metric])).filter((value) => value !== null);
     const value = number(selected?.[metric]);
     const average = values.length ? values.reduce((sum, item) => sum + item, 0) / values.length : 0;
     const maximum = values.length ? Math.max(...values) : 0;
@@ -72,7 +74,7 @@ export default function TeamAnalysisPage() {
     const matching = chartData.filter((item) => styleGroup(item.metric) === style || (style === "Pressing & Regains" && /pressure|regain/i.test(item.metric)));
     return { style, score: matching.length ? Math.round(matching.reduce((sum, item) => sum + item.percentile, 0) / matching.length) : 0, leagueAverage: matching.length ? Math.round(matching.reduce((sum, item) => sum + item.leagueAveragePct, 0) / matching.length) : 0 };
   });
-  const comparison = rows.find((row) => normalise(row[teamKey]) === comparisonTeam) || rows.find((row) => normalise(row[teamKey]) !== selectedTeam) || null;
+  const comparison = teamRows.find((row) => normalise(row[teamKey]) === comparisonTeam) || teamRows.find((row) => normalise(row[teamKey]) !== selectedTeam) || null;
   const comparisonTeamName = displayName(comparison?.[teamKey]);
   const comparisonData = activeMetrics.map((metric) => {
     const first = number(selected?.[metric]) ?? 0;
@@ -98,8 +100,9 @@ export default function TeamAnalysisPage() {
       setRows(clean);
       const keys = Object.keys(clean[0] || {});
       const detectedTeamKey = keys.find((key) => /^(team|club|squad|side|team name|club name)$/i.test(key)) || keys[0] || "Team";
-      setSelectedTeam(normalise(clean[0]?.[detectedTeamKey]) || "");
-      setComparisonTeam(normalise(clean[1]?.[detectedTeamKey]) || "");
+      const uploadedTeams = clean.filter((row) => !/^(league average|league avg|average|avg)$/i.test(normalise(row[detectedTeamKey])));
+      setSelectedTeam(normalise(uploadedTeams[0]?.[detectedTeamKey]) || "");
+      setComparisonTeam(normalise(uploadedTeams[1]?.[detectedTeamKey]) || "");
       setSelectedMetrics([]);
     };
     if (/\.xlsx?$/.test(file.name.toLowerCase())) {
@@ -136,7 +139,7 @@ export default function TeamAnalysisPage() {
 
   return (
     <main style={{ minHeight: "calc(100vh - 80px)", background: "linear-gradient(135deg,#062c63 0%,#063d74 100%)", color: "#fff", padding: "42px clamp(22px,5vw,72px) 70px", boxSizing: "border-box" }}>
-      <style>{`[data-old-metric-section]{display:none!important}[data-grouped-metrics]{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;order:3!important}[data-grouped-metrics] span{color:#fff!important}section[style*="order: 3"]{order:2!important}@media(max-width:800px){[data-grouped-metrics]{grid-template-columns:1fr}}`}</style>
+      <style>{`[data-old-metric-section]{display:none!important}[data-grouped-metrics]{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;order:3!important}[data-grouped-metrics] span{color:#fff!important}section[style*="order: 3"]{order:2!important}section[style*="order: 4"]{display:none!important}@media(max-width:800px){[data-grouped-metrics]{grid-template-columns:1fr}}`}</style>
       <div style={{ maxWidth: 1400, margin: "0 auto" }}>
         <div style={{ color: "#6bd7fa", fontSize: 14, letterSpacing: 1 }}>SCOUTPRO PLATFORM</div>
         <h1 style={{ margin: "10px 0", fontSize: 48, fontWeight: 800, color: "#62dcff", textTransform: "uppercase", fontFamily: 'Impact,"Arial Narrow",sans-serif' }}>Team Analysis</h1>
@@ -193,6 +196,7 @@ export default function TeamAnalysisPage() {
             <section data-grouped-metrics style={{ order: 2.5, marginTop: 24, background: "#173f70", color: "#fff", border: "2px solid #6a96bd", borderRadius: 14, padding: "24px 28px" }}><div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap", marginBottom: 8 }}><h2 style={{ color: "#62dcff", margin: 0 }}><span>Metric</span><span style={{ marginLeft: "0.3em" }}>Percentiles</span></h2><div style={{ display: "flex", gap: 18, flexWrap: "wrap", fontSize: 12, fontWeight: 700 }}><span><i style={{ display: "inline-block", width: 13, height: 13, borderRadius: 4, background: "#15c77a", marginRight: 6, verticalAlign: "-2px" }} />Top 25%</span><span><i style={{ display: "inline-block", width: 13, height: 13, borderRadius: 4, background: "#ff9f1a", marginRight: 6, verticalAlign: "-2px" }} />50%</span><span><i style={{ display: "inline-block", width: 13, height: 13, borderRadius: 4, background: "#ff4740", marginRight: 6, verticalAlign: "-2px" }} />Below 25%</span><span><i style={{ display: "inline-block", width: 13, height: 13, borderRadius: 4, background: "#ffd21c", marginRight: 6, verticalAlign: "-2px" }} />League Average</span></div></div>{metricColumns.map((group) => <div key={group}><h3 style={{ color: "#fff", fontSize: 18, margin: "0 0 16px", borderBottom: "1px solid #6a96bd", paddingBottom: 8 }}>{group}</h3>{chartData.filter((item) => metricGroup(item.metric) === group).map(renderMetric)}</div>)}</section>
             <ChartBoundary><section style={{ order: 3, marginTop: 24, background: "#173f70", color: "#fff", border: "2px solid #6a96bd", borderRadius: 14, padding: "20px 28px" }}><h2 style={{ color: "#62dcff", margin: "0 0 4px", textAlign: "center" }}>Team Visual Comparison</h2><p style={{ color: "#d2e5fa", marginTop: 0, textAlign: "center" }}>Compare the selected teams across the uploaded metrics.</p><div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 24, alignItems: "stretch" }}><section style={{ background: "#123761", borderRadius: 10, padding: 16 }}><h3 style={{ margin: "0 0 4px", color: "#fff", fontSize: 18, textAlign: "center" }}>Team Style</h3><p style={{ margin: "0 0 8px", color: "#d2e5fa", fontSize: 12, textAlign: "center" }}>Compared with league average</p><ResponsiveContainer width="100%" height={300}><RadarChart data={styleData} cx="50%" cy="50%" outerRadius="68%"><PolarGrid stroke="#6a96bd" /><PolarAngleAxis dataKey="style" tick={{ fontSize: 12, fill: "#d2e5fa" }} /><Radar name="League Average" dataKey="leagueAverage" stroke="#ffd21c" fill="#ffd21c" fillOpacity={0.28} /><Radar name={normalise(selected?.[teamKey]) || "Team"} dataKey="score" stroke="#62dcff" fill="#62dcff" fillOpacity={0.5} /></RadarChart></ResponsiveContainer><div style={{ display: "flex", justifyContent: "center", gap: 16, fontSize: 12, fontWeight: 700 }}><span><i style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "#62dcff", marginRight: 5 }} />{selectedTeamName}</span><span><i style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "#ffd21c", marginRight: 5 }} />League Average</span></div></section><section style={{ background: "#123761", borderRadius: 10, padding: 16 }}><h3 style={{ margin: "0 0 4px", color: "#fff", fontSize: 18, textAlign: "center" }}>Team Difference</h3><p style={{ margin: "0 0 14px", color: "#d2e5fa", fontSize: 12, textAlign: "center" }}>{selectedTeamName} vs {comparisonTeamName || "second team"}</p><div style={{ display: "flex", justifyContent: "space-around", color: "#fff", fontSize: 11, marginBottom: 10 }}><span>◀ {selectedTeamName}</span><span style={{ color: "#ffd21c" }}>{comparisonTeamName || "Comparison"} ▶</span></div>{comparisonData.slice(0, 10).map((item) => <div key={item.metric} style={{ marginBottom: 10 }}><div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 1fr", gap: 6, alignItems: "center", fontSize: 10, color: "#fff" }}><span style={{ textAlign: "left" }}>{item.first}</span><strong style={{ textAlign: "center", fontSize: 10 }}>{item.metric}</strong><span style={{ textAlign: "right" }}>{item.second}</span></div><div style={{ display: "grid", gridTemplateColumns: "1fr 2px 1fr", gap: 3, alignItems: "center", marginTop: 3 }}><div style={{ height: 9, background: "#365b80", borderRadius: "6px 0 0 6px", overflow: "hidden", display: "flex", justifyContent: "flex-end" }}><div style={{ width: `${item.difference < 0 ? item.differencePct : 0}%`, height: "100%", background: "#62dcff" }} /></div><div style={{ height: 13, background: "#fff" }} /><div style={{ height: 9, background: "#284d73", borderRadius: "0 6px 6px 0", overflow: "hidden" }}><div style={{ width: `${item.difference > 0 ? item.differencePct : 0}%`, height: "100%", background: "#ffd21c" }} /></div></div></div>)}</section></div></section></ChartBoundary>
             <section style={{ order: 4, marginTop: 24, background: "#173f70", color: "#fff", border: "2px solid #6a96bd", borderRadius: 14, padding: "20px 28px" }}><h2 style={{ color: "#62dcff", margin: "0 0 16px" }}>Team Rankings</h2><div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: "10px 28px" }}>{activeMetrics.map((metric) => { const value = number(selected?.[metric]); const ranked = rows.map((row) => number(row[metric])).filter((item) => item !== null).sort((a, b) => lowerIsBetter(metric) ? a - b : b - a); const rank = value === null ? null : ranked.findIndex((item) => item === value) + 1; return <div key={metric} style={{ display: "flex", justifyContent: "space-between", gap: 12, borderBottom: "1px solid #365b80", paddingBottom: 7 }}><span>{metric}</span><strong>{rank ? `${rank} of ${ranked.length}` : "-"}</strong></div>; })}</div></section>
+            <section style={{ order: 5, marginTop: 24, background: "#173f70", color: "#fff", border: "2px solid #6a96bd", borderRadius: 14, padding: "20px 28px" }}><h2 style={{ color: "#62dcff", margin: "0 0 16px" }}>Team Rankings</h2><div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 24 }}>{metricColumns.map((group) => <div key={group}><h3 style={{ margin: "0 0 10px", color: "#fff", fontSize: 17, borderBottom: "1px solid #6a96bd", paddingBottom: 8 }}>{group}</h3>{activeMetrics.filter((metric) => metricGroup(metric) === group).map((metric) => { const value = number(selected?.[metric]); const ranked = teamRows.map((row) => number(row[metric])).filter((item) => item !== null).sort((a, b) => lowerIsBetter(metric) ? a - b : b - a); const rank = value === null ? null : ranked.findIndex((item) => item === value) + 1; return <div key={metric} style={{ display: "flex", justifyContent: "space-between", gap: 8, borderBottom: "1px solid #365b80", padding: "7px 0", fontSize: 13 }}><span>{metric}</span><strong style={{ color: rank ? rankColour(rank) : "#fff", whiteSpace: "nowrap" }}>{rank ? `${rank} of ${ranked.length}` : "-"}</strong></div>; })}</div>)}</div></section>
             </div>
           </>
         )}
