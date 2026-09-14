@@ -134,7 +134,7 @@ export default function TeamAnalysisPage() {
     const events = ["mousemove", "keydown", "click", "touchstart"];
     events.forEach((event) => window.addEventListener(event, markActive));
     return () => events.forEach((event) => window.removeEventListener(event, markActive));
-  }, []);
+  }, [inactivityMs]);
 
   useEffect(() => {
     if (!hydrated.current || !rows.length) return;
