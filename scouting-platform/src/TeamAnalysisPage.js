@@ -105,14 +105,14 @@ export default function TeamAnalysisPage() {
   const [error, setError] = useState("");
   const dashboardRef = useRef(null);
   const hydrated = useRef(false);
-  const storageKey = "scoutpro-team-analysis-session";
+  const storageKey = "scoutpro-team-analysis-uploaded-data";
   const inactivityMs = 30 * 60 * 1000;
 
   useEffect(() => {
     const navigation = performance.getEntriesByType?.("navigation")?.[0];
     const wasRefresh = navigation?.type === "reload";
-    if (wasRefresh) window.sessionStorage.removeItem(storageKey);
-    const saved = wasRefresh ? null : window.sessionStorage.getItem(storageKey);
+    if (wasRefresh) window.localStorage.removeItem(storageKey);
+    const saved = wasRefresh ? null : window.localStorage.getItem(storageKey);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -121,24 +121,35 @@ export default function TeamAnalysisPage() {
           setSelectedTeam(parsed.selectedTeam || "");
           setSelectedMetrics(parsed.selectedMetrics || []);
           setComparisonMetrics(parsed.comparisonMetrics || []);
-        } else window.sessionStorage.removeItem(storageKey);
-      } catch { window.sessionStorage.removeItem(storageKey); }
+        } else window.localStorage.removeItem(storageKey);
+      } catch { window.localStorage.removeItem(storageKey); }
     }
     hydrated.current = true;
     const markActive = () => {
-      const current = window.sessionStorage.getItem(storageKey);
+      const current = window.localStorage.getItem(storageKey);
       if (current) {
-        try { window.sessionStorage.setItem(storageKey, JSON.stringify({ ...JSON.parse(current), lastActive: Date.now() })); } catch { /* ignore invalid session state */ }
+        try { window.localStorage.setItem(storageKey, JSON.stringify({ ...JSON.parse(current), lastActive: Date.now() })); } catch { /* ignore invalid session state */ }
       }
     };
     const events = ["mousemove", "keydown", "click", "touchstart"];
     events.forEach((event) => window.addEventListener(event, markActive));
-    return () => events.forEach((event) => window.removeEventListener(event, markActive));
+    const expiryTimer = window.setInterval(() => {
+      const current = window.localStorage.getItem(storageKey);
+      if (current) {
+        try {
+          if (Date.now() - Number(JSON.parse(current).lastActive || 0) >= inactivityMs) {
+            window.localStorage.removeItem(storageKey);
+            setRows([]); setSelectedTeam(""); setSelectedMetrics([]); setComparisonMetrics([]);
+          }
+        } catch { window.localStorage.removeItem(storageKey); }
+      }
+    }, 60 * 1000);
+    return () => { events.forEach((event) => window.removeEventListener(event, markActive)); window.clearInterval(expiryTimer); };
   }, [inactivityMs]);
 
   useEffect(() => {
     if (!hydrated.current || !rows.length) return;
-    window.sessionStorage.setItem(storageKey, JSON.stringify({ rows, selectedTeam, selectedMetrics, comparisonMetrics, lastActive: Date.now() }));
+    window.localStorage.setItem(storageKey, JSON.stringify({ rows, selectedTeam, selectedMetrics, comparisonMetrics, lastActive: Date.now() }));
   }, [rows, selectedTeam, selectedMetrics, comparisonMetrics]);
 
   const teamKey = useMemo(() => {
@@ -731,7 +742,7 @@ export default function TeamAnalysisPage() {
                 }}
               >
                 <h2 style={{ margin: "0 0 7px", color: "#fff", fontSize: 32 }}>
-                  {selectedTeamName} Team Analysis
+                  <><span>{selectedTeamName}</span><span style={{ marginLeft: "0.4em", whiteSpace: "nowrap" }}>Team Analysis</span></>
                 </h2>
                 <div style={{ color: "#d2e5fa", fontSize: 14 }}>
                   {gamesKey
