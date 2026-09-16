@@ -48,6 +48,17 @@ const retryPhoto = (e, name) => {
   if (candidates[next - 1]) { image.dataset.photoFallback = String(next); image.src = candidates[next - 1]; }
   else image.style.display = "none";
 };
+const profileFields = ["foot", "playedPosition", "performance", "potential", "conclusion", "reasons", "inPossession", "outPossession", "physical", "behaviour", "strengths", "weaknesses"];
+const stopWords = new Set(["a", "an", "and", "are", "as", "at", "for", "from", "good", "has", "have", "in", "is", "looking", "of", "player", "that", "the", "to", "with"]);
+const profileTerms = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9%+.#-]+/g, " ").split(/\s+/).filter((term) => term.length > 2 && !stopWords.has(term));
+const reportSearchText = (item) => {
+  const report = item.report || {};
+  return [item.player, item.club, item.position, ...profileFields.map((field) => report[field])].filter(Boolean).join(" ").toLowerCase();
+};
+const profileEvidence = (item, terms) => {
+  const report = item.report || {};
+  return profileFields.map((field) => String(report[field] || "").trim()).find((value) => terms.some((term) => value.toLowerCase().includes(term))) || "Report matches the requested profile criteria.";
+};
 export default function ScoutingReportsPageFinal() {
   const nav = useNavigate();
   const { appState, updateAppState, user, profile: accountProfile } = useAuth();
@@ -67,6 +78,8 @@ export default function ScoutingReportsPageFinal() {
   const [sharedReports, setSharedReports] = useState([]);
   const [sharedAssignments, setSharedAssignments] = useState([]);
   const [playerData, setPlayerData] = useState(null);
+  const [profileQuery, setProfileQuery] = useState("");
+  const [profileResults, setProfileResults] = useState([]);
   useEffect(() => {
     const selectedPlayer = profile || active;
     if (!selectedPlayer?.player) {
@@ -235,6 +248,29 @@ export default function ScoutingReportsPageFinal() {
     },
     [items, query, tab, sharedReports, user?.id],
   );
+  const profileCandidates = useMemo(() => {
+    const publishedLocal = items.filter((item) => item.status === "Published");
+    const publishedShared = sharedReports.map((item) => ({ ...item, id: item.assignment_id || item.id, report: item.report, status: "Published", club: item.player_club || item.club || "Club not added", position: item.position || item.report?.playedPosition || "" }));
+    return [...new Map([...publishedLocal, ...publishedShared].map((item) => [String(item.id), item])).values()];
+  }, [items, sharedReports]);
+  const runProfileCheck = () => {
+    const terms = profileTerms(profileQuery);
+    if (!terms.length) { setProfileResults([]); return; }
+    const grouped = new Map();
+    profileCandidates.forEach((item) => {
+      const text = reportSearchText(item);
+      const matches = terms.filter((term) => text.includes(term));
+      if (!matches.length) return;
+      const key = String(item.player || item.id);
+      const current = grouped.get(key) || { ...item, reports: 0, score: 0, matches: [], evidence: "" };
+      current.reports += 1;
+      current.score = Math.min(100, Math.round((new Set([...current.matches, ...matches]).size / terms.length) * 100));
+      current.matches = [...new Set([...current.matches, ...matches])];
+      current.evidence = current.evidence || profileEvidence(item, terms);
+      grouped.set(key, current);
+    });
+    setProfileResults([...grouped.values()].sort((a, b) => b.score - a.score || b.reports - a.reports));
+  };
   const openReport = (x) => {
     setActive(x);
     setReport(x.report || empty);
@@ -805,6 +841,38 @@ export default function ScoutingReportsPageFinal() {
           if (e.key === "Enter") searchPlayer();
         }}
       />
+      <section className="sr-profile-checker">
+        <div className="sr-profile-checker-head">
+          <div>
+            <div className="sr-kicker">PROFILE CHECKER</div>
+            <h2>Find players from your reports</h2>
+            <p>Describe the profile you need and we’ll rank published reports against those criteria.</p>
+          </div>
+          <span className="sr-profile-checker-count">{profileCandidates.length} reports scanned</span>
+        </div>
+        <div className="sr-profile-checker-search">
+          <input
+            className="sr-search"
+            placeholder="e.g. left-footed centre-back strong in duels and good in possession"
+            value={profileQuery}
+            onChange={(e) => setProfileQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") runProfileCheck(); }}
+          />
+          <button className="sr-cyan" onClick={runProfileCheck}>Check Profile</button>
+        </div>
+        {!!profileResults.length && (
+          <div className="sr-profile-results">
+            {profileResults.slice(0, 12).map((match) => (
+              <button className="sr-profile-result" key={match.player || match.id} onClick={() => { setProfile(match); setProfileQuery(""); }}>
+                <span className="sr-profile-result-main"><strong>{match.player || "Unnamed player"}</strong><small>{match.club || "Club not added"}{match.position ? ` · ${match.position}` : ""}</small></span>
+                <span className="sr-profile-result-score">{match.score}% match<small>{match.reports} report{match.reports === 1 ? "" : "s"}</small></span>
+                <span className="sr-profile-result-evidence">{match.evidence}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {profileQuery.trim() && !profileResults.length && <div className="sr-profile-no-results">No published reports match those criteria yet.</div>}
+      </section>
       <section className="sr-tabs">
         {["My Assignments", "All Assigned", "Published"].map((x) => (
           <button
