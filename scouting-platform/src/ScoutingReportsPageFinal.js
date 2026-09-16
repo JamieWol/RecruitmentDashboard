@@ -257,11 +257,15 @@ export default function ScoutingReportsPageFinal() {
     return [...new Map([...publishedLocal, ...publishedShared].map((item) => [String(item.id), item])).values()];
   }, [items, sharedReports]);
   useEffect(() => {
-    const names = profileCandidates.map((item) => item.player).filter(Boolean);
+    const names = profileCandidates.map((item) => String(item.player || "").trim().toLowerCase()).filter(Boolean);
     if (!names.length) return;
-    supabase.from("players").select("Name,Age,age").in("Name", names).then(({ data }) => {
+    supabase.from("players").select("*").limit(2000).then(({ data }) => {
       const directory = {};
-      (data || []).forEach((player) => { directory[String(player.Name || "").trim().toLowerCase()] = player.Age ?? player.age; });
+      (data || []).forEach((player) => {
+        const playerName = String(player.Name || player.name || "").trim().toLowerCase();
+        const ageKey = Object.keys(player).find((key) => key.toLowerCase() === "age");
+        if (playerName && names.includes(playerName) && ageKey) directory[playerName] = player[ageKey];
+      });
       setProfilePlayerDirectory(directory);
     }).catch(() => setProfilePlayerDirectory({}));
   }, [profileCandidates]);
@@ -297,6 +301,11 @@ export default function ScoutingReportsPageFinal() {
     });
     setProfileResults([...grouped.values()].sort((a, b) => b.score - a.score || b.reports - a.reports));
   };
+  useEffect(() => {
+    if (profileQuery.trim() || Object.values(profileFilters).some(Boolean)) runProfileCheck();
+    // Keep results in sync when a filter or the player-profile ages finish loading.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileFilters, profilePlayerDirectory]);
   const openReport = (x) => {
     setActive(x);
     setReport(x.report || empty);
