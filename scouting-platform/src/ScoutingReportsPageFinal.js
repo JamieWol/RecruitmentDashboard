@@ -50,10 +50,10 @@ const retryPhoto = (e, name) => {
 };
 const profileFields = ["foot", "playedPosition", "performance", "potential", "conclusion", "reasons", "inPossession", "outPossession", "physical", "behaviour", "strengths", "weaknesses"];
 const stopWords = new Set(["a", "an", "and", "are", "as", "at", "for", "from", "good", "has", "have", "in", "is", "looking", "of", "player", "that", "the", "to", "with"]);
-const profileTerms = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9%+.#-]+/g, " ").split(/\s+/).filter((term) => term.length > 2 && !stopWords.has(term));
+const profileTerms = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9%+.#-]+/g, " ").split(/\s+/).filter((term) => term.length > 1 && !stopWords.has(term));
 const reportSearchText = (item) => {
   const report = item.report || {};
-  return [item.player, item.club, item.position, ...profileFields.map((field) => report[field])].filter(Boolean).join(" ").toLowerCase();
+  return [item.player, item.club, item.position, item.foot, item.age, item.performance, item.potential, ...Object.values(item), ...profileFields.map((field) => report[field])].filter((value) => typeof value === "string" || typeof value === "number").join(" ").toLowerCase();
 };
 const profileEvidence = (item, terms) => {
   const report = item.report || {};
@@ -81,7 +81,7 @@ export default function ScoutingReportsPageFinal() {
   const [profileQuery, setProfileQuery] = useState("");
   const [profileResults, setProfileResults] = useState([]);
   const [dashboardView, setDashboardView] = useState("reports");
-  const [profileFilters, setProfileFilters] = useState({ foot: "", age: "", performance: "", potential: "" });
+  const [profileFilters, setProfileFilters] = useState({ foot: "", age: "", position: "", performance: "", potential: "" });
   useEffect(() => {
     const selectedPlayer = profile || active;
     if (!selectedPlayer?.player) {
@@ -257,7 +257,7 @@ export default function ScoutingReportsPageFinal() {
   }, [items, sharedReports]);
   const runProfileCheck = () => {
     const terms = profileTerms(profileQuery);
-    if (!terms.length) { setProfileResults([]); return; }
+    if (!terms.length && !Object.values(profileFilters).some(Boolean)) { setProfileResults([]); return; }
     const grouped = new Map();
     const matchesFilters = (item) => {
       const report = item.report || {};
@@ -265,19 +265,22 @@ export default function ScoutingReportsPageFinal() {
       const age = Number(report.age || item.age || item.Age || item.player_age);
       const performance = String(report.performance || item.performance || "");
       const potential = String(report.potential || item.potential || "");
+      const position = String(report.playedPosition || item.position || item.primary_position || "").toLowerCase();
+      const potentialRank = { A: 1, B: 2, C: 3, D: 4, E: 5, F: 6 };
       return (!profileFilters.foot || foot === profileFilters.foot.toLowerCase()) &&
         (!profileFilters.age || (Number.isFinite(age) && (profileFilters.age === "under21" ? age < 21 : profileFilters.age === "21to24" ? age >= 21 && age <= 24 : profileFilters.age === "25to29" ? age >= 25 && age <= 29 : age >= 30))) &&
-        (!profileFilters.performance || performance === profileFilters.performance) &&
-        (!profileFilters.potential || potential.toUpperCase() === profileFilters.potential);
+        (!profileFilters.position || position === profileFilters.position.toLowerCase()) &&
+        (!profileFilters.performance || (Number(performance) >= Number(profileFilters.performance))) &&
+        (!profileFilters.potential || (potentialRank[potential.toUpperCase()] <= potentialRank[profileFilters.potential]));
     };
     profileCandidates.filter(matchesFilters).forEach((item) => {
       const text = reportSearchText(item);
-      const matches = terms.filter((term) => text.includes(term));
-      if (!matches.length) return;
+      const matches = terms.filter((term) => text.includes(term) || text.split(/\s+/).some((word) => word.startsWith(term)));
+      if (!matches.length && terms.length) return;
       const key = String(item.player || item.id);
       const current = grouped.get(key) || { ...item, reports: 0, score: 0, matches: [], evidence: "" };
       current.reports += 1;
-      current.score = Math.min(100, Math.round((new Set([...current.matches, ...matches]).size / terms.length) * 100));
+      current.score = terms.length ? Math.min(100, Math.round((new Set([...current.matches, ...matches]).size / terms.length) * 100)) : 100;
       current.matches = [...new Set([...current.matches, ...matches])];
       current.evidence = current.evidence || profileEvidence(item, terms);
       grouped.set(key, current);
@@ -875,6 +878,7 @@ export default function ScoutingReportsPageFinal() {
       </section>
       {!shown.length && <div className="sr-empty">No assignments found.</div>}</>}
       {dashboardView === "checker" && <section className="sr-profile-checker">
+        <button className="sr-report-back sr-checker-back" onClick={() => { setDashboardView("reports"); setProfileResults([]); }}>‹ Back to Assignments</button>
         <div className="sr-profile-checker-head">
           <div>
             <div className="sr-kicker">PROFILE CHECKER</div>
@@ -896,8 +900,9 @@ export default function ScoutingReportsPageFinal() {
         <div className="sr-profile-filters">
           <select value={profileFilters.foot} onChange={(e) => setProfileFilters({ ...profileFilters, foot: e.target.value })}><option value="">Any foot</option><option>Right</option><option>Left</option><option>Both</option></select>
           <select value={profileFilters.age} onChange={(e) => setProfileFilters({ ...profileFilters, age: e.target.value })}><option value="">Any age</option><option value="under21">Under 21</option><option value="21to24">21–24</option><option value="25to29">25–29</option><option value="30plus">30+</option></select>
-          <select value={profileFilters.performance} onChange={(e) => setProfileFilters({ ...profileFilters, performance: e.target.value })}><option value="">Any performance grade</option>{[5,4,3,2,1].map((x) => <option key={x} value={String(x)}>{x}/5</option>)}</select>
-          <select value={profileFilters.potential} onChange={(e) => setProfileFilters({ ...profileFilters, potential: e.target.value })}><option value="">Any potential grade</option>{["A","B","C","D","E","F"].map((x) => <option key={x}>{x}</option>)}</select>
+          <select value={profileFilters.position} onChange={(e) => setProfileFilters({ ...profileFilters, position: e.target.value })}><option value="">Any position</option>{["GK","LB","LCB","CB","RCB","RB","DM","LM","LCM","CM","RCM","RM","LW","AM","RW","CF","ST"].map((x) => <option key={x}>{x}</option>)}</select>
+          <select value={profileFilters.performance} onChange={(e) => setProfileFilters({ ...profileFilters, performance: e.target.value })}><option value="">Any performance grade</option>{[5,4,3,2,1].map((x) => <option key={x} value={String(x)}>{x}/5 or higher</option>)}</select>
+          <select value={profileFilters.potential} onChange={(e) => setProfileFilters({ ...profileFilters, potential: e.target.value })}><option value="">Any potential grade</option>{["A","B","C","D","E"].map((x) => <option key={x} value={x}>{x} grade and up</option>)}</select>
         </div>
         {!!profileResults.length && (
           <div className="sr-profile-results">
