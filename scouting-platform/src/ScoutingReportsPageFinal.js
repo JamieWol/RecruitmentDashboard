@@ -80,6 +80,8 @@ export default function ScoutingReportsPageFinal() {
   const [playerData, setPlayerData] = useState(null);
   const [profileQuery, setProfileQuery] = useState("");
   const [profileResults, setProfileResults] = useState([]);
+  const [dashboardView, setDashboardView] = useState("reports");
+  const [profileFilters, setProfileFilters] = useState({ foot: "", age: "", performance: "", potential: "" });
   useEffect(() => {
     const selectedPlayer = profile || active;
     if (!selectedPlayer?.player) {
@@ -257,7 +259,18 @@ export default function ScoutingReportsPageFinal() {
     const terms = profileTerms(profileQuery);
     if (!terms.length) { setProfileResults([]); return; }
     const grouped = new Map();
-    profileCandidates.forEach((item) => {
+    const matchesFilters = (item) => {
+      const report = item.report || {};
+      const foot = String(report.foot || item.foot || item.preferred_foot || item["Preferred Foot"] || "").toLowerCase();
+      const age = Number(report.age || item.age || item.Age || item.player_age);
+      const performance = String(report.performance || item.performance || "");
+      const potential = String(report.potential || item.potential || "");
+      return (!profileFilters.foot || foot === profileFilters.foot.toLowerCase()) &&
+        (!profileFilters.age || (Number.isFinite(age) && (profileFilters.age === "under21" ? age < 21 : profileFilters.age === "21to24" ? age >= 21 && age <= 24 : profileFilters.age === "25to29" ? age >= 25 && age <= 29 : age >= 30))) &&
+        (!profileFilters.performance || performance === profileFilters.performance) &&
+        (!profileFilters.potential || potential.toUpperCase() === profileFilters.potential);
+    };
+    profileCandidates.filter(matchesFilters).forEach((item) => {
       const text = reportSearchText(item);
       const matches = terms.filter((term) => text.includes(term));
       if (!matches.length) return;
@@ -824,6 +837,9 @@ export default function ScoutingReportsPageFinal() {
               </div>
             )}
           </div>
+          <button className={`sr-outline sr-profile-tab ${dashboardView === "checker" ? "selected" : ""}`} onClick={() => setDashboardView(dashboardView === "checker" ? "reports" : "checker")}>
+            Profile Checker
+          </button>
           <button className="sr-outline" onClick={() => nav("/shortlists")}>
             View Shortlists
           </button>
@@ -832,7 +848,7 @@ export default function ScoutingReportsPageFinal() {
           </button>
         </div>
       </section>
-      <input
+      {dashboardView === "reports" && <><input
         className="sr-search"
         placeholder="Search scout or player..."
         value={query}
@@ -841,7 +857,24 @@ export default function ScoutingReportsPageFinal() {
           if (e.key === "Enter") searchPlayer();
         }}
       />
-      <section className="sr-profile-checker">
+      <section className="sr-tabs">
+        {["My Assignments", "All Assigned", "Published"].map((x) => (
+          <button className={tab === x ? "selected" : ""} onClick={() => setTab(x)} key={x}>{x}</button>
+        ))}
+      </section>
+      <div className="sr-section-line"><h2>{tab}</h2><span>{shown.length} assignments</span></div>
+      <section className="sr-grid">
+        {shown.map((x) => (
+          <article className="sr-card" key={x.id} onClick={() => { setProfile(null); setActive(x); }}>
+            <div className="sr-card-top"><span className="sr-card-status">{x.status}</span><button className="sr-trash" onClick={(e) => { e.stopPropagation(); deleteAssignment(x); }}>Delete</button></div>
+            <button type="button" className="sr-assignment-player-link" onClick={(e) => { e.stopPropagation(); setProfile(null); setActive(x); }}>{x.player}</button>
+            <p>{x.club || "Club not added"} · {x.position || "Position not added"}</p><div className="sr-fixture">{x.game || "Game not added"}</div>
+            <div className="sr-card-meta"><span>{x.date || "Date not added"}</span><span>{x.viewing}</span><span>Scout: {x.scout || "Unassigned"}</span></div>
+          </article>
+        ))}
+      </section>
+      {!shown.length && <div className="sr-empty">No assignments found.</div>}</>}
+      {dashboardView === "checker" && <section className="sr-profile-checker">
         <div className="sr-profile-checker-head">
           <div>
             <div className="sr-kicker">PROFILE CHECKER</div>
@@ -860,6 +893,12 @@ export default function ScoutingReportsPageFinal() {
           />
           <button className="sr-cyan" onClick={runProfileCheck}>Check Profile</button>
         </div>
+        <div className="sr-profile-filters">
+          <select value={profileFilters.foot} onChange={(e) => setProfileFilters({ ...profileFilters, foot: e.target.value })}><option value="">Any foot</option><option>Right</option><option>Left</option><option>Both</option></select>
+          <select value={profileFilters.age} onChange={(e) => setProfileFilters({ ...profileFilters, age: e.target.value })}><option value="">Any age</option><option value="under21">Under 21</option><option value="21to24">21–24</option><option value="25to29">25–29</option><option value="30plus">30+</option></select>
+          <select value={profileFilters.performance} onChange={(e) => setProfileFilters({ ...profileFilters, performance: e.target.value })}><option value="">Any performance grade</option>{[5,4,3,2,1].map((x) => <option key={x} value={String(x)}>{x}/5</option>)}</select>
+          <select value={profileFilters.potential} onChange={(e) => setProfileFilters({ ...profileFilters, potential: e.target.value })}><option value="">Any potential grade</option>{["A","B","C","D","E","F"].map((x) => <option key={x}>{x}</option>)}</select>
+        </div>
         {!!profileResults.length && (
           <div className="sr-profile-results">
             {profileResults.slice(0, 12).map((match) => (
@@ -872,69 +911,7 @@ export default function ScoutingReportsPageFinal() {
           </div>
         )}
         {profileQuery.trim() && !profileResults.length && <div className="sr-profile-no-results">No published reports match those criteria yet.</div>}
-      </section>
-      <section className="sr-tabs">
-        {["My Assignments", "All Assigned", "Published"].map((x) => (
-          <button
-            className={tab === x ? "selected" : ""}
-            onClick={() => setTab(x)}
-            key={x}
-          >
-            {x}
-          </button>
-        ))}
-      </section>
-      <div className="sr-section-line">
-        <h2>{tab}</h2>
-        <span>{shown.length} assignments</span>
-      </div>
-      <section className="sr-grid">
-        {shown.map((x) => (
-          <article
-            className="sr-card"
-            key={x.id}
-            onClick={() => {
-              setProfile(null);
-              setActive(x);
-            }}
-          >
-            <div className="sr-card-top">
-              <span className="sr-card-status">{x.status}</span>
-              <button
-                className="sr-trash"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  deleteAssignment(x);
-                }}
-              >
-                Delete
-              </button>
-            </div>
-            <button
-              type="button"
-              className="sr-assignment-player-link"
-              onClick={(e) => {
-                e.stopPropagation();
-                setProfile(null);
-                setActive(x);
-              }}
-            >
-              {x.player}
-            </button>
-            <p>
-              {x.club || "Club not added"} ·{" "}
-              {x.position || "Position not added"}
-            </p>
-            <div className="sr-fixture">{x.game || "Game not added"}</div>
-            <div className="sr-card-meta">
-              <span>{x.date || "Date not added"}</span>
-              <span>{x.viewing}</span>
-              <span>Scout: {x.scout || "Unassigned"}</span>
-            </div>
-          </article>
-        ))}
-      </section>
-      {!shown.length && <div className="sr-empty">No assignments found.</div>}
+      </section>}
       {reportPage}
     </main>
   );
