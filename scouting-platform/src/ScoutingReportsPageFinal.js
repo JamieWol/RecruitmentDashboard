@@ -80,6 +80,7 @@ export default function ScoutingReportsPageFinal() {
   const [playerData, setPlayerData] = useState(null);
   const [profileQuery, setProfileQuery] = useState("");
   const [profileResults, setProfileResults] = useState([]);
+  const [profilePlayerDirectory, setProfilePlayerDirectory] = useState({});
   const [dashboardView, setDashboardView] = useState("reports");
   const [profileFilters, setProfileFilters] = useState({ foot: "", age: "", position: "", performance: "", potential: "" });
   useEffect(() => {
@@ -255,6 +256,15 @@ export default function ScoutingReportsPageFinal() {
     const publishedShared = sharedReports.map((item) => ({ ...item, id: item.assignment_id || item.id, report: item.report, status: "Published", club: item.player_club || item.club || "Club not added", position: item.position || item.report?.playedPosition || "" }));
     return [...new Map([...publishedLocal, ...publishedShared].map((item) => [String(item.id), item])).values()];
   }, [items, sharedReports]);
+  useEffect(() => {
+    const names = profileCandidates.map((item) => item.player).filter(Boolean);
+    if (!names.length) return;
+    supabase.from("players").select("Name,Age,age").in("Name", names).then(({ data }) => {
+      const directory = {};
+      (data || []).forEach((player) => { directory[String(player.Name || "").trim().toLowerCase()] = player.Age ?? player.age; });
+      setProfilePlayerDirectory(directory);
+    }).catch(() => setProfilePlayerDirectory({}));
+  }, [profileCandidates]);
   const runProfileCheck = () => {
     const terms = profileTerms(profileQuery);
     if (!terms.length && !Object.values(profileFilters).some(Boolean)) { setProfileResults([]); return; }
@@ -262,7 +272,7 @@ export default function ScoutingReportsPageFinal() {
     const matchesFilters = (item) => {
       const report = item.report || {};
       const foot = String(report.foot || item.foot || item.preferred_foot || item["Preferred Foot"] || "").toLowerCase();
-      const age = Number(report.age || item.age || item.Age || item.player_age);
+      const age = Number(profilePlayerDirectory[String(item.player || "").trim().toLowerCase()] ?? report.age ?? item.age ?? item.Age ?? item.player_age);
       const performance = String(report.performance || item.performance || "");
       const potential = String(report.potential || item.potential || "");
       const position = String(report.playedPosition || item.position || item.primary_position || "").toLowerCase();
@@ -878,7 +888,7 @@ export default function ScoutingReportsPageFinal() {
       </section>
       {!shown.length && <div className="sr-empty">No assignments found.</div>}</>}
       {dashboardView === "checker" && <section className="sr-profile-checker">
-        <button className="sr-report-back sr-checker-back" onClick={() => { setDashboardView("reports"); setProfileResults([]); }}>‹ Back to Assignments</button>
+        <button type="button" className="sr-checker-back" onClick={() => { setDashboardView("reports"); setProfileResults([]); setProfileQuery(""); }}>← Back to Assignments</button>
         <div className="sr-profile-checker-head">
           <div>
             <div className="sr-kicker">PROFILE CHECKER</div>
