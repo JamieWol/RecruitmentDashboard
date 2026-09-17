@@ -288,7 +288,7 @@ export default function ScoutingReportsPageFinal() {
         (!profileFilters.age || (Number.isFinite(age) && (profileFilters.age === "under21" ? age < 21 : profileFilters.age === "21to24" ? age >= 21 && age <= 24 : profileFilters.age === "25to29" ? age >= 25 && age <= 29 : age >= 30))) &&
         (!profileFilters.position || position === profileFilters.position.toLowerCase()) &&
         (!profileFilters.performance || (Number(performance) >= Number(profileFilters.performance))) &&
-        (!profileFilters.potential || (potentialRank[potential.toUpperCase()] <= potentialRank[profileFilters.potential]));
+        (!profileFilters.potential || (potentialRank[potential.toUpperCase()] >= potentialRank[profileFilters.potential]));
     };
     profileCandidates.filter(matchesFilters).forEach((item) => {
       const text = reportSearchText(item);
@@ -932,7 +932,7 @@ export default function ScoutingReportsPageFinal() {
           <select value={profileFilters.age} onChange={(e) => setProfileFilters({ ...profileFilters, age: e.target.value })}><option value="">Any age</option><option value="under21">Under 21</option><option value="21to24">21–24</option><option value="25to29">25–29</option><option value="30plus">30+</option></select>
           <select value={profileFilters.position} onChange={(e) => setProfileFilters({ ...profileFilters, position: e.target.value })}><option value="">Any position</option>{["GK","LB","LCB","CB","RCB","RB","DM","LM","LCM","CM","RCM","RM","LW","AM","RW","CF","ST"].map((x) => <option key={x}>{x}</option>)}</select>
           <select value={profileFilters.performance} onChange={(e) => setProfileFilters({ ...profileFilters, performance: e.target.value })}><option value="">Any performance grade</option>{[1,2,3,4,5].map((x) => <option key={x} value={String(x)}>{x}/5 or higher</option>)}</select>
-          <select value={profileFilters.potential} onChange={(e) => setProfileFilters({ ...profileFilters, potential: e.target.value })}><option value="">Any potential grade</option>{["F","E","D","C","B","A"].map((x) => <option key={x} value={x}>{x} grade and up</option>)}</select>
+          <select value={profileFilters.potential} onChange={(e) => setProfileFilters({ ...profileFilters, potential: e.target.value })}><option value="">Any potential grade</option>{["A","B","C","D","E","F"].map((x) => <option key={x} value={x}>{x} grade and below</option>)}</select>
         </div>
         {!!profileResults.length && (
           <><div className="sr-profile-results-actions"><strong>{profileResults.length} matching players</strong><button className="sr-outline" onClick={exportProfileNames}>Export Names</button></div><div className="sr-profile-results">
