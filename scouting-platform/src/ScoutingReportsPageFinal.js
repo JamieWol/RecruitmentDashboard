@@ -78,11 +78,14 @@ export default function ScoutingReportsPageFinal() {
   const [sharedReports, setSharedReports] = useState([]);
   const [sharedAssignments, setSharedAssignments] = useState([]);
   const [playerData, setPlayerData] = useState(null);
-  const [profileQuery, setProfileQuery] = useState("");
+  const [profileQuery, setProfileQuery] = useState(() => sessionStorage.getItem("profileCheckerQuery") || "");
   const [profileResults, setProfileResults] = useState([]);
   const [profilePlayerDirectory, setProfilePlayerDirectory] = useState({});
-  const [dashboardView, setDashboardView] = useState("reports");
-  const [profileFilters, setProfileFilters] = useState({ foot: "", age: "", position: "", performance: "", potential: "" });
+  const [dashboardView, setDashboardView] = useState(() => sessionStorage.getItem("scoutingDashboardView") || "reports");
+  const [profileFilters, setProfileFilters] = useState(() => JSON.parse(sessionStorage.getItem("profileCheckerFilters") || '{"foot":"","age":"","position":"","performance":"","potential":""}'));
+  useEffect(() => { sessionStorage.setItem("scoutingDashboardView", dashboardView); }, [dashboardView]);
+  useEffect(() => { sessionStorage.setItem("profileCheckerFilters", JSON.stringify(profileFilters)); }, [profileFilters]);
+  useEffect(() => { sessionStorage.setItem("profileCheckerQuery", profileQuery); }, [profileQuery]);
   useEffect(() => {
     const selectedPlayer = profile || active;
     if (!selectedPlayer?.player) {
@@ -306,6 +309,14 @@ export default function ScoutingReportsPageFinal() {
     // Keep results in sync when a filter or the player-profile ages finish loading.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileFilters, profilePlayerDirectory]);
+  const exportProfileNames = () => {
+    if (!profileResults.length) return;
+    const csv = ["Player,Club,Position,Match"].concat(profileResults.map((item) => [item.player, item.club || "", item.position || "", `${item.score}%`].map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","))).join("\n");
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    link.download = "profile-checker-players.csv";
+    link.click();
+  };
   const openReport = (x) => {
     setActive(x);
     setReport(x.report || empty);
@@ -920,11 +931,11 @@ export default function ScoutingReportsPageFinal() {
           <select value={profileFilters.foot} onChange={(e) => setProfileFilters({ ...profileFilters, foot: e.target.value })}><option value="">Any foot</option><option>Right</option><option>Left</option><option>Both</option></select>
           <select value={profileFilters.age} onChange={(e) => setProfileFilters({ ...profileFilters, age: e.target.value })}><option value="">Any age</option><option value="under21">Under 21</option><option value="21to24">21–24</option><option value="25to29">25–29</option><option value="30plus">30+</option></select>
           <select value={profileFilters.position} onChange={(e) => setProfileFilters({ ...profileFilters, position: e.target.value })}><option value="">Any position</option>{["GK","LB","LCB","CB","RCB","RB","DM","LM","LCM","CM","RCM","RM","LW","AM","RW","CF","ST"].map((x) => <option key={x}>{x}</option>)}</select>
-          <select value={profileFilters.performance} onChange={(e) => setProfileFilters({ ...profileFilters, performance: e.target.value })}><option value="">Any performance grade</option>{[5,4,3,2,1].map((x) => <option key={x} value={String(x)}>{x}/5 or higher</option>)}</select>
-          <select value={profileFilters.potential} onChange={(e) => setProfileFilters({ ...profileFilters, potential: e.target.value })}><option value="">Any potential grade</option>{["A","B","C","D","E"].map((x) => <option key={x} value={x}>{x} grade and up</option>)}</select>
+          <select value={profileFilters.performance} onChange={(e) => setProfileFilters({ ...profileFilters, performance: e.target.value })}><option value="">Any performance grade</option>{[1,2,3,4,5].map((x) => <option key={x} value={String(x)}>{x}/5 or higher</option>)}</select>
+          <select value={profileFilters.potential} onChange={(e) => setProfileFilters({ ...profileFilters, potential: e.target.value })}><option value="">Any potential grade</option>{["F","E","D","C","B","A"].map((x) => <option key={x} value={x}>{x} grade and up</option>)}</select>
         </div>
         {!!profileResults.length && (
-          <div className="sr-profile-results">
+          <><div className="sr-profile-results-actions"><strong>{profileResults.length} matching players</strong><button className="sr-outline" onClick={exportProfileNames}>Export Names</button></div><div className="sr-profile-results">
             {profileResults.slice(0, 12).map((match) => (
               <button className="sr-profile-result" key={match.player || match.id} onClick={() => { setProfile(match); setProfileQuery(""); }}>
                 <span className="sr-profile-result-main"><strong>{match.player || "Unnamed player"}</strong><small>{match.club || "Club not added"}{match.position ? ` · ${match.position}` : ""}</small></span>
@@ -932,7 +943,7 @@ export default function ScoutingReportsPageFinal() {
                 <span className="sr-profile-result-evidence">{match.evidence}</span>
               </button>
             ))}
-          </div>
+          </div></>
         )}
         {profileQuery.trim() && !profileResults.length && <div className="sr-profile-no-results">No published reports match those criteria yet.</div>}
       </section>}

@@ -108,3 +108,4 @@ header{z-index:1000!important}.sr-page{position:relative;z-index:1}.sr-pitch{z-i
 .sr-profile-filters{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:14px}.sr-profile-filters select{background:#244f82;color:#fff;border:1px solid #6a96bd;border-radius:7px;padding:11px;font:inherit}@media(max-width:720px){.sr-profile-filters{grid-template-columns:1fr 1fr}}
 .sr-profile-tab{white-space:nowrap}.sr-profile-tab.selected{background:#d8f1ff;color:#123b67}
 .sr-checker-back{display:inline-block;margin-bottom:16px;background:transparent;color:#d2e5fa;border:0;padding:0;font:inherit;cursor:pointer}.sr-checker-back:hover{text-decoration:underline}
+.sr-profile-results-actions{display:flex;justify-content:space-between;align-items:center;margin-top:18px;color:#d2e5fa}.sr-profile-results-actions .sr-outline{padding:9px 14px}
