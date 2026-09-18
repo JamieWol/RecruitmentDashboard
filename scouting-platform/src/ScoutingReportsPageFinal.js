@@ -34,6 +34,12 @@ const photoSlug = (name, lower = false) =>
     .join("_");
 const playerPhoto = (name, lower = true) =>
   `${photoBase}${photoSlug(name, lower)}.png`;
+const playerPhotoFor = (record) => {
+  const direct = ["Photo", "photo", "_photoUrl", "photoUrl", "playerPhoto", "Image", "image", "Photo URL"]
+    .map((key) => record?.[key])
+    .find((value) => typeof value === "string" && value.trim());
+  return direct || playerPhoto(record?.player || record?.Name || record?.name);
+};
 const photoCandidates = (name) => {
   const raw = String(name || "").trim();
   const display = raw.split(/\s+/).length > 2 ? `${raw.split(/\s+/)[0]} ${raw.split(/\s+/).at(-1)}` : raw;
@@ -74,7 +80,9 @@ export default function ScoutingReportsPageFinal() {
       name = localStorage.getItem("scoutingProfilePlayer");
     return name ? n.find((x) => x.player === name) || { player: name } : null;
   });
-  const [active, setActive] = useState(null);
+  const [active, setActive] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem("scoutingActiveReport") || "null")?.active || null; } catch { return null; }
+  });
   const [sharedReports, setSharedReports] = useState([]);
   const [sharedAssignments, setSharedAssignments] = useState([]);
   const [playerData, setPlayerData] = useState(null);
@@ -107,8 +115,13 @@ export default function ScoutingReportsPageFinal() {
       })
       .catch(() => setPlayerData(null));
   }, [profile, active]);
-  const [report, setReport] = useState(empty);
+  const [report, setReport] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem("scoutingActiveReport") || "null")?.report || empty; } catch { return empty; }
+  });
   const [editing, setEditing] = useState(false);
+  useEffect(() => {
+    if (active) sessionStorage.setItem("scoutingActiveReport", JSON.stringify({ active, report }));
+  }, [active, report]);
   const publishedAssignmentIds = useMemo(
     () => new Set(sharedReports.map((x) => String(x.assignment_id || x.id))),
     [sharedReports],
@@ -377,6 +390,7 @@ export default function ScoutingReportsPageFinal() {
       });
     }
     setActive(null);
+    sessionStorage.removeItem("scoutingActiveReport");
     setProfile(n.find((x) => x.id === active.id) || profile);
   };
   const field = (l, k, r = 5) => (
@@ -439,12 +453,12 @@ export default function ScoutingReportsPageFinal() {
       <section
         className={`sr-form sr-report ${active?.status === "Published" && !editing ? "readonly" : ""}`}
       >
-        <button className="sr-report-back" onClick={() => { setActive(null); setProfile(null); }}>‹ Back to Assignments</button>
+        <button className="sr-report-back" onClick={() => { setActive(null); setProfile(null); sessionStorage.removeItem("scoutingActiveReport"); }}>‹ Back to Assignments</button>
         <div className="sr-form-head sr-report-banner">
           <div className="sr-report-banner-main">
             <img
               className="sr-report-banner-photo"
-              src={playerPhoto(active.player)}
+              src={playerPhotoFor({ ...active, ...(playerData || {}) })}
               alt=""
               onError={(e) => retryPhoto(e, active.player)}
             />
@@ -658,7 +672,7 @@ export default function ScoutingReportsPageFinal() {
         <section className="sr-profile-summary">
           <div className="sr-avatar">
             <img
-              src={playerPhoto(profile.player)}
+              src={playerPhotoFor({ ...profile, ...(playerData || {}) })}
               alt=""
               onLoad={(e) => {
                 e.currentTarget.nextElementSibling.style.display = "none";
