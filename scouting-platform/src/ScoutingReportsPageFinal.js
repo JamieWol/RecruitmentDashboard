@@ -87,7 +87,10 @@ export default function ScoutingReportsPageFinal() {
     return name ? n.find((x) => x.player === name) || { player: name } : null;
   });
   const [active, setActive] = useState(() => {
-    try { return JSON.parse(sessionStorage.getItem("scoutingActiveReport") || "null")?.active || null; } catch { return null; }
+    try {
+      const saved = JSON.parse(sessionStorage.getItem("scoutingActiveReport") || "null");
+      return saved?.active ? { ...saved.active, report: saved.report || saved.active.report || null } : null;
+    } catch { return null; }
   });
   const [sharedReports, setSharedReports] = useState([]);
   const [sharedAssignments, setSharedAssignments] = useState([]);
