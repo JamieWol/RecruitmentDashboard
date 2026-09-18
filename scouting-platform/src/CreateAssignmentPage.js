@@ -118,8 +118,14 @@ export default function CreateAssignmentPage() {
     if (!fixtures.length) return setError("Add at least one fixture / game.");
     const chosen = players.find((p) => p.name === selected);
     const old = appState?.assignments || JSON.parse(localStorage.getItem("scoutingAssignments") || "[]");
+    const editing = JSON.parse(
+      localStorage.getItem("editingAssignment") || "null",
+    );
+    const existing = editing
+      ? old.find((x) => String(x.id) === String(editing.id))
+      : null;
     const assignment = {
-      id: Date.now(),
+      id: existing?.id || editing?.id || Date.now(),
       player,
       playerId: chosen?.id || null,
       club: details.club || chosen?.club || "",
@@ -134,13 +140,12 @@ export default function CreateAssignmentPage() {
       date,
       viewing,
       status: "Not Started",
-      report: null,
+      report: existing?.report || editing?.report || null,
     };
-    const editing = JSON.parse(
-      localStorage.getItem("editingAssignment") || "null",
-    );
     const nextAssignments = editing
-      ? old.map((x) => x.id === editing.id ? { ...assignment, id: editing.id } : x)
+      ? old
+        .map((x) => String(x.id) === String(editing.id) ? { ...x, ...assignment, id: x.id } : x)
+        .filter((x) => String(x.id) === String(editing.id) || String(x.player || "").trim().toLowerCase() !== String(player).trim().toLowerCase())
       : [...old, assignment];
     updateAppState({ assignments: nextAssignments, shortlists: appState?.shortlists || [], tags: appState?.tags || [] });
     if (profile?.club && scout) await supabase.from("club_assignments").upsert({ id: Number(assignment.id), club: profile.club, assigned_to: scout, created_by: (await supabase.auth.getUser()).data.user.id, assignment: { ...assignment, id: Number(assignment.id) }, status: assignment.status }, { onConflict: "id" });

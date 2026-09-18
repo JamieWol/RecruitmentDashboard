@@ -144,13 +144,14 @@ export default function ScoutingReportsPageFinal() {
           console.error("Could not load shared assignments", error);
           return;
         }
-        setSharedAssignments((data || []).map((row) => ({
+        const loadedAssignments = (data || []).map((row) => ({
           ...(row.assignment || {}),
           id: row.assignment?.id || row.id,
           sharedAssignmentId: row.id,
           scoutId: row.assigned_to || row.assignment?.scoutId,
           status: row.status || row.assignment?.status || "Not Started",
-        })));
+        }));
+        setSharedAssignments([...new Map(loadedAssignments.map((assignment) => [String(assignment.player || assignment.id).trim().toLowerCase(), assignment])).values()]);
       });
   }, [user, accountProfile?.club]);
   useEffect(() => {
