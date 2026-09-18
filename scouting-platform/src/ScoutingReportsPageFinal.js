@@ -65,11 +65,12 @@ const profileEvidence = (item, terms) => {
   const report = item.report || {};
   return profileFields.map((field) => String(report[field] || "").trim()).find((value) => terms.some((term) => value.toLowerCase().includes(term))) || "Report matches the requested profile criteria.";
 };
+const fixtureRecords = (item) => Array.isArray(item?.games) && item.games.length ? item.games : (Array.isArray(item?.report?.__fixtures) ? item.report.__fixtures : []);
 const fixtureLabel = (item) => {
-  const fixtures = Array.isArray(item?.games) ? item.games : [];
+  const fixtures = fixtureRecords(item);
   if (fixtures.length > 1) return "Multiple";
   if (fixtures.length === 1) return typeof fixtures[0] === "string" ? fixtures[0] : fixtures[0]?.name || "Fixture not added";
-  return item?.game || "Fixture not added";
+  return item?.game || item?.fixture_summary || "Fixture not added";
 };
 export default function ScoutingReportsPageFinal() {
   const nav = useNavigate();
@@ -362,8 +363,13 @@ export default function ScoutingReportsPageFinal() {
   };
   const saveReport = () => {
     const completedAt = new Date().toISOString().slice(0, 10);
+    const reportWithFixtures = {
+      ...report,
+      __fixtures: active.games || [],
+      __fixtureDates: active.fixtureDates || [],
+    };
     const n = items.map((x) =>
-      x.id === active.id ? { ...x, report, status: "Published", completedAt } : x,
+      x.id === active.id ? { ...x, report: reportWithFixtures, status: "Published", completedAt } : x,
     );
     saveItems(n);
     const publishedImmediately = {
@@ -371,10 +377,15 @@ export default function ScoutingReportsPageFinal() {
       assignment_id: Number(active.id),
       player: active.player,
       player_club: active.club || "",
-      report,
+      report: reportWithFixtures,
       status: "Published",
       completed_at: completedAt,
       scout: active.scout || "",
+      games: active.games || [],
+      game: active.game || active.fixture_summary || "",
+      fixtureDates: active.fixtureDates || [],
+      viewing: active.viewing || "",
+      date: active.date || completedAt,
     };
     setSharedReports((current) => [
       ...current.filter((item) => String(item.assignment_id || item.id) !== String(active.id)),
@@ -384,7 +395,7 @@ export default function ScoutingReportsPageFinal() {
     if (user && accountProfile?.club) {
       supabase.from("club_reports").upsert({
         id: Number(active.id), assignment_id: Number(active.id), player_id: active.playerId || null,
-        player: active.player, club: accountProfile.club, player_club: active.club || "", author_id: user.id, report, status: "Published",
+        player: active.player, club: accountProfile.club, player_club: active.club || "", author_id: user.id, report: reportWithFixtures, status: "Published",
         updated_at: new Date().toISOString(), completed_at: active.completedAt || active.date || new Date().toISOString().slice(0, 10), scout: active.scout || "", fixture_summary: (active.games || []).length > 1 ? "Multiple" : (active.games?.[0] ? `${active.games[0].date || ""} · ${active.games[0].name || active.games[0]}` : active.game || ""),
       }, { onConflict: "id" }).then(async ({ error }) => {
         if (error) {
@@ -393,7 +404,7 @@ export default function ScoutingReportsPageFinal() {
         }
         const { error: assignmentError } = await supabase
           .from("club_assignments")
-          .update({ status: "Published", assignment: { ...active, report, status: "Published" } })
+          .update({ status: "Published", assignment: { ...active, report: reportWithFixtures, status: "Published", games: active.games || [], fixtureDates: active.fixtureDates || [] } })
           .eq("club", accountProfile.club)
           .eq("id", Number(active.id));
         if (assignmentError) console.error("Could not mark shared assignment published", assignmentError);
@@ -513,7 +524,7 @@ export default function ScoutingReportsPageFinal() {
         <div className="sr-fixture-box">
           <strong>Assigned Fixture</strong>
           <div className="sr-fixture-list">
-            {(active.games?.length ? active.games : [{ name: active.game || "Fixture not added", date: active.fixtureDates?.[0] || active.date || "Date not added" }]).map((fixture, i) => (
+            {(fixtureRecords(active).length ? fixtureRecords(active) : [{ name: active.game || "Fixture not added", date: active.fixtureDates?.[0] || active.date || "Date not added" }]).map((fixture, i) => (
               <div className="sr-fixture-card" key={`${typeof fixture === "string" ? fixture : fixture.name}-${i}`}>
                 <strong>{typeof fixture === "string" ? fixture : fixture.name || "Fixture not added"}</strong>
                 <small>{typeof fixture === "string" ? active.fixtureDates?.[i] || "Date not added" : fixture.date || "Date not added"}</small>
