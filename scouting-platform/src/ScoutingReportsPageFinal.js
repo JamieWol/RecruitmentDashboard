@@ -65,6 +65,12 @@ const profileEvidence = (item, terms) => {
   const report = item.report || {};
   return profileFields.map((field) => String(report[field] || "").trim()).find((value) => terms.some((term) => value.toLowerCase().includes(term))) || "Report matches the requested profile criteria.";
 };
+const fixtureLabel = (item) => {
+  const fixtures = Array.isArray(item?.games) ? item.games : [];
+  if (fixtures.length > 1) return "Multiple";
+  if (fixtures.length === 1) return typeof fixtures[0] === "string" ? fixtures[0] : fixtures[0]?.name || "Fixture not added";
+  return item?.game || "Fixture not added";
+};
 export default function ScoutingReportsPageFinal() {
   const nav = useNavigate();
   const { appState, updateAppState, user, profile: accountProfile } = useAuth();
@@ -503,18 +509,14 @@ export default function ScoutingReportsPageFinal() {
         </div>
         <div className="sr-fixture-box">
           <strong>Assigned Fixture</strong>
-          <span>
-            {active.games?.length
-              ? active.games.map((fixture, i) => (
-                  <React.Fragment key={i}>
-                    {i > 0 && " • "}
-                    {typeof fixture === "string"
-                      ? `${fixture} · ${active.fixtureDates?.[i] || "Date not added"}`
-                      : `${fixture.name} · ${fixture.date || "Date not added"}`}
-                  </React.Fragment>
-                ))
-              : `${active.game || "Fixture not added"} · ${active.fixtureDates?.[0] || active.date || "Date not added"}`}
-          </span>
+          <div className="sr-fixture-list">
+            {(active.games?.length ? active.games : [{ name: active.game || "Fixture not added", date: active.fixtureDates?.[0] || active.date || "Date not added" }]).map((fixture, i) => (
+              <div className="sr-fixture-card" key={`${typeof fixture === "string" ? fixture : fixture.name}-${i}`}>
+                <strong>{typeof fixture === "string" ? fixture : fixture.name || "Fixture not added"}</strong>
+                <small>{typeof fixture === "string" ? active.fixtureDates?.[i] || "Date not added" : fixture.date || "Date not added"}</small>
+              </div>
+            ))}
+          </div>
           <small>{active.viewing || "Viewing not added"}</small>
           {(!active.author_id || active.author_id === user?.id) && <button
             className="sr-edit-games"
@@ -769,7 +771,7 @@ export default function ScoutingReportsPageFinal() {
                     onClick={() => openReport(x)}
                   >
                     <span>{x.completed_at || x.completedAt || x.date || "—"}</span>
-                    <span>{x.game || "—"}</span>
+                    <span>{fixtureLabel(x) || "—"}</span>
                     <span>{x.scout || "—"}</span>
                     <span>{x.report?.potential || "—"}</span>
                     <span>{x.report?.performance || "—"}</span>
@@ -916,7 +918,7 @@ export default function ScoutingReportsPageFinal() {
           <article className="sr-card" key={x.id} onClick={() => { setProfile(null); setActive(x); }}>
             <div className="sr-card-top"><span className="sr-card-status">{x.status}</span><button className="sr-trash" onClick={(e) => { e.stopPropagation(); deleteAssignment(x); }}>Delete</button></div>
             <button type="button" className="sr-assignment-player-link" onClick={(e) => { e.stopPropagation(); setProfile(null); setActive(x); }}>{x.player}</button>
-            <p>{x.club || "Club not added"} · {x.position || "Position not added"}</p><div className="sr-fixture">{x.game || "Game not added"}</div>
+            <p>{x.club || "Club not added"} · {x.position || "Position not added"}</p><div className="sr-fixture">{fixtureLabel(x)}</div>
             <div className="sr-card-meta"><span>{x.date || "Date not added"}</span><span>{x.viewing}</span><span>Scout: {x.scout || "Unassigned"}</span></div>
           </article>
         ))}
