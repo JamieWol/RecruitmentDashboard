@@ -14,9 +14,10 @@ const formationRows = {
 const normalise = (value) => String(value || "").trim().toLowerCase();
 const playerName = (p) => p.Name || p.name || p.player || [p.first_name, p.last_name].filter(Boolean).join(" ") || "Unnamed player";
 const playerClub = (p) => p.Team || p.team || p.club || p.Club || "";
-const photoFor = (name) => `https://syjsmvvsvvprxibqoizw.supabase.co/storage/v1/object/public/player-photos/player-photos/${String(name || "").trim().split(/\s+/).filter(Boolean).map((x) => x.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-zA-Z0-9]+/g, "_").toLowerCase()).join("_")}.png`;
-const photoCandidates = (name) => { const raw = String(name || "").trim(); const short = raw.split(/\s+/).length > 2 ? `${raw.split(/\s+/)[0]} ${raw.split(/\s+/).at(-1)}` : raw; return [...new Set([raw, short].flatMap((x) => [x, x.toLowerCase(), x.toUpperCase(), x.normalize("NFD").replace(/[̀-ͯ]/g, "")]).map((x) => `${"https://syjsmvvsvvprxibqoizw.supabase.co/storage/v1/object/public/player-photos/player-photos/"}${x.replace(/[^a-zA-Z0-9]+/g, "_")}.png`))]; };
-const imageSource = (p) => p.Photo || p.photo || p.photo_url || p.image_url || photoFor(playerName(p));
+const photoBase = "https://syjsmvvsvvprxibqoizw.supabase.co/storage/v1/object/public/player-photos/player-photos/";
+const photoFor = (name) => `${photoBase}${String(name || "").trim().split(/\s+/).filter(Boolean).map((x) => x.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-zA-Z0-9]+/g, "_").toLowerCase()).join("_")}.png`;
+const photoCandidates = (name) => { const raw = String(name || "").trim(); const short = raw.split(/\s+/).length > 2 ? `${raw.split(/\s+/)[0]} ${raw.split(/\s+/).at(-1)}` : raw; const bases = [...new Set([raw, short].map((x) => x.replace(/[^\p{L}\p{N}]+/gu, "_").replace(/^_+|_+$/g, "")))]; return [...new Set(bases.flatMap((x) => [x, x.toLowerCase(), x.toUpperCase(), `_${x}`, `_${x.toLowerCase()}`, `__${x}`, x.normalize("NFD").replace(/[̀-ͯ]/g, "")]).map((x) => `${photoBase}${x}.png`))]; };
+const imageSource = (p) => p.Photo || p.photo || p._photoUrl || p.photoUrl || p.photo_url || p.playerPhoto || p.Image || p.image || p["Photo URL"] || p.image_url || photoFor(playerName(p));
 const imageFallback = (e, name) => { const image = e.currentTarget; const candidates = photoCandidates(name); const next = Number(image.dataset.photoFallback || 0) + 1; if (candidates[next - 1]) { image.dataset.photoFallback = String(next); image.src = candidates[next - 1]; } else image.style.display = "none"; };
 const defaultTags = [];
 
@@ -112,7 +113,7 @@ export default function SquadPlanPage() {
     setTags(next); localStorage.setItem("squadPlanTags", JSON.stringify(next)); setNewTagName("");
   };
   const tagMenu = (p) => tagPicker === String(p.id) && <div className="sr-squad-tag-menu">{tags.map((tag) => <button type="button" key={tag.id} onClick={() => toggleTag(p.id, tag.id)}><i style={{ background: tag.color }} />{p.tags?.includes(tag.id) ? "✓ " : ""}{tag.name}</button>)}{p.tags?.length > 0 && <button type="button" className="sr-remove-tag" onClick={() => { persist(squad.map((item) => item.planKey === planKey && String(item.id) === String(p.id) ? { ...item, tags: [] } : item)); setTagPicker(null); }}>Remove tag</button>}</div>;
-  const tagStyle = (p) => { const tag = tags.find((item) => p.tags?.includes(item.id)); return tag ? { backgroundColor: `${tag.color}cc`, borderColor: tag.color, color: "#063d74" } : { backgroundColor: "#e9f4fb", borderColor: "#b4d2e8", color: "#063d74" }; };
+  const tagStyle = (p) => { const tag = tags.find((item) => p.tags?.includes(item.id)); return tag ? { backgroundColor: tag.color, borderColor: tag.color, color: "#063d74" } : { backgroundColor: "#e9f4fb", borderColor: "#b4d2e8", color: "#063d74" }; };
   const changeFormation = (value) => {
     const nextSlots = formationRows[value].flatMap((row) => row.map((position, index) => `${position}-${index}`));
     const used = {};
