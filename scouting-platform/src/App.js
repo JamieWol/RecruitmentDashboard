@@ -7,6 +7,7 @@ import ScoutReportPage from "./ScoutReportPage";
 import RecruitmentDashboardPage from "./RecruitmentDashboardPage";
 import ScoutingReportsPage from "./ScoutingReportsPageFinal";
 import ShortlistsPage from "./ShortlistsPage";
+import SquadPlanPage from "./SquadPlanPage";
 import CreateAssignmentPage from "./CreateAssignmentPage";
 import TeamAnalysisPage from "./TeamAnalysisPage";
 import "./App.css";
@@ -23,7 +24,7 @@ function LoginGate() {
 
 function AppRoutes() {
   const [shadowSquad, setShadowSquad] = useState([]);
-  return <><Header /><div style={{ paddingTop: 80 }}><Routes><Route path="/" element={<LandingPage />} /><Route path="/scout-report" element={<ScoutReportPage shadowSquad={shadowSquad} setShadowSquad={setShadowSquad} />} /><Route path="/scouting-reports" element={<ScoutingReportsPage />} /><Route path="/shortlists" element={<ShortlistsPage />} /><Route path="/create-assignment" element={<CreateAssignmentPage />} /><Route path="/team-analysis" element={<TeamAnalysisPage />} /><Route path="/recruitment-dashboard" element={<RecruitmentDashboardPage />} /></Routes></div></>;
+  return <><Header /><div style={{ paddingTop: 80 }}><Routes><Route path="/" element={<LandingPage />} /><Route path="/scout-report" element={<ScoutReportPage shadowSquad={shadowSquad} setShadowSquad={setShadowSquad} />} /><Route path="/scouting-reports" element={<ScoutingReportsPage />} /><Route path="/shortlists" element={<ShortlistsPage />} /><Route path="/squad-plan" element={<SquadPlanPage />} /><Route path="/create-assignment" element={<CreateAssignmentPage />} /><Route path="/team-analysis" element={<TeamAnalysisPage />} /><Route path="/recruitment-dashboard" element={<RecruitmentDashboardPage />} /></Routes></div></>;
 }
 
 // ------------------- HEADER COMPONENT -------------------
@@ -45,6 +46,7 @@ function Header() {
     { label: "Scout Report", path: "/scout-report" },
     { label: "Reports & Assignments", path: "/scouting-reports" },
     { label: "Shortlists", path: "/shortlists" },
+    { label: "Squad Plan", path: "/squad-plan" },
     { label: "Team Analysis", path: "/team-analysis" },
   ];
 
