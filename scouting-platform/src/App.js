@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AuthProvider, useAuth } from "./AuthContext";
 import { supabase } from "./supabaseClient";
 import LandingPage from "./LandingPage";
@@ -14,12 +14,19 @@ import "./App.css";
 
 function LoginGate() {
   const { user, profile, profileError, loading } = useAuth();
-  const [signup, setSignup] = useState(false), [email, setEmail] = useState(""), [password, setPassword] = useState(""), [name, setName] = useState(""), [club, setClub] = useState(""), [error, setError] = useState("");
+  const [signup, setSignup] = useState(false), [email, setEmail] = useState(""), [password, setPassword] = useState(""), [name, setName] = useState(""), [club, setClub] = useState(""), [clubs, setClubs] = useState([]), [error, setError] = useState("");
+  useEffect(() => {
+    if (!signup) return;
+    supabase.from("players").select("Team,team,club,Club").limit(10000).then(({ data }) => {
+      const names = [...new Set((data || []).map((item) => item.Team || item.team || item.club || item.Club).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+      setClubs(names);
+    });
+  }, [signup]);
   if (loading) return <div className="sr-auth-screen">Loading…</div>;
   if (user && profile?.approved) return <AppRoutes />;
   if (user) return <div className="sr-auth-screen"><div className="sr-pending-card"><h1>Awaiting admin approval</h1><p>{profileError || "Your account has been created. An administrator must assign your club before you can access the platform."}</p><small>Signed-in user ID: {user.id}</small><button className="sr-cyan" onClick={() => supabase.auth.signOut()}>Sign out</button></div></div>;
   const submit = async (e) => { e.preventDefault(); setError(""); const result = signup ? await supabase.auth.signUp({ email, password, options: { data: { full_name: name, club } } }) : await supabase.auth.signInWithPassword({ email, password }); if (result.error) setError(result.error.message); };
-  return <main className="sr-auth-screen"><section className="sr-auth-landing"><div className="sr-auth-copy"><div className="sr-auth-brand">⚽ ScoutPro</div><h1>Football Recruitment<br />Organised Properly.</h1><p>Manage assignments, reports and shortlists securely with your scouting team.</p></div><form className="sr-form sr-auth-form" onSubmit={submit}><h2>{signup ? "Request access" : "Welcome back"}</h2>{signup && <><input placeholder="Full name" value={name} onChange={e => setName(e.target.value)} required /><input placeholder="Club" value={club} onChange={e => setClub(e.target.value)} required /><small className="sr-auth-note">Your club admin will review your request.</small></>}<input type="email" placeholder="Email address" value={email} onChange={e => setEmail(e.target.value)} required /><input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />{error && <p className="sr-auth-error">{error}</p>}<button className="sr-cyan">{signup ? "Request account" : "Sign in"}</button><button type="button" className="sr-outline" onClick={() => setSignup(!signup)}>{signup ? "Already have an account? Sign in" : "Create an account"}</button></form></section></main>;
+  return <main className="sr-auth-screen"><section className="sr-auth-landing"><div className="sr-auth-copy"><div className="sr-auth-brand">⚽ ScoutPro</div><h1>Football Recruitment<br />Organised Properly.</h1><p>Manage assignments, reports and shortlists securely with your scouting team.</p></div><form className="sr-form sr-auth-form" onSubmit={submit}><h2>{signup ? "Request access" : "Welcome back"}</h2>{signup && <><input placeholder="Full name" value={name} onChange={e => setName(e.target.value)} required /><input list="signup-clubs" placeholder="Start typing your club" value={club} onChange={e => setClub(e.target.value)} required /><datalist id="signup-clubs">{clubs.map((name) => <option key={name} value={name} />)}</datalist><small className="sr-auth-note">Your club admin will review your request.</small></>}<input type="email" placeholder="Email address" value={email} onChange={e => setEmail(e.target.value)} required /><input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />{error && <p className="sr-auth-error">{error}</p>}<button className="sr-cyan">{signup ? "Request account" : "Sign in"}</button><button type="button" className="sr-outline" onClick={() => setSignup(!signup)}>{signup ? "Already have an account? Sign in" : "Create an account"}</button></form></section></main>;
 }
 
 function AppRoutes() {
