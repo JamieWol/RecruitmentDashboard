@@ -17,7 +17,7 @@ const playerClub = (p) => p.Team || p.team || p.club || p.Club || "";
 const photoBase = "https://syjsmvvsvvprxibqoizw.supabase.co/storage/v1/object/public/player-photos/player-photos/";
 const photoFor = (name) => `${photoBase}${String(name || "").trim().split(/\s+/).filter(Boolean).map((x) => x.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-zA-Z0-9]+/g, "_").toLowerCase()).join("_")}.png`;
 const photoCandidates = (name) => { const raw = String(name || "").trim(); const short = raw.split(/\s+/).length > 2 ? `${raw.split(/\s+/)[0]} ${raw.split(/\s+/).at(-1)}` : raw; const bases = [...new Set([raw, short].map((x) => x.replace(/[^\p{L}\p{N}]+/gu, "_").replace(/^_+|_+$/g, "")))]; return [...new Set(bases.flatMap((x) => [x, x.toLowerCase(), x.toUpperCase(), `_${x}`, `_${x.toLowerCase()}`, `__${x}`, x.normalize("NFD").replace(/[̀-ͯ]/g, "")]).map((x) => `${photoBase}${x}.png`))]; };
-const imageSource = (p) => p.Photo || p.photo || p._photoUrl || p.photoUrl || p.photo_url || p.playerPhoto || p.Image || p.image || p["Photo URL"] || p.image_url || photoFor(playerName(p));
+const imageSource = (p) => p.Photo || p.photo || p._photoUrl || p.photoUrl || p.photo_url || p.playerPhoto || p.player_photo || p.profile_photo || p.profilePhoto || p.headshot || p.headshot_url || p.Image || p.image || p["Photo URL"] || p["Photo Url"] || p["Image URL"] || p.image_url || photoFor(playerName(p));
 const imageFallback = (e, name) => { const image = e.currentTarget; const candidates = photoCandidates(name); const next = Number(image.dataset.photoFallback || 0) + 1; if (candidates[next - 1]) { image.dataset.photoFallback = String(next); image.src = candidates[next - 1]; } else image.style.display = "none"; };
 const defaultTags = [];
 
