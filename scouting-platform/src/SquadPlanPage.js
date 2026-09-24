@@ -15,6 +15,7 @@ const normalise = (value) => String(value || "").trim().toLowerCase();
 const playerName = (p) => p.Name || p.name || p.player || [p.first_name, p.last_name].filter(Boolean).join(" ") || "Unnamed player";
 const playerClub = (p) => p.Team || p.team || p.club || p.Club || "";
 const photoFor = (name) => `https://syjsmvvsvvprxibqoizw.supabase.co/storage/v1/object/public/player-photos/player-photos/${String(name || "").trim().split(/\s+/).filter(Boolean).map((x) => x.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-zA-Z0-9]+/g, "_").toLowerCase()).join("_")}.png`;
+const defaultTags = [{ id: "elite", name: "Elite", color: "#62dcff" }, { id: "high", name: "High Potential", color: "#142b83" }, { id: "monitor", name: "Monitor", color: "#ff7416" }, { id: "contract", name: "Out of contract", color: "#22c55e" }, { id: "deprioritise", name: "Deprioritise", color: "#f2b807" }];
 
 export default function SquadPlanPage() {
   const { appState, updateAppState, profile: accountProfile } = useAuth();
@@ -26,6 +27,27 @@ export default function SquadPlanPage() {
   const [loading, setLoading] = useState(true);
   const [picker, setPicker] = useState(null);
   const [pickerSearch, setPickerSearch] = useState("");
+  const [tags, setTags] = useState(() => appState?.tags?.length ? appState.tags : JSON.parse(localStorage.getItem("scoutingTags") || JSON.stringify(defaultTags)));
+  const [tagPicker, setTagPicker] = useState(null);
+  const [newTagName, setNewTagName] = useState("");
+
+  useEffect(() => {
+    const saved = appState?.squadPlan;
+    if (!saved) return;
+    const hasLocalPlan = Boolean(localStorage.getItem("squadPlanPlayers"));
+    if (!hasLocalPlan && Array.isArray(saved.players)) {
+      setSquad(saved.players);
+      localStorage.setItem("squadPlanPlayers", JSON.stringify(saved.players));
+    }
+    if (!localStorage.getItem("squadPlanClub") && saved.club) {
+      setClub(saved.club);
+      localStorage.setItem("squadPlanClub", saved.club);
+    }
+    if (!localStorage.getItem("squadPlanFormation") && saved.formation) {
+      setFormation(saved.formation);
+      localStorage.setItem("squadPlanFormation", saved.formation);
+    }
+  }, [appState]);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,8 +86,18 @@ export default function SquadPlanPage() {
   const persist = (next) => {
     setSquad(next);
     localStorage.setItem("squadPlanPlayers", JSON.stringify(next));
-    updateAppState({ assignments: appState?.assignments || [], shortlists: appState?.shortlists || [], tags: appState?.tags || [], squadPlan: { club, formation, players: next } });
+    updateAppState({ assignments: appState?.assignments || [], shortlists: appState?.shortlists || [], tags, squadPlan: { club, formation, players: next } });
   };
+  const toggleTag = (id, tagId) => {
+    const next = squad.map((p) => p.planKey === planKey && String(p.id) === String(id) ? { ...p, tags: p.tags?.includes(tagId) ? p.tags.filter((x) => x !== tagId) : [...(p.tags || []), tagId] } : p);
+    persist(next); setTagPicker(null);
+  };
+  const createTag = () => {
+    if (!newTagName.trim()) return;
+    const next = [...tags, { id: `squad-${Date.now()}`, name: newTagName.trim(), color: "#62dcff" }];
+    setTags(next); localStorage.setItem("scoutingTags", JSON.stringify(next)); updateAppState({ assignments: appState?.assignments || [], shortlists: appState?.shortlists || [], tags: next }); setNewTagName("");
+  };
+  const tagMenu = (p) => tagPicker === String(p.id) && <div className="sr-squad-tag-menu">{tags.map((tag) => <button type="button" key={tag.id} onClick={() => toggleTag(p.id, tag.id)}><i style={{ background: tag.color }} />{p.tags?.includes(tag.id) ? "✓ " : ""}{tag.name}</button>)}</div>;
   const changeFormation = (value) => {
     const nextSlots = formationRows[value].flatMap((row) => row.map((position, index) => `${position}-${index}`));
     const used = {};
@@ -91,13 +123,14 @@ export default function SquadPlanPage() {
   const dropPlayer = (slot) => { if (dragging) place(dragging, slot); setDragging(null); };
   const rosterCard = (p) => {
     const id = p["Player Id"] || p.player_id || p.playerId || p.id || playerName(p);
-    return <div className="sr-pitch-player-card sr-squad-roster-card" key={String(id)} draggable onDragStart={() => setDragging(p)}><img className="sr-shortlist-player-photo" src={photoFor(playerName(p))} alt="" onError={(e) => { e.currentTarget.style.display = "none"; }} /><span><strong>{playerName(p)}</strong><small>{p.primary_position || p.position || "Player"}</small></span></div>;
+    const selected = currentPlayers.find((x) => String(x.id) === String(id));
+    return <div className="sr-squad-roster-wrap" key={String(id)}><div className="sr-pitch-player-card sr-squad-roster-card" draggable onDragStart={() => setDragging(p)}><img className="sr-shortlist-player-photo" src={photoFor(playerName(p))} alt="" onError={(e) => { e.currentTarget.style.display = "none"; }} /><span><strong>{playerName(p)}</strong><small>{p.primary_position || p.position || "Player"}</small></span>{selected && <button type="button" className="sr-squad-tag-button" onClick={() => setTagPicker(tagPicker === String(id) ? null : String(id))}>●</button>}<button type="button" className="sr-slot-remove" title="Remove from squad plan" onClick={() => remove(id)}>×</button></div>{selected && tagMenu(selected)}</div>;
   };
   const zone = (position, index) => {
     const slot = `${position}-${index}`;
     const listed = currentPlayers.filter((p) => p.slot === slot);
-    return <div className="sr-zone" key={slot} data-count={`${listed.length} player${listed.length === 1 ? "" : "s"}`} onDragOver={(e) => e.preventDefault()} onDrop={() => dropPlayer(slot)}><div className="sr-zone-head"><strong>{position}</strong><span>{listed.length ? listed.length : ""}</span><button type="button" onClick={() => { setPicker(picker === slot ? null : slot); setPickerSearch(""); }}>+</button></div><div className="sr-zone-list">{listed.map((p) => <div className="sr-pitch-player-card" key={String(p.id)} draggable onDragStart={() => setDragging(p)}><button type="button"><img className="sr-shortlist-player-photo" src={photoFor(p.player)} alt="" onError={(e) => { e.currentTarget.style.display = "none"; }} /><span><strong>{p.player}</strong><small>{p.club}</small></span></button><button className="sr-slot-remove" type="button" onClick={() => remove(p.id)}>×</button></div>)}</div>{picker === slot && <div className="sr-zone-picker"><input autoFocus placeholder="Search club players" value={pickerSearch} onChange={(e) => setPickerSearch(e.target.value)} />{pickerPlayers.slice(0, 12).map((p) => <button type="button" key={String(p["Player Id"] || p.id || playerName(p))} onClick={() => place(p, slot)}>{playerName(p)}<small>{p.primary_position || p.position || "Player"}</small></button>)}</div>}</div>;
+    return <div className="sr-zone" key={slot} data-count={`${listed.length} player${listed.length === 1 ? "" : "s"}`} onDragOver={(e) => e.preventDefault()} onDrop={() => dropPlayer(slot)}><div className="sr-zone-head"><strong>{position}</strong><span>{listed.length ? listed.length : ""}</span><button type="button" onClick={() => { setPicker(picker === slot ? null : slot); setPickerSearch(""); }}>+</button></div><div className="sr-zone-list">{listed.map((p) => <div className="sr-squad-pitch-wrap" key={String(p.id)}><div className="sr-pitch-player-card" draggable onDragStart={() => setDragging(p)}><button type="button"><img className="sr-shortlist-player-photo" src={photoFor(p.player)} alt="" onError={(e) => { e.currentTarget.style.display = "none"; }} /><span><strong>{p.player}</strong><small>{p.club}</small></span></button><button className="sr-squad-tag-button" type="button" onClick={() => setTagPicker(tagPicker === String(p.id) ? null : String(p.id))}>●</button><button className="sr-slot-remove" type="button" onClick={() => remove(p.id)}>×</button></div>{tagMenu(p)}</div>)}</div>{picker === slot && <div className="sr-zone-picker"><input autoFocus placeholder="Search club players" value={pickerSearch} onChange={(e) => setPickerSearch(e.target.value)} />{pickerPlayers.slice(0, 12).map((p) => <button type="button" key={String(p["Player Id"] || p.id || playerName(p))} onClick={() => place(p, slot)}>{playerName(p)}<small>{p.primary_position || p.position || "Player"}</small></button>)}</div>}</div>;
   };
 
-  return <main className="sr-page sr-shortlist-view sr-squad-plan"><button className="sr-back" onClick={() => window.history.back()}>‹ Back</button><section className="sr-dashboard-head"><div><div className="sr-kicker">SQUAD PLAN</div><h1>Plan Your Squad</h1><p>Choose a club, then add players yourself to each position.</p></div><div className="sr-shortlist-head-actions"><label className="sr-field"><span>Club</span><input list="squad-plan-clubs" className="sr-formation-select" placeholder="Start typing your club" value={club} onChange={(e) => { setClub(e.target.value); localStorage.setItem("squadPlanClub", e.target.value); }} /><datalist id="squad-plan-clubs">{clubs.map((x) => <option key={x} value={x} />)}</datalist></label><label className="sr-field"><span>Formation</span><select className="sr-formation-select" value={formation} onChange={(e) => changeFormation(e.target.value)}>{formations.map((x) => <option key={x}>{x}</option>)}</select></label></div></section>{loading && <div className="sr-empty">Loading players…</div>}{!loading && club && !clubPlayers.length && <div className="sr-empty">No players found for this club.</div>}{club && clubPlayers.length > 0 && <div className="sr-tag-legend"><span>{clubPlayers.length} players available</span><span>{currentPlayers.length} added to squad plan</span></div>}<div className="sr-squad-plan-layout"><aside className="sr-squad-roster"><h2>{club || "Club"} players</h2><p>Drag a player into a position.</p>{clubPlayers.map(rosterCard)}</aside><div className="sr-real-pitch"><div className="sr-goal-box top" />{rows.map((row, i) => <div className="sr-pitch-row" key={i}>{row.map((pos, j) => zone(pos, j))}</div>)}<div className="sr-centre-circle" /><div className="sr-halfway-line" /><div className="sr-goal-box bottom" /></div></div></main>;
+  return <main className="sr-page sr-shortlist-view sr-squad-plan"><button className="sr-back" onClick={() => window.history.back()}>‹ Back</button><section className="sr-dashboard-head"><div><div className="sr-kicker">SQUAD PLAN</div><h1>Plan Your Squad</h1><p>Choose a club, then add players yourself to each position.</p></div><div className="sr-shortlist-head-actions"><label className="sr-field"><span>Club</span><input list="squad-plan-clubs" className="sr-formation-select" placeholder="Start typing your club" value={club} onChange={(e) => { setClub(e.target.value); localStorage.setItem("squadPlanClub", e.target.value); }} /><datalist id="squad-plan-clubs">{clubs.map((x) => <option key={x} value={x} />)}</datalist></label><label className="sr-field"><span>Formation</span><select className="sr-formation-select" value={formation} onChange={(e) => changeFormation(e.target.value)}>{formations.map((x) => <option key={x}>{x}</option>)}</select></label></div></section>{loading && <div className="sr-empty">Loading players…</div>}{!loading && club && !clubPlayers.length && <div className="sr-empty">No players found for this club.</div>}{club && clubPlayers.length > 0 && <div className="sr-tag-legend"><span>{clubPlayers.length} players available</span><span>{currentPlayers.length} added to squad plan</span></div>}<div className="sr-squad-tag-tools"><strong>Tags</strong>{tags.map((tag) => <span key={tag.id}><i style={{ background: tag.color }} />{tag.name}</span>)}<input placeholder="Create tag" value={newTagName} onChange={(e) => setNewTagName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); createTag(); } }} /><button type="button" className="sr-outline" onClick={createTag}>Add tag</button></div><div className="sr-squad-plan-layout"><aside className="sr-squad-roster"><h2>{club || "Club"} players</h2><p>Drag a player into a position. Use × to remove one from the plan.</p>{clubPlayers.map(rosterCard)}</aside><div className="sr-real-pitch"><div className="sr-goal-box top" />{rows.map((row, i) => <div className="sr-pitch-row" key={i}>{row.map((pos, j) => zone(pos, j))}</div>)}<div className="sr-centre-circle" /><div className="sr-halfway-line" /><div className="sr-goal-box bottom" /></div></div></main>;
 }
