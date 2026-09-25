@@ -145,7 +145,8 @@ export default function ScoutingReportsPageFinal() {
       setPlayerData((current) => ({ ...(current || {}), Photo: publicUrl }));
       setPhotoStatus("Photo added");
     } catch (error) {
-      setPhotoStatus(`Upload failed: ${error?.message || "Please try again"}`);
+      const message = error?.message || "Please try again";
+      setPhotoStatus(message.toLowerCase().includes("row-level security") ? "Upload blocked by Supabase permissions. Run the included player-photo policy SQL, then try again." : `Upload failed: ${message}`);
     } finally { setPhotoUploading(false); event.target.value = ""; }
   };
   const [report, setReport] = useState(() => {
