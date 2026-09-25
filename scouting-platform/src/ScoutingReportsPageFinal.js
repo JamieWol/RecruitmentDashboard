@@ -96,6 +96,8 @@ export default function ScoutingReportsPageFinal() {
   const [sharedReports, setSharedReports] = useState([]);
   const [sharedAssignments, setSharedAssignments] = useState([]);
   const [playerData, setPlayerData] = useState(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoStatus, setPhotoStatus] = useState("");
   const [profileQuery, setProfileQuery] = useState(() => sessionStorage.getItem("profileCheckerQuery") || "");
   const [profileResults, setProfileResults] = useState([]);
   const [profilePlayerDirectory, setProfilePlayerDirectory] = useState({});
@@ -125,6 +127,27 @@ export default function ScoutingReportsPageFinal() {
       })
       .catch(() => setPlayerData(null));
   }, [profile, active]);
+  const uploadProfilePhoto = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file || !profile?.player) return;
+    const filename = photoSlug(profile.player, true);
+    const path = `player-photos/${filename}.png`;
+    try {
+      setPhotoUploading(true); setPhotoStatus("");
+      const { error: uploadError } = await supabase.storage.from("player-photos").upload(path, file, { upsert: true, contentType: file.type || "image/png" });
+      if (uploadError) throw uploadError;
+      const { data: publicData } = supabase.storage.from("player-photos").getPublicUrl(path);
+      const publicUrl = publicData.publicUrl;
+      const id = playerData?.id || playerData?.player_id;
+      const updateQuery = id ? supabase.from("players").update({ Photo: publicUrl }).eq("id", id) : supabase.from("players").update({ Photo: publicUrl }).ilike("Name", profile.player);
+      const { error: updateError } = await updateQuery;
+      if (updateError) console.warn("Photo uploaded, but player record was not updated", updateError);
+      setPlayerData((current) => ({ ...(current || {}), Photo: publicUrl }));
+      setPhotoStatus("Photo added");
+    } catch (error) {
+      setPhotoStatus(`Upload failed: ${error?.message || "Please try again"}`);
+    } finally { setPhotoUploading(false); event.target.value = ""; }
+  };
   const [report, setReport] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem("scoutingActiveReport") || "null")?.report || empty; } catch { return empty; }
   });
@@ -433,6 +456,7 @@ export default function ScoutingReportsPageFinal() {
   };
   const clubName = dataValue("club", "Club", "team", "Team");
   const clubBadge = dataValue("badgeUrl", "club_badge_url", "clubBadgeUrl", "badge_url");
+  const profileHasDirectPhoto = Boolean(["Photo", "photo", "_photoUrl", "photoUrl", "playerPhoto", "Image", "image", "Photo URL"].some((key) => String((playerData || profile)?.[key] || "").trim()));
   const reportFoot = [
     ...items.filter((x) => x.player === profile?.player),
     ...sharedReports.filter((x) => x.player === profile?.player),
@@ -697,6 +721,7 @@ export default function ScoutingReportsPageFinal() {
               onError={(e) => retryPhoto(e, profile.player)}
             />
             <span>{profile.player.slice(0, 2).toUpperCase()}</span>
+            {!profileHasDirectPhoto && <label className="sr-add-photo" title="Add player photo"><input type="file" accept="image/*" onChange={uploadProfilePhoto} disabled={photoUploading} />{photoUploading ? "…" : "+"}</label>}
           </div>
           <div>
             <h2>{profile.player}</h2>
@@ -712,6 +737,7 @@ export default function ScoutingReportsPageFinal() {
               published reports
             </span>
           </div>
+          {photoStatus && <small className="sr-photo-status">{photoStatus}</small>}
           <button
             className="sr-outline"
             onClick={() => {
