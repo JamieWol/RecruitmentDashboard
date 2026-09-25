@@ -55,6 +55,32 @@ const retryPhoto = (e, name) => {
   if (candidates[next - 1]) { image.dataset.photoFallback = String(next); image.src = candidates[next - 1]; }
   else image.style.display = "none";
 };
+const focusPlayerCutout = (blob) => new Promise((resolve) => {
+  const url = URL.createObjectURL(blob);
+  const image = new Image();
+  image.onload = () => {
+    const source = document.createElement("canvas");
+    source.width = image.naturalWidth; source.height = image.naturalHeight;
+    const sourceContext = source.getContext("2d"); sourceContext.drawImage(image, 0, 0);
+    const pixels = sourceContext.getImageData(0, 0, source.width, source.height).data;
+    let left = source.width, top = source.height, right = 0, bottom = 0;
+    for (let y = 0; y < source.height; y += 2) for (let x = 0; x < source.width; x += 2) {
+      if (pixels[(y * source.width + x) * 4 + 3] > 18) { left = Math.min(left, x); top = Math.min(top, y); right = Math.max(right, x); bottom = Math.max(bottom, y); }
+    }
+    URL.revokeObjectURL(url);
+    if (right <= left || bottom <= top) { resolve(blob); return; }
+    const paddingX = Math.round((right - left) * 0.08);
+    const cropX = Math.max(0, left - paddingX);
+    const cropWidth = Math.min(source.width - cropX, right - left + paddingX * 2);
+    const subjectHeight = bottom - top;
+    const cropHeight = Math.min(source.height - top, Math.max(Math.round(subjectHeight * 0.78), Math.round(cropWidth * 1.15)));
+    const crop = document.createElement("canvas"); crop.width = cropWidth; crop.height = cropHeight;
+    crop.getContext("2d").drawImage(source, cropX, top, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+    crop.toBlob((result) => resolve(result || blob), "image/png");
+  };
+  image.onerror = () => { URL.revokeObjectURL(url); resolve(blob); };
+  image.src = url;
+});
 const profileFields = ["foot", "playedPosition", "performance", "potential", "conclusion", "reasons", "inPossession", "outPossession", "physical", "behaviour", "strengths", "weaknesses"];
 const stopWords = new Set(["a", "an", "and", "are", "as", "at", "for", "from", "good", "has", "have", "in", "is", "looking", "of", "player", "that", "the", "to", "with"]);
 const profileTerms = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9%+.#-]+/g, " ").split(/\s+/).filter((term) => term.length > 1 && !stopWords.has(term));
@@ -136,8 +162,9 @@ export default function ScoutingReportsPageFinal() {
     try {
       setPhotoUploading(true); setPhotoStatus("Removing background…");
       const processedFile = await removeBackground(file);
+      const focusedFile = await focusPlayerCutout(processedFile);
       setPhotoStatus("Uploading cutout…");
-      const { error: uploadError } = await supabase.storage.from("player-photos").upload(path, processedFile, { upsert: true, contentType: "image/png" });
+      const { error: uploadError } = await supabase.storage.from("player-photos").upload(path, focusedFile, { upsert: true, contentType: "image/png" });
       if (uploadError) throw uploadError;
       const { data: publicData } = supabase.storage.from("player-photos").getPublicUrl(path);
       const publicUrl = publicData.publicUrl;
