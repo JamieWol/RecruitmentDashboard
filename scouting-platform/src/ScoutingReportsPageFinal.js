@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "./supabaseClient";
 import { useAuth } from "./AuthContext";
+import { removeBackground } from "@imgly/background-removal";
 const empty = {
   type: "Long Report",
   foot: "",
@@ -133,8 +134,10 @@ export default function ScoutingReportsPageFinal() {
     const filename = photoSlug(profile.player, true);
     const path = `player-photos/${filename}.png`;
     try {
-      setPhotoUploading(true); setPhotoStatus("");
-      const { error: uploadError } = await supabase.storage.from("player-photos").upload(path, file, { upsert: true, contentType: file.type || "image/png" });
+      setPhotoUploading(true); setPhotoStatus("Removing background…");
+      const processedFile = await removeBackground(file);
+      setPhotoStatus("Uploading cutout…");
+      const { error: uploadError } = await supabase.storage.from("player-photos").upload(path, processedFile, { upsert: true, contentType: "image/png" });
       if (uploadError) throw uploadError;
       const { data: publicData } = supabase.storage.from("player-photos").getPublicUrl(path);
       const publicUrl = publicData.publicUrl;
