@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import { supabase } from "./supabaseClient";
 
@@ -21,10 +21,16 @@ const photoCandidates = (name) => { const raw = String(name || "").trim(); const
 const imageSource = (p) => p.Photo || p.photo || p._photoUrl || p.photoUrl || p.photo_url || p.playerPhoto || p.player_photo || p.profile_photo || p.profilePhoto || p.headshot || p.headshot_url || p.Image || p.image || p["Photo URL"] || p["Photo Url"] || p["Image URL"] || p.image_url || photoFor(playerName(p));
 const imageFallback = (e, name) => { const image = e.currentTarget; const candidates = photoCandidates(name); const next = Number(image.dataset.photoFallback || 0) + 1; if (candidates[next - 1]) { image.dataset.photoFallback = String(next); image.src = candidates[next - 1]; } else image.style.display = "none"; };
 const defaultTags = [];
+const savedSquadsKey = "squadPlans";
+const readSavedSquads = () => { try { const value = JSON.parse(localStorage.getItem(savedSquadsKey) || "[]"); return Array.isArray(value) ? value : []; } catch { return []; } };
 
 export default function SquadPlanPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { appState, updateAppState, profile: accountProfile } = useAuth();
+  const query = new URLSearchParams(location.search);
+  const planId = query.get("plan");
+  const isNewPlan = query.has("new");
   const [players, setPlayers] = useState([]);
   const [clubs, setClubs] = useState([]);
   const [club, setClub] = useState(() => localStorage.getItem("squadPlanClub") || accountProfile?.club || "");
@@ -39,6 +45,7 @@ export default function SquadPlanPage() {
   const [newTagColor, setNewTagColor] = useState("#62dcff");
   const [removedIds, setRemovedIds] = useState(() => JSON.parse(localStorage.getItem("squadPlanRemoved") || "{}"));
   const [savedMessage, setSavedMessage] = useState("");
+  const [squadName, setSquadName] = useState(() => readSavedSquads().find((item) => String(item.id) === String(planId))?.name || "");
   const [positionLabels, setPositionLabels] = useState(() => JSON.parse(localStorage.getItem("squadPlanPositionLabels") || "{}"));
   const openPlayer = (p) => { localStorage.setItem("scoutingProfilePlayer", playerName(p)); localStorage.setItem("scoutingProfileOrigin", "squad-plan"); navigate("/scouting-reports"); };
 
@@ -59,6 +66,16 @@ export default function SquadPlanPage() {
       localStorage.setItem("squadPlanFormation", saved.formation);
     }
   }, [appState]);
+
+  useEffect(() => {
+    const saved = readSavedSquads().find((item) => String(item.id) === String(planId));
+    if (saved) {
+      setSquadName(saved.name || ""); setClub(saved.club || ""); setFormation(saved.formation || "4-2-3-1"); setSquad(Array.isArray(saved.players) ? saved.players : []); setPositionLabels(saved.positionLabels || {}); setTags(Array.isArray(saved.tags) ? saved.tags : defaultTags);
+      localStorage.setItem("squadPlanActiveId", String(saved.id)); localStorage.setItem("squadPlanClub", saved.club || ""); localStorage.setItem("squadPlanFormation", saved.formation || "4-2-3-1"); localStorage.setItem("squadPlanPlayers", JSON.stringify(saved.players || [])); localStorage.setItem("squadPlanPositionLabels", JSON.stringify(saved.positionLabels || {})); localStorage.setItem("squadPlanTags", JSON.stringify(saved.tags || []));
+    } else if (isNewPlan) {
+      setSquadName(""); setClub(""); setFormation("4-2-3-1"); setSquad([]); setPositionLabels({}); setTags(defaultTags); localStorage.removeItem("squadPlanActiveId"); localStorage.setItem("squadPlanPlayers", "[]"); localStorage.setItem("squadPlanPositionLabels", "{}");
+    }
+  }, [planId, isNewPlan]);
 
   useEffect(() => {
     let cancelled = false;
@@ -136,7 +153,14 @@ export default function SquadPlanPage() {
     setRemovedIds(nextRemoved); localStorage.setItem("squadPlanRemoved", JSON.stringify(nextRemoved));
     persist(squad.filter((p) => !(p.planKey === planKey && String(p.id) === key)));
   };
-  const savePlan = () => { persist(squad); setSavedMessage("Squad plan saved"); window.setTimeout(() => setSavedMessage(""), 2200); };
+  const savePlan = () => {
+    const enteredName = window.prompt("Name this squad plan", squadName || `${club || "New"} Squad Plan`);
+    if (!enteredName?.trim()) return;
+    const id = planId || localStorage.getItem("squadPlanActiveId") || `squad-${Date.now()}`;
+    const record = { id, name: enteredName.trim(), club, formation, players: currentPlayers, positionLabels, tags, updatedAt: new Date().toISOString() };
+    localStorage.setItem(savedSquadsKey, JSON.stringify([...readSavedSquads().filter((item) => String(item.id) !== String(id)), record]));
+    localStorage.setItem("squadPlanActiveId", String(id)); setSquadName(record.name); persist(squad); setSavedMessage("Squad plan saved"); window.setTimeout(() => setSavedMessage(""), 2200); navigate(`/squad-plan?plan=${encodeURIComponent(id)}`, { replace: true });
+  };
   const place = (source, slot) => {
     const id = source["Player Id"] || source.player_id || source.playerId || source.id || playerName(source);
     const existing = currentPlayers.find((p) => String(p.id) === String(id));
