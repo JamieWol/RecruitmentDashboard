@@ -113,6 +113,28 @@ const assignmentBelongsToScout = (assignment, user, accountProfile) => {
   const names = [accountProfile?.full_name, user?.email].filter(Boolean).map((value) => String(value).trim().toLowerCase());
   return ids.includes(String(assignment.scoutId)) || names.includes(String(assignment.scout || "").trim().toLowerCase());
 };
+const playerDobKeys = ["DOB", "Date of Birth", "date_of_birth", "dateOfBirth", "date of birth", "birth_date", "birthDate"];
+const ageFromDob = (value) => {
+  if (!value) return null;
+  let year, month, day;
+  const text = String(value).trim();
+  const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  const dayFirst = text.match(/^(\d{1,2})[/. -](\d{1,2})[/. -](\d{4})$/);
+  if (iso) [, year, month, day] = iso;
+  else if (dayFirst) [, day, month, year] = dayFirst;
+  else {
+    const parsed = new Date(text);
+    if (Number.isNaN(parsed.getTime())) return null;
+    year = parsed.getFullYear(); month = parsed.getMonth() + 1; day = parsed.getDate();
+  }
+  year = Number(year); month = Number(month); day = Number(day);
+  const dob = new Date(year, month - 1, day);
+  if (dob.getFullYear() !== year || dob.getMonth() !== month - 1 || dob.getDate() !== day) return null;
+  const today = new Date();
+  let age = today.getFullYear() - year;
+  if (today.getMonth() + 1 < month || (today.getMonth() + 1 === month && today.getDate() < day)) age -= 1;
+  return age >= 0 ? age : null;
+};
 export default function ScoutingReportsPageFinal() {
   const nav = useNavigate();
   const { appState, updateAppState, user, profile: accountProfile } = useAuth();
@@ -137,6 +159,7 @@ export default function ScoutingReportsPageFinal() {
   const [sharedReports, setSharedReports] = useState([]);
   const [sharedAssignments, setSharedAssignments] = useState([]);
   const [playerData, setPlayerData] = useState(null);
+  const [ageDate, setAgeDate] = useState(() => new Date());
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoStatus, setPhotoStatus] = useState("");
   const [profileQuery, setProfileQuery] = useState(() => sessionStorage.getItem("profileCheckerQuery") || "");
@@ -147,6 +170,12 @@ export default function ScoutingReportsPageFinal() {
   useEffect(() => { sessionStorage.setItem("scoutingDashboardView", dashboardView); }, [dashboardView]);
   useEffect(() => { sessionStorage.setItem("profileCheckerFilters", JSON.stringify(profileFilters)); }, [profileFilters]);
   useEffect(() => { sessionStorage.setItem("profileCheckerQuery", profileQuery); }, [profileQuery]);
+  useEffect(() => {
+    const now = new Date();
+    const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1);
+    const timer = setTimeout(() => setAgeDate(new Date()), nextMidnight.getTime() - now.getTime());
+    return () => clearTimeout(timer);
+  }, [ageDate]);
   useEffect(() => {
     const selectedPlayer = profile || active;
     if (!selectedPlayer?.player) {
@@ -377,11 +406,13 @@ export default function ScoutingReportsPageFinal() {
       (data || []).forEach((player) => {
         const playerName = String(player.Name || player.name || "").trim().toLowerCase();
         const ageKey = Object.keys(player).find((key) => key.toLowerCase() === "age");
-        if (playerName && names.includes(playerName) && ageKey) directory[playerName] = player[ageKey];
+        const dobKey = Object.keys(player).find((key) => playerDobKeys.some((name) => name.toLowerCase() === key.toLowerCase()));
+        const currentAge = dobKey ? ageFromDob(player[dobKey]) : null;
+        if (playerName && names.includes(playerName) && (currentAge !== null || ageKey)) directory[playerName] = currentAge ?? player[ageKey];
       });
       setProfilePlayerDirectory(directory);
     }).catch(() => setProfilePlayerDirectory({}));
-  }, [profileCandidates]);
+  }, [profileCandidates, ageDate]);
   const runProfileCheck = () => {
     const terms = profileTerms(profileQuery);
     if (!terms.length && !Object.values(profileFilters).some(Boolean)) { setProfileResults([]); return; }
@@ -872,7 +903,9 @@ export default function ScoutingReportsPageFinal() {
                 <div className="sr-detail-row" key={label}>
                   <strong>{label}:</strong>
                   <span>
-                    {label === "Dominant Foot"
+                    {label === "Age"
+                      ? ageFromDob(dataValue(...playerDobKeys)) ?? dataValue(...keys)
+                      : label === "Dominant Foot"
                       ? reportFoot || dataValue(...keys)
                       : dataValue(...keys)}
                   </span>
