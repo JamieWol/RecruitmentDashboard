@@ -114,6 +114,14 @@ const assignmentBelongsToScout = (assignment, user, accountProfile) => {
   return ids.includes(String(assignment.scoutId)) || names.includes(String(assignment.scout || "").trim().toLowerCase());
 };
 const playerDobKeys = ["DOB", "Date of Birth", "date_of_birth", "dateOfBirth", "date of birth", "birth_date", "birthDate"];
+const normalizePlayerName = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
+const ageFromValue = (value) => {
+  if (value === null || value === undefined || String(value).trim() === "") return null;
+  const text = String(value).trim();
+  if (!/^\d{1,3}$/.test(text)) return null;
+  const age = Number(text);
+  return age >= 0 && age <= 120 ? age : null;
+};
 const ageFromDob = (value) => {
   if (!value) return null;
   let year, month, day;
@@ -134,6 +142,15 @@ const ageFromDob = (value) => {
   let age = today.getFullYear() - year;
   if (today.getMonth() + 1 < month || (today.getMonth() + 1 === month && today.getDate() < day)) age -= 1;
   return age >= 0 ? age : null;
+};
+const matchesAgeFilter = (age, filter) => {
+  if (!filter) return true;
+  if (age === null || age === undefined || !Number.isFinite(age)) return false;
+  if (filter === "under21") return age < 21;
+  if (filter === "21to24") return age >= 21 && age <= 24;
+  if (filter === "25to29") return age >= 25 && age <= 29;
+  if (filter === "30plus") return age >= 30;
+  return false;
 };
 export default function ScoutingReportsPageFinal() {
   const nav = useNavigate();
@@ -399,20 +416,30 @@ export default function ScoutingReportsPageFinal() {
     return [...new Map([...publishedLocal, ...publishedShared].map((item) => [String(item.id), item])).values()];
   }, [items, sharedReports]);
   useEffect(() => {
-    const names = profileCandidates.map((item) => String(item.player || "").trim().toLowerCase()).filter(Boolean);
-    if (!names.length) return;
-    supabase.from("players").select("*").limit(2000).then(({ data }) => {
+    const names = profileCandidates.map((item) => String(item.player || "").trim()).filter(Boolean);
+    let cancelled = false;
+    if (!names.length) { setProfilePlayerDirectory({}); return () => { cancelled = true; }; }
+    const loadPlayerAges = async () => {
       const directory = {};
-      (data || []).forEach((player) => {
-        const playerName = String(player.Name || player.name || "").trim().toLowerCase();
-        const ageKey = Object.keys(player).find((key) => key.toLowerCase() === "age");
-        const dobKey = Object.keys(player).find((key) => playerDobKeys.some((name) => name.toLowerCase() === key.toLowerCase()));
-        const currentAge = dobKey ? ageFromDob(player[dobKey]) : null;
-        if (playerName && names.includes(playerName) && (currentAge !== null || ageKey)) directory[playerName] = currentAge ?? player[ageKey];
-      });
-      setProfilePlayerDirectory(directory);
-    }).catch(() => setProfilePlayerDirectory({}));
-  }, [profileCandidates, ageDate]);
+      const uniqueNames = [...new Map(names.map((name) => [normalizePlayerName(name), name])).values()];
+      for (let offset = 0; offset < uniqueNames.length; offset += 20) {
+        const batch = uniqueNames.slice(offset, offset + 20);
+        const responses = await Promise.all(batch.map((name) => supabase.from("players").select("*").ilike("Name", name).limit(5)));
+        responses.forEach(({ data, error }) => {
+          if (error) throw error;
+          (data || []).forEach((player) => {
+            const playerName = normalizePlayerName(player.Name || player.name);
+            const ageKey = Object.keys(player).find((key) => key.toLowerCase() === "age");
+            const dobKey = Object.keys(player).find((key) => playerDobKeys.some((name) => name.toLowerCase() === key.toLowerCase()));
+            if (playerName) directory[playerName] = { dob: dobKey ? player[dobKey] : null, age: ageKey ? player[ageKey] : null };
+          });
+        });
+      }
+      if (!cancelled) setProfilePlayerDirectory(directory);
+    };
+    loadPlayerAges().catch(() => { if (!cancelled) setProfilePlayerDirectory({}); });
+    return () => { cancelled = true; };
+  }, [profileCandidates]);
   const runProfileCheck = () => {
     const terms = profileTerms(profileQuery);
     if (!terms.length && !Object.values(profileFilters).some(Boolean)) { setProfileResults([]); return; }
@@ -420,13 +447,17 @@ export default function ScoutingReportsPageFinal() {
     const matchesFilters = (item) => {
       const report = item.report || {};
       const foot = String(report.foot || item.foot || item.preferred_foot || item["Preferred Foot"] || "").toLowerCase();
-      const age = Number(profilePlayerDirectory[String(item.player || "").trim().toLowerCase()] ?? report.age ?? item.age ?? item.Age ?? item.player_age);
+      const directoryEntry = profilePlayerDirectory[normalizePlayerName(item.player)];
+      const itemDobKey = Object.keys({ ...item, ...report }).find((key) => playerDobKeys.some((name) => name.toLowerCase() === key.toLowerCase()));
+      const age = ageFromDob(directoryEntry?.dob) ?? ageFromValue(directoryEntry?.age) ??
+        ageFromDob(itemDobKey ? report[itemDobKey] ?? item[itemDobKey] : null) ??
+        ageFromValue(report.age ?? item.age ?? item.Age ?? item.player_age);
       const performance = String(report.performance || item.performance || "");
       const potential = String(report.potential || item.potential || "");
       const position = String(report.playedPosition || item.position || item.primary_position || "").toLowerCase();
       const potentialRank = { A: 1, B: 2, C: 3, D: 4, E: 5, F: 6 };
       return (!profileFilters.foot || foot === profileFilters.foot.toLowerCase()) &&
-        (!profileFilters.age || (Number.isFinite(age) && (profileFilters.age === "under21" ? age < 21 : profileFilters.age === "21to24" ? age >= 21 && age <= 24 : profileFilters.age === "25to29" ? age >= 25 && age <= 29 : age >= 30))) &&
+        matchesAgeFilter(age, profileFilters.age) &&
         (!profileFilters.position || position === profileFilters.position.toLowerCase()) &&
         (!profileFilters.performance || (Number(performance) >= Number(profileFilters.performance))) &&
         (!profileFilters.potential || (potentialRank[potential.toUpperCase()] >= potentialRank[profileFilters.potential]));
@@ -447,9 +478,9 @@ export default function ScoutingReportsPageFinal() {
   };
   useEffect(() => {
     if (profileQuery.trim() || Object.values(profileFilters).some(Boolean)) runProfileCheck();
-    // Keep results in sync when a filter or the player-profile ages finish loading.
+    // Keep results in sync when a filter, player data or the local date changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profileFilters, profilePlayerDirectory]);
+  }, [profileFilters, profilePlayerDirectory, ageDate]);
   const exportProfileNames = () => {
     if (!profileResults.length) return;
     const csv = ["Player,Club,Position,Match"].concat(profileResults.map((item) => [item.player, item.club || "", item.position || "", `${item.score}%`].map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","))).join("\n");
