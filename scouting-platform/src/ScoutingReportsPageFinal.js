@@ -152,6 +152,32 @@ const matchesAgeFilter = (age, filter) => {
   if (filter === "30plus") return age >= 30;
   return false;
 };
+const playerSummaryText = (player, profile) => {
+  const source = player || profile || {};
+  const existingSummary = ["Player Summary", "player_summary", "playerSummary", "AI Summary", "ai_summary", "Generated Summary", "background_summary", "Summary", "summary"]
+    .map((key) => source[key])
+    .find((value) => typeof value === "string" && value.trim());
+  if (existingSummary) return existingSummary.trim();
+  const name = source.Name || source.name || profile?.player || "This player";
+  const age = ageFromDob(playerDobKeys.map((key) => source[key]).find((value) => value)) ??
+    ageFromValue(source.Age ?? source.age);
+  const nationality = source.Nationality || source.nationality;
+  const position = source["Playing Position"] || source["Primary Position"] || source.Position || source.position || source.primary_position;
+  const club = source.Club || source.club || source.Team || source.team || profile?.club;
+  const league = source.League || source.league || source.Competition || source.competition;
+  const minutesValue = source["Minutes Played"] ?? source["Minutes played"] ?? source.minutes_played ?? source.Minutes ?? source.minutes;
+  const minutes = Number.isFinite(Number(minutesValue)) && String(minutesValue ?? "").trim() !== ""
+    ? `${Math.round(Number(minutesValue)).toLocaleString()} minutes`
+    : "";
+  const identity = [age !== null ? `${age}-year-old` : "", position].filter(Boolean).join(" ");
+  let summary = `${name}${identity ? ` is a ${identity}` : nationality ? ` is from ${nationality}` : ""}`;
+  if (identity && nationality) summary += ` from ${nationality}`;
+  if (club) summary += ` at ${club}`;
+  summary += ".";
+  if (league) summary += ` The player competes in ${league}.`;
+  if (minutes) summary += ` The available data records ${minutes} played.`;
+  return summary;
+};
 export default function ScoutingReportsPageFinal() {
   const nav = useNavigate();
   const { appState, updateAppState, user, profile: accountProfile } = useAuth();
@@ -177,6 +203,8 @@ export default function ScoutingReportsPageFinal() {
   const [sharedAssignments, setSharedAssignments] = useState([]);
   const [playerData, setPlayerData] = useState(null);
   const [ageDate, setAgeDate] = useState(() => new Date());
+  const [summaryDraft, setSummaryDraft] = useState("");
+  const [summaryEditing, setSummaryEditing] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoStatus, setPhotoStatus] = useState("");
   const [profileQuery, setProfileQuery] = useState(() => sessionStorage.getItem("profileCheckerQuery") || "");
@@ -184,6 +212,13 @@ export default function ScoutingReportsPageFinal() {
   const [profilePlayerDirectory, setProfilePlayerDirectory] = useState({});
   const [dashboardView, setDashboardView] = useState(() => sessionStorage.getItem("scoutingDashboardView") || "reports");
   const [profileFilters, setProfileFilters] = useState(() => JSON.parse(sessionStorage.getItem("profileCheckerFilters") || '{"foot":"","age":"","position":"","performance":"","potential":""}'));
+  const summaryKey = String(playerData?.id || playerData?.player_id || profile?.playerId || normalizePlayerName(profile?.player));
+  const savedPlayerSummary = appState?.playerSummaries?.[summaryKey];
+  const shownPlayerSummary = typeof savedPlayerSummary === "string" ? savedPlayerSummary : playerSummaryText(playerData, profile);
+  useEffect(() => {
+    setSummaryDraft(shownPlayerSummary);
+    setSummaryEditing(false);
+  }, [summaryKey, playerData, savedPlayerSummary]);
   useEffect(() => { sessionStorage.setItem("scoutingDashboardView", dashboardView); }, [dashboardView]);
   useEffect(() => { sessionStorage.setItem("profileCheckerFilters", JSON.stringify(profileFilters)); }, [profileFilters]);
   useEffect(() => { sessionStorage.setItem("profileCheckerQuery", profileQuery); }, [profileQuery]);
@@ -598,6 +633,18 @@ export default function ScoutingReportsPageFinal() {
     );
     return key ? source[key] : "—";
   };
+  const savePlayerSummary = () => {
+    const playerSummaries = { ...(appState?.playerSummaries || {}), [summaryKey]: summaryDraft.trim() };
+    updateAppState({
+      ...appState,
+      assignments: appState?.assignments || [],
+      shortlists: appState?.shortlists || [],
+      tags: appState?.tags || [],
+      playerSummaries,
+    });
+    setSummaryDraft(summaryDraft.trim());
+    setSummaryEditing(false);
+  };
   const clubName = dataValue("club", "Club", "team", "Team");
   const clubBadge = dataValue("badgeUrl", "club_badge_url", "clubBadgeUrl", "badge_url");
   const profileHasDirectPhoto = Boolean(["Photo", "photo", "_photoUrl", "photoUrl", "playerPhoto", "Image", "image", "Photo URL"].some((key) => String((playerData || profile)?.[key] || "").trim()));
@@ -901,6 +948,32 @@ export default function ScoutingReportsPageFinal() {
           >
             Add to Shortlist
           </button>
+        </section>
+        <section
+          className="sr-player-details sr-player-summary-editor"
+          style={{ width: "100%", boxSizing: "border-box", border: "1px solid #2f84c5", borderRadius: 12, padding: 20, marginBottom: 20 }}
+        >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
+            <h2 style={{ margin: 0 }}>Player Summary</h2>
+            {!summaryEditing && <button className="sr-outline" type="button" onClick={() => setSummaryEditing(true)}>Edit Summary</button>}
+          </div>
+          {summaryEditing ? (
+            <>
+              <textarea
+                aria-label="Player Summary"
+                value={summaryDraft}
+                onChange={(e) => setSummaryDraft(e.target.value)}
+                rows={5}
+                style={{ display: "block", width: "100%", boxSizing: "border-box", resize: "vertical", padding: 12, font: "inherit", lineHeight: 1.55, border: "1px solid #cbd5e1", borderRadius: 8 }}
+              />
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
+                <button className="sr-outline" type="button" onClick={() => { setSummaryDraft(shownPlayerSummary); setSummaryEditing(false); }}>Cancel</button>
+                <button className="sr-cyan" type="button" onClick={savePlayerSummary}>Save Summary</button>
+              </div>
+            </>
+          ) : (
+            <p style={{ margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{shownPlayerSummary || "No summary yet. Select Edit Summary to add one."}</p>
+          )}
         </section>
         <section className="sr-profile-layout">
           <section className="sr-player-details">
