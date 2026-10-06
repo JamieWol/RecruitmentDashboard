@@ -478,7 +478,7 @@ export default function ScoutingReportsPageFinal() {
         report: x.report,
         status: "Published",
         club: clubFromReport(
-          x.player_club, x.playerClub, x.club, x.Club, x.team, x.Team,
+          x.player_club, x.playerClub, x.team, x.Team,
           x.report?.player_club, x.report?.playerClub, x.report?.club,
           x.report?.Club, x.report?.team, x.report?.Team,
         ) || "Club not added",
@@ -521,7 +521,7 @@ export default function ScoutingReportsPageFinal() {
       report: item.report,
       status: "Published",
       club: clubFromReport(
-        item.player_club, item.playerClub, item.club, item.Club, item.team, item.Team,
+        item.player_club, item.playerClub, item.team, item.Team,
         item.report?.player_club, item.report?.playerClub, item.report?.club,
         item.report?.Club, item.report?.team, item.report?.Team,
       ) || "Club not added",
@@ -530,7 +530,9 @@ export default function ScoutingReportsPageFinal() {
     return [...new Map([...publishedLocal, ...publishedShared].map((item) => [String(item.id), item])).values()];
   }, [items, sharedReports]);
   useEffect(() => {
-    const records = [...profileCandidates, ...items, ...sharedReports];
+    // In shared reports, top-level `club` is the scout's organisation, not the player's club.
+    // Use the normalized report candidates and local assignments, then enrich from the players table.
+    const records = [...profileCandidates, ...items];
     const names = records.map((item) => String(item.player || item.Name || item.name || "").trim()).filter(Boolean);
     let cancelled = false;
     const directory = {};
@@ -1033,7 +1035,7 @@ export default function ScoutingReportsPageFinal() {
             <span>
               {[...new Map([
                 ...items.filter((x) => x.player === profile.player && x.status === "Published"),
-                ...sharedReports.filter((x) => x.player === profile.player).map((x) => ({ ...x, id: x.assignment_id || x.id, report: x.report, status: "Published", club: x.player_club || x.club, date: x.completed_at, game: x.fixture_summary, scout: x.scout })),
+                ...sharedReports.filter((x) => x.player === profile.player).map((x) => ({ ...x, id: x.assignment_id || x.id, report: x.report, status: "Published", club: clubFromReport(x.player_club, x.playerClub, x.team, x.Team, x.report?.player_club, x.report?.playerClub, x.report?.club, x.report?.Club, x.report?.team, x.report?.Team), date: x.completed_at, game: x.fixture_summary, scout: x.scout })),
               ].map((x) => [x.id, x])).values()].length} {" "}
               published reports
             </span>
@@ -1136,7 +1138,7 @@ export default function ScoutingReportsPageFinal() {
               </div>
               {[...new Map([
                 ...items.filter((x) => x.player === profile.player),
-                ...sharedReports.filter((x) => x.player === profile.player).map((x) => ({ ...x, id: x.assignment_id || x.id, report: x.report, status: "Published", club: x.player_club || x.club, date: x.completed_at, game: x.fixture_summary, scout: x.scout })),
+                ...sharedReports.filter((x) => x.player === profile.player).map((x) => ({ ...x, id: x.assignment_id || x.id, report: x.report, status: "Published", club: clubFromReport(x.player_club, x.playerClub, x.team, x.Team, x.report?.player_club, x.report?.playerClub, x.report?.club, x.report?.Club, x.report?.team, x.report?.Team), date: x.completed_at, game: x.fixture_summary, scout: x.scout })),
               ].map((x) => [x.id, x])).values()]
                 .map((x) => (
                   <button

@@ -4663,7 +4663,7 @@ const clubNameDescriptors = new Set([
   "kv", "kaa", "krc", "kvc", "rsc", "ksc", "kfc", "kas", "rfc",
   "city", "town", "united", "utd", "athletic", "athletics", "rovers",
   "county", "albion", "wanderers", "borough", "vale", "park", "football",
-  "club", "royal", "royale", "st", "sint", "the", "f", "c",
+  "club", "royal", "royale", "sporting", "st", "sint", "the", "f", "c",
 ]);
 const clubNameVariants = (key) => {
   const variants = new Set([key]);
