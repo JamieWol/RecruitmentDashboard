@@ -182,6 +182,7 @@ export default function ScoutingReportsPageFinal() {
   const [report, setReport] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem("scoutingActiveReport") || "null")?.report || empty; } catch { return empty; }
   });
+  const [publishError, setPublishError] = useState("");
   const [editing, setEditing] = useState(false);
   useEffect(() => {
     if (active) sessionStorage.setItem("scoutingActiveReport", JSON.stringify({ active, report }));
@@ -399,6 +400,7 @@ export default function ScoutingReportsPageFinal() {
     setActive(x);
     setReport(x.report || empty);
     setEditing(x.status !== "Published");
+    setPublishError("");
   };
   const searchPlayer = () => {
     const match =
@@ -416,6 +418,23 @@ export default function ScoutingReportsPageFinal() {
     }
   };
   const saveReport = () => {
+    const required = [
+      ["Preferred foot", report.foot],
+      ["Position played", report.playedPosition || active.position],
+      ["Conclusion", report.conclusion],
+      ["Reasons why", report.reasons],
+      ["Performance grade", report.performance],
+      ["Potential grade", report.potential],
+    ];
+    if (report.type === "Long Report") {
+      required.push(["Strengths", report.strengths], ["Weaknesses", report.weaknesses]);
+    }
+    const missing = required.filter(([, value]) => !String(value || "").trim()).map(([label]) => label);
+    if (missing.length) {
+      setPublishError(`Complete these sections before publishing: ${missing.join(", ")}. Match content can be left blank.`);
+      return;
+    }
+    setPublishError("");
     const completedAt = new Date().toISOString().slice(0, 10);
     const reportWithFixtures = {
       ...report,
@@ -575,6 +594,7 @@ export default function ScoutingReportsPageFinal() {
               Publish Report
             </button>
           )}
+          {publishError && <p className="sr-publish-error" role="alert">{publishError}</p>}
         </div>
         <div className="sr-fixture-box">
           <strong>Assigned Fixture</strong>
