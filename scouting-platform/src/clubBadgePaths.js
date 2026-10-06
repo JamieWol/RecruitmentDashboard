@@ -4640,7 +4640,6 @@ const clubBadgePaths = Object.freeze({
 });
 
 const clubBadgeAliases = Object.freeze({
-  'bradford-city': 'bradford',
   'afc-bournemouth': 'bournemouth',
   'brighton-and-hove-albion': 'brighton',
   'crystal-palace-fc': 'crystal-palace',
@@ -4659,10 +4658,59 @@ const clubBadgeAliases = Object.freeze({
 });
 
 const normalizeClubBadgeKey = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+const clubNameDescriptors = new Set([
+  "fc", "afc", "cf", "sc", "ac", "fk", "sk", "sv", "tsv", "cd", "ud",
+  "city", "town", "united", "utd", "athletic", "athletics", "rovers",
+  "county", "albion", "wanderers", "borough", "vale", "park", "football",
+  "club", "the", "f", "c",
+]);
+const clubNameVariants = (key) => {
+  const variants = new Set([key]);
+  const pending = [key.split("-").filter(Boolean)];
+  while (pending.length) {
+    const parts = pending.pop();
+    if (parts.length <= 1) continue;
+    const prefix = parts[0];
+    const suffix = parts[parts.length - 1];
+    if (clubNameDescriptors.has(prefix)) {
+      const next = parts.slice(1);
+      const candidate = next.join("-");
+      if (candidate && !variants.has(candidate)) { variants.add(candidate); pending.push(next); }
+    }
+    if (clubNameDescriptors.has(suffix)) {
+      const next = parts.slice(0, -1);
+      const candidate = next.join("-");
+      if (candidate && !variants.has(candidate)) { variants.add(candidate); pending.push(next); }
+    }
+  }
+  return variants;
+};
+const informativeClubVariant = (value) => value.replace(/-/g, "").length >= 5 &&
+  value.split("-").some((part) => !clubNameDescriptors.has(part));
+const looseClubBadgeIndex = (() => {
+  const index = new Map();
+  Object.entries(clubBadgePaths).forEach(([name, path]) => {
+    clubNameVariants(name).forEach((variant) => {
+      if (!informativeClubVariant(variant)) return;
+      if (!index.has(variant)) index.set(variant, new Set());
+      index.get(variant).add(path);
+    });
+  });
+  return index;
+})();
 export const clubBadgePathFor = (clubName) => {
   const key = normalizeClubBadgeKey(clubName);
   if (!key) return "";
   const candidates = [clubBadgeAliases[key], key, key.replace(/^(?:fc|afc|cf|sc)-/, ""), key.replace(/-(?:fc|afc|cf|sc)$/, ""), key.replace(/(?:^|-)(?:fc|afc|cf|sc)(?=-|$)/g, "-").replace(/^-+|-+$/g, "")].filter(Boolean);
-  const match = candidates.find((candidate) => clubBadgePaths[candidate]);
-  return match ? clubBadgePaths[match] : "";
+  const exactMatch = candidates.find((candidate) => clubBadgePaths[candidate]);
+  if (exactMatch) return clubBadgePaths[exactMatch];
+
+  const possibleVariants = [...new Set(candidates.flatMap((candidate) => [...clubNameVariants(candidate)]))]
+    .filter(informativeClubVariant)
+    .sort((left, right) => right.length - left.length);
+  for (const variant of possibleVariants) {
+    const matches = looseClubBadgeIndex.get(variant);
+    if (matches?.size === 1) return matches.values().next().value;
+  }
+  return "";
 };
