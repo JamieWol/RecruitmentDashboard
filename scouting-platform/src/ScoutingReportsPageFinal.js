@@ -96,8 +96,16 @@ const fixtureRecords = (item) => Array.isArray(item?.games) && item.games.length
 const fixtureLabel = (item) => {
   const fixtures = fixtureRecords(item);
   if (fixtures.length > 1) return "Multiple";
-  if (fixtures.length === 1) return typeof fixtures[0] === "string" ? fixtures[0] : fixtures[0]?.name || "Fixture not added";
-  return item?.game || item?.fixture_summary || "Fixture not added";
+  if (fixtures.length === 1) {
+    if (typeof fixtures[0] === "string") {
+      return item?.fixtureDates?.[0] ? `${item.fixtureDates[0]} · ${fixtures[0]}` : fixtures[0];
+    }
+    const name = fixtures[0]?.name || "Fixture not added";
+    return fixtures[0]?.date ? `${fixtures[0].date} · ${name}` : name;
+  }
+  return item?.fixtureDates?.[0] && item?.game
+    ? `${item.fixtureDates[0]} · ${item.game}`
+    : item?.game || item?.fixture_summary || "Fixture not added";
 };
 const assignmentBelongsToScout = (assignment, user, accountProfile) => {
   if (!assignment?.scoutId) return true;
