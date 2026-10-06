@@ -99,6 +99,12 @@ const fixtureLabel = (item) => {
   if (fixtures.length === 1) return typeof fixtures[0] === "string" ? fixtures[0] : fixtures[0]?.name || "Fixture not added";
   return item?.game || item?.fixture_summary || "Fixture not added";
 };
+const assignmentBelongsToScout = (assignment, user, accountProfile) => {
+  if (!assignment?.scoutId) return true;
+  const ids = [user?.id, accountProfile?.id].filter(Boolean).map((value) => String(value));
+  const names = [accountProfile?.full_name, user?.email].filter(Boolean).map((value) => String(value).trim().toLowerCase());
+  return ids.includes(String(assignment.scoutId)) || names.includes(String(assignment.scout || "").trim().toLowerCase());
+};
 export default function ScoutingReportsPageFinal() {
   const nav = useNavigate();
   const { appState, updateAppState, user, profile: accountProfile } = useAuth();
@@ -184,6 +190,11 @@ export default function ScoutingReportsPageFinal() {
   });
   const [publishError, setPublishError] = useState("");
   const [editing, setEditing] = useState(false);
+  useEffect(() => {
+    if (!active) return;
+    // Restore the report and its permissions together after a tab switch or refresh.
+    setEditing(active.status !== "Published" && assignmentBelongsToScout(active, user, accountProfile));
+  }, [active, user, accountProfile]);
   useEffect(() => {
     if (active) sessionStorage.setItem("scoutingActiveReport", JSON.stringify({ active, report }));
   }, [active, report]);
@@ -411,7 +422,7 @@ export default function ScoutingReportsPageFinal() {
   const openReport = (x) => {
     setActive(x);
     setReport(x.report || empty);
-    setEditing(x.status !== "Published" && canEditAssignment(x));
+    setEditing(x.status !== "Published" && assignmentBelongsToScout(x, user, accountProfile));
     setPublishError("");
   };
   const searchPlayer = () => {
@@ -429,13 +440,6 @@ export default function ScoutingReportsPageFinal() {
       setQuery("");
     }
   };
-  const currentScoutIds = [user?.id, accountProfile?.id].filter(Boolean).map((value) => String(value));
-  const currentScoutNames = [accountProfile?.full_name, user?.email].filter(Boolean).map((value) => String(value).trim().toLowerCase());
-  const isCurrentScout = (assignment) => {
-    if (!assignment?.scoutId) return true;
-    return currentScoutIds.includes(String(assignment.scoutId)) || currentScoutNames.includes(String(assignment.scout || "").trim().toLowerCase());
-  };
-  const canEditAssignment = (assignment) => tab !== "All Assigned" || isCurrentScout(assignment);
   const saveReport = () => {
     const required = [
       ["Preferred foot", report.foot],
