@@ -4660,9 +4660,10 @@ const clubBadgeAliases = Object.freeze({
 const normalizeClubBadgeKey = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 const clubNameDescriptors = new Set([
   "fc", "afc", "cf", "sc", "ac", "fk", "sk", "sv", "tsv", "cd", "ud",
+  "kv", "kaa", "krc", "kvc", "rsc", "ksc", "kfc", "kas", "rfc",
   "city", "town", "united", "utd", "athletic", "athletics", "rovers",
   "county", "albion", "wanderers", "borough", "vale", "park", "football",
-  "club", "the", "f", "c",
+  "club", "royal", "royale", "st", "sint", "the", "f", "c",
 ]);
 const clubNameVariants = (key) => {
   const variants = new Set([key]);
@@ -4687,6 +4688,32 @@ const clubNameVariants = (key) => {
 };
 const informativeClubVariant = (value) => value.replace(/-/g, "").length >= 5 &&
   value.split("-").some((part) => !clubNameDescriptors.has(part));
+const meaningfulClubTokens = (value) => value.split("-").filter((part) =>
+  part.length >= 3 && !clubNameDescriptors.has(part) &&
+  !["de", "la", "le", "del", "da", "di", "van", "von", "der", "den", "el"].includes(part),
+);
+const editDistance = (left, right) => {
+  const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let row = 1; row <= left.length; row += 1) {
+    let diagonal = previous[0];
+    previous[0] = row;
+    for (let column = 1; column <= right.length; column += 1) {
+      const above = previous[column];
+      previous[column] = Math.min(
+        previous[column] + 1,
+        previous[column - 1] + 1,
+        diagonal + (left[row - 1] === right[column - 1] ? 0 : 1),
+      );
+      diagonal = above;
+    }
+  }
+  return previous[right.length];
+};
+const tokenSimilarity = (left, right) => {
+  if (left === right) return 1;
+  if (Math.min(left.length, right.length) < 4) return 0;
+  return 1 - editDistance(left, right) / Math.max(left.length, right.length);
+};
 const looseClubBadgeIndex = (() => {
   const index = new Map();
   Object.entries(clubBadgePaths).forEach(([name, path]) => {
@@ -4698,19 +4725,56 @@ const looseClubBadgeIndex = (() => {
   });
   return index;
 })();
+const clubBadgeNameRecords = Object.entries(clubBadgePaths).map(([name, path]) => ({
+  path,
+  variants: [...clubNameVariants(name)].map(meaningfulClubTokens).filter((tokens) => tokens.length),
+}));
+const fuzzyClubBadgeMatch = (nameVariants) => {
+  const queryTokens = nameVariants.map(meaningfulClubTokens).filter((tokens) => tokens.length);
+  const pathScores = new Map();
+  queryTokens.forEach((query) => {
+    clubBadgeNameRecords.forEach(({ path, variants }) => {
+      variants.forEach((candidate) => {
+        const smaller = query.length <= candidate.length ? query : candidate;
+        const larger = query.length <= candidate.length ? candidate : query;
+        if (larger.length - smaller.length > 1) return;
+        const tokenScores = smaller.map((token) => Math.max(...larger.map((other) => tokenSimilarity(token, other))));
+        if (tokenScores.some((score) => score < 0.76)) return;
+        const score = tokenScores.reduce((sum, value) => sum + value, 0) / tokenScores.length;
+        pathScores.set(path, Math.max(pathScores.get(path) || 0, score));
+      });
+    });
+  });
+  const ranked = [...pathScores.entries()].sort((left, right) => right[1] - left[1]);
+  if (!ranked.length || ranked[0][1] < 0.76) return "";
+  if (ranked.length > 1 && ranked[0][1] - ranked[1][1] < 0.08) return "";
+  return ranked[0][0];
+};
+const clubBadgeResultCache = new Map();
 export const clubBadgePathFor = (clubName) => {
   const key = normalizeClubBadgeKey(clubName);
   if (!key) return "";
+  if (clubBadgeResultCache.has(key)) return clubBadgeResultCache.get(key);
   const candidates = [clubBadgeAliases[key], key, key.replace(/^(?:fc|afc|cf|sc)-/, ""), key.replace(/-(?:fc|afc|cf|sc)$/, ""), key.replace(/(?:^|-)(?:fc|afc|cf|sc)(?=-|$)/g, "-").replace(/^-+|-+$/g, "")].filter(Boolean);
   const exactMatch = candidates.find((candidate) => clubBadgePaths[candidate]);
-  if (exactMatch) return clubBadgePaths[exactMatch];
+  if (exactMatch) {
+    const exactPath = clubBadgePaths[exactMatch];
+    clubBadgeResultCache.set(key, exactPath);
+    return exactPath;
+  }
 
   const possibleVariants = [...new Set(candidates.flatMap((candidate) => [...clubNameVariants(candidate)]))]
     .filter(informativeClubVariant)
     .sort((left, right) => right.length - left.length);
   for (const variant of possibleVariants) {
     const matches = looseClubBadgeIndex.get(variant);
-    if (matches?.size === 1) return matches.values().next().value;
+    if (matches?.size === 1) {
+      const path = matches.values().next().value;
+      clubBadgeResultCache.set(key, path);
+      return path;
+    }
   }
-  return "";
+  const fuzzyPath = fuzzyClubBadgeMatch(possibleVariants.length ? possibleVariants : [key]);
+  clubBadgeResultCache.set(key, fuzzyPath);
+  return fuzzyPath;
 };
