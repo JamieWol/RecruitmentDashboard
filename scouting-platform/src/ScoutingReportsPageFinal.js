@@ -218,7 +218,7 @@ export default function ScoutingReportsPageFinal() {
   useEffect(() => {
     setSummaryDraft(shownPlayerSummary);
     setSummaryEditing(false);
-  }, [summaryKey, playerData, savedPlayerSummary]);
+  }, [summaryKey, playerData, savedPlayerSummary, shownPlayerSummary]);
   useEffect(() => { sessionStorage.setItem("scoutingDashboardView", dashboardView); }, [dashboardView]);
   useEffect(() => { sessionStorage.setItem("profileCheckerFilters", JSON.stringify(profileFilters)); }, [profileFilters]);
   useEffect(() => { sessionStorage.setItem("profileCheckerQuery", profileQuery); }, [profileQuery]);
