@@ -1,3 +1,4 @@
+import { ClubName } from "./ClubBadge";
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "./supabaseClient";
@@ -945,7 +946,7 @@ export default function ScoutingReportsPageFinal() {
             <div className="sr-kicker">PLAYER PROFILE</div>
             <h1>{profile.player}</h1>
             <p>
-              {clubName} ·{" "}
+              <ClubName club={clubName} /> ·{" "}
               {dataValue("Playing Position", "Primary Position", "Position", "playing_position", "primary_position", "position")}
             </p>
           </div>
@@ -969,8 +970,7 @@ export default function ScoutingReportsPageFinal() {
           <div>
             <h2>{profile.player}</h2>
             <p className="sr-player-club">
-              {clubBadge !== "—" && <img src={clubBadge} alt="" onError={(e) => { e.currentTarget.style.display = "none"; }} />}
-              <span>{clubName}</span>
+              <ClubName club={clubName} externalUrl={clubBadge !== "—" ? clubBadge : undefined} size={24} />
             </p>
             <span>
               {[...new Map([
@@ -1187,11 +1187,7 @@ export default function ScoutingReportsPageFinal() {
                     >
                       {name}
                       <small>
-                        {p.club ||
-                          p.Club ||
-                          p.team ||
-                          p.Team ||
-                          "Club not added"}
+                        <ClubName club={p.club || p.Club || p.team || p.Team} size={16} />
                       </small>
                     </button>
                   );
@@ -1230,7 +1226,7 @@ export default function ScoutingReportsPageFinal() {
           <article className="sr-card" key={x.id} onClick={() => { setProfile(null); openReport(x); }}>
             <div className="sr-card-top"><span className="sr-card-status">{x.status}</span><button className="sr-trash" onClick={(e) => { e.stopPropagation(); deleteAssignment(x); }}>Delete</button></div>
             <button type="button" className="sr-assignment-player-link" onClick={(e) => { e.stopPropagation(); setProfile(null); openReport(x); }}>{x.player}</button>
-            <p>{x.club || "Club not added"} · {x.position || "Position not added"}</p><div className="sr-fixture">{fixtureLabel(x)}</div>
+            <p><ClubName club={x.club} /> · {x.position || "Position not added"}</p><div className="sr-fixture">{fixtureLabel(x)}</div>
             <div className="sr-card-meta"><span>{x.date || "Date not added"}</span><span>{x.viewing}</span><span>Scout: {x.scout || "Unassigned"}</span></div>
           </article>
         ))}
@@ -1267,7 +1263,7 @@ export default function ScoutingReportsPageFinal() {
           <><div className="sr-profile-results-actions"><strong>{profileResults.length} matching players</strong><button className="sr-outline" onClick={exportProfileNames}>Export Names</button></div><div className="sr-profile-results">
             {profileResults.slice(0, 12).map((match) => (
               <button className="sr-profile-result" key={match.player || match.id} onClick={() => { setProfile(match); setProfileQuery(""); }}>
-                <span className="sr-profile-result-main"><strong>{match.player || "Unnamed player"}</strong><small>{match.club || "Club not added"}{match.position ? ` · ${match.position}` : ""}</small></span>
+                <span className="sr-profile-result-main"><strong>{match.player || "Unnamed player"}</strong><small><ClubName club={match.club} size={16} />{match.position ? ` · ${match.position}` : ""}</small></span>
                 <span className="sr-profile-result-score">{match.score}% match<small>{match.reports} report{match.reports === 1 ? "" : "s"}</small></span>
                 <span className="sr-profile-result-evidence">{match.evidence}</span>
               </button>

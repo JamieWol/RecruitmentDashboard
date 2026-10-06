@@ -1,3 +1,4 @@
+import { ClubBadge } from "./ClubBadge";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
@@ -744,7 +745,7 @@ export default function TeamAnalysisPage() {
                 }}
               >
                 <h2 style={{ margin: "0 0 7px", color: "#fff", fontSize: 26, whiteSpace: "nowrap", wordSpacing: "0.18em" }}>
-                  <><span>{selectedTeamName}</span><span style={{ marginLeft: "0.4em", whiteSpace: "nowrap" }}>Team Analysis</span></>
+                  <><span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}><ClubBadge club={selectedTeamName} size={28} />{selectedTeamName}</span><span style={{ marginLeft: "0.4em", whiteSpace: "nowrap" }}>Team Analysis</span></>
                 </h2>
                 <div style={{ color: "#d2e5fa", fontSize: 14 }}>
                   {gamesKey
@@ -1303,8 +1304,8 @@ export default function TeamAnalysisPage() {
                           textAlign: "center",
                         }}
                       >
-                        {selectedTeamName} vs{" "}
-                        {comparisonTeamName || "second team"}
+                        <ClubBadge club={selectedTeamName} size={18} /> {selectedTeamName} vs{" "}
+                        <ClubBadge club={comparisonTeamName} size={18} /> {comparisonTeamName || "second team"}
                       </p>
                       <div
                         style={{
@@ -1315,9 +1316,9 @@ export default function TeamAnalysisPage() {
                           marginBottom: 10,
                         }}
                       >
-                        <span>◀ {selectedTeamName}</span>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><ClubBadge club={selectedTeamName} size={15} />◀ {selectedTeamName}</span>
                         <span style={{ color: "#ffd21c" }}>
-                          {comparisonTeamName || "Comparison"} ▶
+                          <ClubBadge club={comparisonTeamName} size={15} /> {comparisonTeamName || "Comparison"} ▶
                         </span>
                       </div>
                       {comparisonData.slice(0, 10).map((item) => (

@@ -1,3 +1,4 @@
+import { ClubName } from "./ClubBadge";
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "./supabaseClient";
 import { useAuth } from "./AuthContext";
@@ -546,7 +547,7 @@ export default function ShortlistsPage() {
                 />
                 <span>
                   <strong>{p.player}</strong>
-                  <small>{p.club || "Club not added"}</small>
+                  <small><ClubName club={p.club || p.Club || p.team || p.Team} size={16} /></small>
                   <em className="sr-report-count">
                     ▤{" "}
                     {
@@ -605,7 +606,7 @@ export default function ShortlistsPage() {
               matches.map((p) => (
                 <button key={p.id} onClick={() => add(p, pos)}>
                   {p.player}
-                  <small>{p.club || "Club not added"}</small>
+                  <small><ClubName club={p.club || p.Club || p.team || p.Team} size={16} /></small>
                 </button>
               ))}
           </div>
@@ -673,7 +674,7 @@ export default function ShortlistsPage() {
                 <img src={shortlistPhoto(p.player)} alt="" />
                 <span>
                   <strong>{p.player}</strong>
-                  <small>{p.club || "Club not added"}</small>
+                  <small><ClubName club={p.club || p.Club || p.team || p.Team} size={16} /></small>
                 </span>
                 {chosen && (
                   <select

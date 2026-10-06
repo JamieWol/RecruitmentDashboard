@@ -1,3 +1,4 @@
+import { ClubName } from "./ClubBadge";
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
@@ -1098,7 +1099,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
               <div style={{ fontSize: 14, opacity: 0.9 }}>
                 {selectedPlayer["Primary Position"]}
                 {" • "}
-                {selectedPlayer.Team}
+                <ClubName club={selectedPlayer.Team || selectedPlayer.Club || selectedPlayer.club} size={18} />
               </div>
             </div>
             <div data-pdf-clips="true" style={{ marginLeft: "auto", display: "flex", alignItems: "center" }}>
@@ -1148,7 +1149,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
           <div style={{ marginTop:20, display:"grid", gridTemplateColumns:"300px 1fr", gap:40 }}>
             <div style={{ background:"rgba(255,255,255,0.9)", padding:20, borderRadius:12, lineHeight:2.8, border:"2px solid #1f77b4" }}>
           
-              <div>Team: <strong>{selectedPlayer.Team}</strong></div>
+              <div>Team: <strong><ClubName club={selectedPlayer.Team || selectedPlayer.Club || selectedPlayer.club} size={18} /></strong></div>
               <div>Position: <strong>{selectedPlayer["Primary Position"]}</strong></div>
               <div>Competition: <strong>{getCompetitionValue(selectedPlayer)}</strong></div>
               <div>Age: <strong>{selectedPlayer.Age}</strong></div>

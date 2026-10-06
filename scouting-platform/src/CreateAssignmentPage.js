@@ -1,3 +1,4 @@
+import { ClubName } from "./ClubBadge";
 import React, { useMemo, useState } from "react";
 import { useEffect } from "react";
 import { supabase } from "./supabaseClient";
@@ -206,7 +207,7 @@ export default function CreateAssignmentPage() {
                   <>
                     {p.name}
                     <small>
-                      {p.club || "Club not added"} ·{" "}
+                      <ClubName club={p.club} size={16} /> ·{" "}
                       {p.position || "Position not added"}
                     </small>
                   </>
