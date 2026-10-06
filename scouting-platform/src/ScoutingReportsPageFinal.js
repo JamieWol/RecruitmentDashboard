@@ -4,6 +4,14 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "./supabaseClient";
 import { useAuth } from "./AuthContext";
 import { removeBackground } from "@imgly/background-removal";
+const clubFromReport = (...values) => {
+  const club = values.find((value) => {
+    if (typeof value !== "string") return false;
+    const normalized = value.trim().toLowerCase();
+    return normalized && !["club not added", "—", "-", "n/a", "unknown"].includes(normalized);
+  });
+  return typeof club === "string" ? club.trim() : "";
+};
 const empty = {
   type: "Long Report",
   foot: "",
@@ -464,7 +472,21 @@ export default function ScoutingReportsPageFinal() {
   };
   const shown = useMemo(
     () => {
-      const shared = sharedReports.map((x) => ({ ...x, id: x.assignment_id || x.id, report: x.report, status: "Published", club: x.player_club || "Club not added", position: x.position || x.report?.playedPosition || "", date: x.completed_at, game: x.fixture_summary, scout: x.scout }));
+      const shared = sharedReports.map((x) => ({
+        ...x,
+        id: x.assignment_id || x.id,
+        report: x.report,
+        status: "Published",
+        club: clubFromReport(
+          x.player_club, x.playerClub, x.club, x.Club, x.team, x.Team,
+          x.report?.player_club, x.report?.playerClub, x.report?.club,
+          x.report?.Club, x.report?.team, x.report?.Team,
+        ) || "Club not added",
+        position: x.position || x.report?.playedPosition || "",
+        date: x.completed_at,
+        game: x.fixture_summary,
+        scout: x.scout,
+      }));
       const source = tab === "Published" ? shared : items;
       const currentIds = [user?.id, accountProfile?.id].filter(Boolean).map((value) => String(value));
       const currentNames = [accountProfile?.full_name, user?.email].filter(Boolean).map((value) => String(value).trim().toLowerCase());
@@ -476,30 +498,59 @@ export default function ScoutingReportsPageFinal() {
       };
       return [...new Map(source.map((x) => [String(x.id), x])).values()]
         .filter(belongsToCurrentScout)
-        .filter((x) =>
-          `${x.player} ${x.club} ${x.scout}`
+        .filter((x) => {
+          const club = clubFromReport(x.player_club, x.playerClub, x.club, x.Club, x.team, x.Team) ||
+            profilePlayerDirectory[normalizePlayerName(x.player)]?.club || "";
+          return `${x.player} ${club} ${x.scout}`
             .toLowerCase()
-            .includes(query.toLowerCase()),
-        )
+            .includes(query.toLowerCase());
+        })
         .filter((x) =>
           tab === "Published"
             ? x.status === "Published"
             : x.status !== "Published",
         );
     },
-    [items, query, tab, sharedReports, user?.id, user?.email, accountProfile?.id, accountProfile?.full_name],
+    [items, query, tab, sharedReports, profilePlayerDirectory, user?.id, user?.email, accountProfile?.id, accountProfile?.full_name],
   );
   const profileCandidates = useMemo(() => {
     const publishedLocal = items.filter((item) => item.status === "Published");
-    const publishedShared = sharedReports.map((item) => ({ ...item, id: item.assignment_id || item.id, report: item.report, status: "Published", club: item.player_club || item.club || "Club not added", position: item.position || item.report?.playedPosition || "" }));
+    const publishedShared = sharedReports.map((item) => ({
+      ...item,
+      id: item.assignment_id || item.id,
+      report: item.report,
+      status: "Published",
+      club: clubFromReport(
+        item.player_club, item.playerClub, item.club, item.Club, item.team, item.Team,
+        item.report?.player_club, item.report?.playerClub, item.report?.club,
+        item.report?.Club, item.report?.team, item.report?.Team,
+      ) || "Club not added",
+      position: item.position || item.report?.playedPosition || "",
+    }));
     return [...new Map([...publishedLocal, ...publishedShared].map((item) => [String(item.id), item])).values()];
   }, [items, sharedReports]);
   useEffect(() => {
-    const names = profileCandidates.map((item) => String(item.player || "").trim()).filter(Boolean);
+    const records = [...profileCandidates, ...items, ...sharedReports];
+    const names = records.map((item) => String(item.player || item.Name || item.name || "").trim()).filter(Boolean);
     let cancelled = false;
-    if (!names.length) { setProfilePlayerDirectory({}); return () => { cancelled = true; }; }
-    const loadPlayerAges = async () => {
-      const directory = {};
+    const directory = {};
+    records.forEach((record) => {
+      const key = normalizePlayerName(record.player || record.Name || record.name);
+      if (!key) return;
+      const club = clubFromReport(
+        record.player_club, record.playerClub, record.club, record.Club,
+        record.team, record.Team, record.Squad, record.squad,
+        record.report?.player_club, record.report?.playerClub,
+        record.report?.club, record.report?.Club, record.report?.team,
+        record.report?.Team,
+      );
+      if (club) directory[key] = { ...(directory[key] || {}), club };
+    });
+    if (!names.length) {
+      setProfilePlayerDirectory(directory);
+      return () => { cancelled = true; };
+    }
+    const loadPlayerDetails = async () => {
       const uniqueNames = [...new Map(names.map((name) => [normalizePlayerName(name), name])).values()];
       for (let offset = 0; offset < uniqueNames.length; offset += 20) {
         const batch = uniqueNames.slice(offset, offset + 20);
@@ -510,15 +561,22 @@ export default function ScoutingReportsPageFinal() {
             const playerName = normalizePlayerName(player.Name || player.name);
             const ageKey = Object.keys(player).find((key) => key.toLowerCase() === "age");
             const dobKey = Object.keys(player).find((key) => playerDobKeys.some((name) => name.toLowerCase() === key.toLowerCase()));
-            if (playerName) directory[playerName] = { dob: dobKey ? player[dobKey] : null, age: ageKey ? player[ageKey] : null };
+            const club = clubFromReport(player.club, player.Club, player.team, player.Team, player.Squad, player.squad);
+            if (playerName) directory[playerName] = {
+              ...(directory[playerName] || {}),
+              dob: dobKey ? player[dobKey] : directory[playerName]?.dob || null,
+              age: ageKey ? player[ageKey] : directory[playerName]?.age || null,
+              club: directory[playerName]?.club || club,
+            };
           });
         });
       }
       if (!cancelled) setProfilePlayerDirectory(directory);
     };
-    loadPlayerAges().catch(() => { if (!cancelled) setProfilePlayerDirectory({}); });
+    setProfilePlayerDirectory(directory);
+    loadPlayerDetails().catch(() => { if (!cancelled) setProfilePlayerDirectory(directory); });
     return () => { cancelled = true; };
-  }, [profileCandidates]);
+  }, [profileCandidates, items, sharedReports]);
   const runProfileCheck = () => {
     const terms = profileTerms(profileQuery);
     if (!terms.length && !Object.values(profileFilters).some(Boolean)) { setProfileResults([]); return; }
@@ -1051,11 +1109,15 @@ export default function ScoutingReportsPageFinal() {
                 <div className="sr-detail-row" key={label}>
                   <strong>{label}:</strong>
                   <span>
-                    {label === "Age"
-                      ? ageFromDob(dataValue(...playerDobKeys)) ?? dataValue(...keys)
-                      : label === "Dominant Foot"
-                      ? reportFoot || dataValue(...keys)
-                      : dataValue(...keys)}
+                    {label === "Club" ? (
+                      <ClubName club={dataValue(...keys)} size={20} />
+                    ) : label === "Age" ? (
+                      ageFromDob(dataValue(...playerDobKeys)) ?? dataValue(...keys)
+                    ) : label === "Dominant Foot" ? (
+                      reportFoot || dataValue(...keys)
+                    ) : (
+                      dataValue(...keys)
+                    )}
                   </span>
                 </div>
               ))}
@@ -1226,7 +1288,7 @@ export default function ScoutingReportsPageFinal() {
           <article className="sr-card" key={x.id} onClick={() => { setProfile(null); openReport(x); }}>
             <div className="sr-card-top"><span className="sr-card-status">{x.status}</span><button className="sr-trash" onClick={(e) => { e.stopPropagation(); deleteAssignment(x); }}>Delete</button></div>
             <button type="button" className="sr-assignment-player-link" onClick={(e) => { e.stopPropagation(); setProfile(null); openReport(x); }}>{x.player}</button>
-            <p><ClubName club={x.club} /> · {x.position || "Position not added"}</p><div className="sr-fixture">{fixtureLabel(x)}</div>
+            <p><ClubName club={clubFromReport(x.player_club, x.playerClub, x.club, x.Club, x.team, x.Team) || profilePlayerDirectory[normalizePlayerName(x.player)]?.club} /> · {x.position || "Position not added"}</p><div className="sr-fixture">{fixtureLabel(x)}</div>
             <div className="sr-card-meta"><span>{x.date || "Date not added"}</span><span>{x.viewing}</span><span>Scout: {x.scout || "Unassigned"}</span></div>
           </article>
         ))}

@@ -4640,6 +4640,7 @@ const clubBadgePaths = Object.freeze({
 });
 
 const clubBadgeAliases = Object.freeze({
+  'bradford-city': 'bradford',
   'afc-bournemouth': 'bournemouth',
   'brighton-and-hove-albion': 'brighton',
   'crystal-palace-fc': 'crystal-palace',
