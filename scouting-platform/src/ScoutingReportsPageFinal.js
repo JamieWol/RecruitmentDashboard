@@ -152,8 +152,46 @@ const matchesAgeFilter = (age, filter) => {
   if (filter === "30plus") return age >= 30;
   return false;
 };
-const playerSummaryText = (player, profile) => {
+const reportSummaryPhrases = (values, limit = 3) => {
+  const seen = new Set();
+  return values
+    .flatMap((value) => Array.isArray(value) ? value : String(value || "").split(/[\n•]+/))
+    .map((value) => String(value || "").replace(/^\s*(?:[-*]\s*|\d+[.)]\s*)/, "").trim())
+    .filter((value) => {
+      if (!value) return false;
+      const key = value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, limit);
+};
+const playerSummaryText = (player, profile, reports = []) => {
   const source = player || profile || {};
+  const reportRecords = reports.map((item) => item?.report || item || {});
+  if (reportRecords.length) {
+    const name = source.Name || source.name || profile?.player || "This player";
+    const strengths = reportSummaryPhrases(reportRecords.map((report) => report.strengths));
+    const weaknesses = reportSummaryPhrases(reportRecords.map((report) => report.weaknesses));
+    const conclusions = reportSummaryPhrases(reportRecords.map((report) => report.conclusion), 2);
+    const performanceGrades = reportSummaryPhrases(reportRecords.map((report) => report.performance), 5)
+      .filter((grade) => /^[1-5](?:\.0)?$/.test(grade))
+      .map(Number);
+    const potentialGrades = reportSummaryPhrases(reportRecords.map((report) => report.potential), 6)
+      .filter((grade) => /^[A-F]$/i.test(grade))
+      .map((grade) => grade.toUpperCase());
+    const sentences = [`Across ${reportRecords.length} published scouting report${reportRecords.length === 1 ? "" : "s"}, scouts have assessed ${name}.`];
+    if (strengths.length) sentences.push(`Reported strengths include ${strengths.join(", ")}.`);
+    if (weaknesses.length) sentences.push(`Areas identified for improvement include ${weaknesses.join(", ")}.`);
+    if (conclusions.length) sentences.push(`Scout conclusions: ${conclusions.join(" ")}`);
+    if (performanceGrades.length) {
+      const low = Math.min(...performanceGrades);
+      const high = Math.max(...performanceGrades);
+      sentences.push(`Performance grades range from ${low} to ${high} out of 5.`);
+    }
+    if (potentialGrades.length) sentences.push(`Potential grades recorded include ${reportSummaryPhrases(potentialGrades, 6).join(", ")}.`);
+    if (strengths.length || weaknesses.length || conclusions.length || performanceGrades.length || potentialGrades.length) return sentences.join(" ");
+  }
   const existingSummary = ["Player Summary", "player_summary", "playerSummary", "AI Summary", "ai_summary", "Generated Summary", "background_summary", "Summary", "summary"]
     .map((key) => source[key])
     .find((value) => typeof value === "string" && value.trim());
@@ -214,7 +252,12 @@ export default function ScoutingReportsPageFinal() {
   const [profileFilters, setProfileFilters] = useState(() => JSON.parse(sessionStorage.getItem("profileCheckerFilters") || '{"foot":"","age":"","position":"","performance":"","potential":""}'));
   const summaryKey = String(playerData?.id || playerData?.player_id || profile?.playerId || normalizePlayerName(profile?.player));
   const savedPlayerSummary = appState?.playerSummaries?.[summaryKey];
-  const shownPlayerSummary = typeof savedPlayerSummary === "string" ? savedPlayerSummary : playerSummaryText(playerData, profile);
+  const summaryReports = [...new Map([
+    ...items.filter((item) => item.player === profile?.player && String(item.status || "").toLowerCase() === "published"),
+    ...sharedReports.filter((item) => item.player === profile?.player && String(item.status || "Published").toLowerCase() === "published"),
+  ].map((item) => [String(item.assignment_id || item.id || `${item.player}-${item.completed_at || item.date || ""}`), item])).values()];
+  const generatedPlayerSummary = playerSummaryText(playerData, profile, summaryReports);
+  const shownPlayerSummary = typeof savedPlayerSummary === "string" ? savedPlayerSummary : generatedPlayerSummary;
   useEffect(() => {
     setSummaryDraft(shownPlayerSummary);
     setSummaryEditing(false);
@@ -967,6 +1010,7 @@ export default function ScoutingReportsPageFinal() {
                 style={{ display: "block", width: "100%", boxSizing: "border-box", resize: "vertical", padding: 12, font: "inherit", lineHeight: 1.55, border: "1px solid #cbd5e1", borderRadius: 8 }}
               />
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
+                {summaryReports.length > 0 && <button className="sr-outline" type="button" onClick={() => setSummaryDraft(generatedPlayerSummary)}>Use Report Summary</button>}
                 <button className="sr-outline" type="button" onClick={() => { setSummaryDraft(shownPlayerSummary); setSummaryEditing(false); }}>Cancel</button>
                 <button className="sr-cyan" type="button" onClick={savePlayerSummary}>Save Summary</button>
               </div>
