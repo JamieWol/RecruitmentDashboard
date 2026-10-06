@@ -192,7 +192,11 @@ export default function ScoutingReportsPageFinal() {
     [sharedReports],
   );
   useEffect(() => {
-    const localAssignments = appState?.assignments || [];
+    // Keep the local bootstrap list visible until the cloud state has loaded.
+    // Otherwise the first null appState render can briefly (or permanently,
+    // after a quick navigation) replace a newly-created assignment with [].
+    if (!appState) return;
+    const localAssignments = Array.isArray(appState.assignments) ? appState.assignments : [];
     const combined = [...localAssignments, ...sharedAssignments]
       .filter((assignment) => String(assignment?.status || "").toLowerCase() !== "published")
       .filter((assignment) => !publishedAssignmentIds.has(String(assignment?.id)));
@@ -318,8 +322,16 @@ export default function ScoutingReportsPageFinal() {
     () => {
       const shared = sharedReports.map((x) => ({ ...x, id: x.assignment_id || x.id, report: x.report, status: "Published", club: x.player_club || "Club not added", position: x.position || x.report?.playedPosition || "", date: x.completed_at, game: x.fixture_summary, scout: x.scout }));
       const source = tab === "Published" ? shared : items;
+      const currentIds = [user?.id, accountProfile?.id].filter(Boolean).map((value) => String(value));
+      const currentNames = [accountProfile?.full_name, user?.email].filter(Boolean).map((value) => String(value).trim().toLowerCase());
+      const belongsToCurrentScout = (assignment) => {
+        if (tab !== "My Assignments") return true;
+        if (!assignment.scoutId) return true;
+        const assignedId = String(assignment.scoutId);
+        return currentIds.includes(assignedId) || currentNames.includes(String(assignment.scout || "").trim().toLowerCase());
+      };
       return [...new Map(source.map((x) => [String(x.id), x])).values()]
-        .filter((x) => tab !== "My Assignments" || !x.scoutId || x.scoutId === user?.id)
+        .filter(belongsToCurrentScout)
         .filter((x) =>
           `${x.player} ${x.club} ${x.scout}`
             .toLowerCase()
@@ -331,7 +343,7 @@ export default function ScoutingReportsPageFinal() {
             : x.status !== "Published",
         );
     },
-    [items, query, tab, sharedReports, user?.id],
+    [items, query, tab, sharedReports, user?.id, user?.email, accountProfile?.id, accountProfile?.full_name],
   );
   const profileCandidates = useMemo(() => {
     const publishedLocal = items.filter((item) => item.status === "Published");
@@ -399,7 +411,7 @@ export default function ScoutingReportsPageFinal() {
   const openReport = (x) => {
     setActive(x);
     setReport(x.report || empty);
-    setEditing(x.status !== "Published");
+    setEditing(x.status !== "Published" && canEditAssignment(x));
     setPublishError("");
   };
   const searchPlayer = () => {
@@ -417,6 +429,13 @@ export default function ScoutingReportsPageFinal() {
       setQuery("");
     }
   };
+  const currentScoutIds = [user?.id, accountProfile?.id].filter(Boolean).map((value) => String(value));
+  const currentScoutNames = [accountProfile?.full_name, user?.email].filter(Boolean).map((value) => String(value).trim().toLowerCase());
+  const isCurrentScout = (assignment) => {
+    if (!assignment?.scoutId) return true;
+    return currentScoutIds.includes(String(assignment.scoutId)) || currentScoutNames.includes(String(assignment.scout || "").trim().toLowerCase());
+  };
+  const canEditAssignment = (assignment) => tab !== "All Assigned" || isCurrentScout(assignment);
   const saveReport = () => {
     const required = [
       ["Preferred foot", report.foot],
@@ -493,6 +512,7 @@ export default function ScoutingReportsPageFinal() {
       <textarea
         rows={r}
         value={report[k]}
+        readOnly={!editing}
         onChange={(e) => setReport({ ...report, [k]: e.target.value })}
       />
     </label>
@@ -519,6 +539,7 @@ export default function ScoutingReportsPageFinal() {
         <span>Performance Grade (1–5)</span>
         <select
           value={report.performance}
+          disabled={!editing}
           onChange={(e) =>
             setReport({ ...report, performance: e.target.value })
           }
@@ -533,6 +554,7 @@ export default function ScoutingReportsPageFinal() {
         <span>Potential Grade (A–F)</span>
         <select
           value={report.potential}
+          disabled={!editing}
           onChange={(e) => setReport({ ...report, potential: e.target.value })}
         >
           <option value="">Select</option>
@@ -546,7 +568,7 @@ export default function ScoutingReportsPageFinal() {
   const reportPage = active && (
     <div className="sr-modal">
       <section
-        className={`sr-form sr-report ${active?.status === "Published" && !editing ? "readonly" : ""}`}
+        className={`sr-form sr-report ${!editing ? "readonly" : ""}`}
       >
         <button className="sr-report-back" onClick={() => { setActive(null); setProfile(null); sessionStorage.removeItem("scoutingActiveReport"); }}>‹ Back to Assignments</button>
         <div className="sr-form-head sr-report-banner">
@@ -589,11 +611,12 @@ export default function ScoutingReportsPageFinal() {
               </p>
             </div>
           </div>
-          {(!active || active.status !== "Published" || editing) && (
+          {editing && active.status !== "Published" && (
             <button className="sr-cyan sr-banner-publish" onClick={saveReport}>
               Publish Report
             </button>
           )}
+          {!editing && active.status !== "Published" && <p className="sr-readonly-note">Read-only: this assignment belongs to another scout.</p>}
           {publishError && <p className="sr-publish-error" role="alert">{publishError}</p>}
         </div>
         <div className="sr-fixture-box">
@@ -607,7 +630,7 @@ export default function ScoutingReportsPageFinal() {
             ))}
           </div>
           <small>{active.viewing || "Viewing not added"}</small>
-          {(!active.author_id || active.author_id === user?.id) && <button
+          {editing && <button
             className="sr-edit-games"
             onClick={() => {
               localStorage.setItem("editingAssignment", JSON.stringify(active));
@@ -621,6 +644,7 @@ export default function ScoutingReportsPageFinal() {
             <span>Report type</span>
             <select
               value={report.type}
+              disabled={!editing}
               onChange={(e) => setReport({ ...report, type: e.target.value })}
             >
               <option>Long Report</option>
@@ -631,6 +655,7 @@ export default function ScoutingReportsPageFinal() {
             <span>Footage</span>
             <select
               value={report.footage || "Full game"}
+              disabled={!editing}
               onChange={(e) =>
                 setReport({ ...report, footage: e.target.value })
               }
@@ -643,6 +668,7 @@ export default function ScoutingReportsPageFinal() {
             <span>Viewing</span>
             <select
               value={report.viewing || active.viewing || "Video"}
+              disabled={!editing}
               onChange={(e) =>
                 setReport({ ...report, viewing: e.target.value })
               }
@@ -655,6 +681,7 @@ export default function ScoutingReportsPageFinal() {
             <span>Preferred foot</span>
             <select
               value={report.foot}
+              disabled={!editing}
               onChange={(e) => setReport({ ...report, foot: e.target.value })}
             >
               <option value="">Select</option>
@@ -667,6 +694,7 @@ export default function ScoutingReportsPageFinal() {
             <span>Position Played</span>
             <select
               value={report.playedPosition || active.position || ""}
+              disabled={!editing}
               onChange={(e) =>
                 setReport({ ...report, playedPosition: e.target.value })
               }
