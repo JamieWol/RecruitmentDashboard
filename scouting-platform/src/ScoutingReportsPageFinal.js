@@ -1034,9 +1034,9 @@ export default function ScoutingReportsPageFinal() {
       <div className="sr-section-line"><h2>{tab}</h2><span>{shown.length} assignments</span></div>
       <section className="sr-grid">
         {shown.map((x) => (
-          <article className="sr-card" key={x.id} onClick={() => { setProfile(null); setActive(x); }}>
+          <article className="sr-card" key={x.id} onClick={() => { setProfile(null); openReport(x); }}>
             <div className="sr-card-top"><span className="sr-card-status">{x.status}</span><button className="sr-trash" onClick={(e) => { e.stopPropagation(); deleteAssignment(x); }}>Delete</button></div>
-            <button type="button" className="sr-assignment-player-link" onClick={(e) => { e.stopPropagation(); setProfile(null); setActive(x); }}>{x.player}</button>
+            <button type="button" className="sr-assignment-player-link" onClick={(e) => { e.stopPropagation(); setProfile(null); openReport(x); }}>{x.player}</button>
             <p>{x.club || "Club not added"} · {x.position || "Position not added"}</p><div className="sr-fixture">{fixtureLabel(x)}</div>
             <div className="sr-card-meta"><span>{x.date || "Date not added"}</span><span>{x.viewing}</span><span>Scout: {x.scout || "Unassigned"}</span></div>
           </article>
