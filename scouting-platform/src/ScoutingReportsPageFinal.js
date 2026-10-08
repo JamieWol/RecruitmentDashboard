@@ -54,8 +54,10 @@ const playerPhotoFor = (record) => {
 };
 const photoCandidates = (name) => {
   const raw = String(name || "").trim();
-  const display = raw.split(/\s+/).length > 2 ? `${raw.split(/\s+/)[0]} ${raw.split(/\s+/).at(-1)}` : raw;
-  const rawBases = [raw, display].map((value) => value.replace(/[^\p{L}\p{N}]+/gu, "_").replace(/^_+|_+$/g, ""));
+  const parts = raw.split(/\s+/).filter(Boolean);
+  const display = parts.length > 2 ? `${parts[0]} ${parts.at(-1)}` : raw;
+  const twoNameVariants = parts.length > 2 ? parts.slice(0, -1).map((_, index) => parts.slice(index, index + 2).join(" ")) : [];
+  const rawBases = [raw, ...twoNameVariants, display].map((value) => value.replace(/[^\p{L}\p{N}]+/gu, "_").replace(/^_+|_+$/g, ""));
   const bases = [...new Set([...rawBases, ...rawBases.map((value) => value.normalize("NFD").replace(/[̀-ͯ]/g, ""))].filter(Boolean))];
   return [...new Set(bases.flatMap((base) => [base, base.toLowerCase(), base.toUpperCase(), `_${base}`, `_${base.toLowerCase()}`, `__${base}`]).map((base) => `${photoBase}${base}.png`))];
 };

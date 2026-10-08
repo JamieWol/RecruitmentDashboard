@@ -169,8 +169,13 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
         "";
 
       const displayName = getDisplayName(fullName || player?.["Player Name"] || "");
+      const nameParts = String(fullName || player?.["Player Name"] || "").replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+      const twoNameVariants = nameParts.length > 2
+        ? nameParts.slice(0, -1).map((_, index) => nameParts.slice(index, index + 2).join(" "))
+        : [];
       const rawCandidates = uniquePreserveOrder([
         fullName,
+        ...twoNameVariants,
         displayName,
         player?.["Player Name"],
         player?.["Display Name"],
