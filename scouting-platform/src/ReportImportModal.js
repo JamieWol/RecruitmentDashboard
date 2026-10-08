@@ -9,6 +9,7 @@ const editableReportFields = [
   ["Out of possession", "outPossession"], ["Physical", "physical"], ["On-pitch behaviour", "behaviour"],
 ];
 const gradeOptions = (values) => [<option key="" value="">Not included</option>, ...values.map((value) => <option key={value} value={value}>{value}</option>)];
+const reportPositions = ["GK", "LB", "LCB", "CB", "RCB", "RB", "LWB", "RWB", "DM", "LM", "LCM", "CM", "RCM", "RM", "LW", "AM", "CAM", "RW", "CF", "ST"];
 
 const readImportDraft = (storageKey) => {
   try { return JSON.parse(sessionStorage.getItem(`${storageKey}:draft`) || "null") || {}; }
@@ -142,7 +143,7 @@ export default function ReportImportModal({ onClose, onImport, storageKey = "sco
                 <label className="sr-field"><span>Match to player database</span><select value={record.playerId || ""} onChange={(event) => choosePlayer(index, event.target.value)}><option value="">Keep this name / choose a match</option>{(record.matches || []).map((player, matchIndex) => { const key = player.id || player.player_id || player.Name || player.name; return <option key={`${key}-${matchIndex}`} value={String(key)}>{player.Name || player.name}{player.club || player.Club || player.team ? ` · ${player.club || player.Club || player.team}` : ""}</option>; })}</select></label>
                 {!!record.player && !record.playerId && <small className="sr-import-unmatched">No exact player selected. This report will stay attached to the name you entered.</small>}
                 <label className="sr-field"><span>Club at the time</span><input value={record.club} onChange={(event) => updateRecord(index, { club: event.target.value })} /></label>
-                <label className="sr-field"><span>Position</span><input value={record.position} onChange={(event) => updateRecord(index, { position: event.target.value, report: { ...record.report, playedPosition: event.target.value } })} /></label>
+                <label className="sr-field"><span>Position</span><select value={record.position || ""} onChange={(event) => updateRecord(index, { position: event.target.value, report: { ...record.report, playedPosition: event.target.value } })}><option value="">Select position</option>{record.position && !reportPositions.includes(record.position) && <option value={record.position}>{record.position}</option>}{reportPositions.map((position) => <option key={position} value={position}>{position}</option>)}</select></label>
                 <label className="sr-field"><span>Fixture / opponent</span><input value={record.game} onChange={(event) => updateRecord(index, { game: event.target.value })} /></label>
                 <label className="sr-field"><span>Match date</span><input type="date" value={record.date || ""} onChange={(event) => updateRecord(index, { date: event.target.value })} /></label>
                 <label className="sr-field"><span>Viewing</span><select value={record.viewing || "Video"} onChange={(event) => updateRecord(index, { viewing: event.target.value })}><option>Video</option><option>Live</option></select></label>

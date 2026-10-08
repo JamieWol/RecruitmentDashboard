@@ -103,6 +103,29 @@ describe("old report import parsing", () => {
     });
   });
 
+  test("keeps side-by-side Word table sections in their own columns", () => {
+    const [record] = parseWordHtml(`<table>
+      <tr><td><p>Player</p></td><td><p>Yuki Ohashi</p></td><td><p>Club</p></td><td><p>Lommel</p></td></tr>
+      <tr><td><p>Strengths</p></td><td><p>Weaknesses</p></td></tr>
+      <tr><td><p>Finishes well.</p><p>Good attacking movement.</p></td><td><p>Needs to be more clinical.</p><p>Not dominant aerially.</p></td></tr>
+      <tr><td><p>Physical</p></td><td><p>On-pitch behaviour&#x20;</p></td></tr>
+      <tr><td><p>Competes well in duels.</p></td><td><p>Works hard for the team.</p></td></tr>
+      <tr><td><p>Conclusion (75 words)</p></td><td><p>A hard-working striker.</p></td></tr>
+    </table>`);
+
+    expect(record).toMatchObject({
+      player: "Yuki Ohashi",
+      club: "Lommel",
+      report: {
+        strengths: "Finishes well.\nGood attacking movement.",
+        weaknesses: "Needs to be more clinical.\nNot dominant aerially.",
+        physical: "Competes well in duels.",
+        behaviour: "Works hard for the team.",
+        conclusion: "A hard-working striker.",
+      },
+    });
+  });
+
   test("recognises the existing player, club, fixture, date and notes layout", () => {
     const [record] = parseWordHtml([
       "<p><strong>D. KOWNACKI</strong></p><p>Werder Bremen</p>",

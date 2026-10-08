@@ -135,21 +135,23 @@ const collectWordBlocks = (html) => {
     walk(node);
     return parts.join("").split(/\r?\n/).map(clean).filter(Boolean);
   };
-  const addTextBlock = (node, text) => {
+  const addTextBlock = (node, text, tableCell = null) => {
     if (!text) return;
     const heading = /^H[1-6]$/.test(node.tagName);
     const strong = heading || Boolean(node.querySelector?.("strong,b")) || (node.tagName === "STRONG" || node.tagName === "B");
-    blocks.push({ text, cells: null, strong, heading });
+    blocks.push({ text, cells: null, strong, heading, tableCell });
   };
   const walk = (node) => {
     if (node.tagName === "TABLE") {
-      Array.from(node.querySelectorAll("tr")).forEach((row) => {
-        Array.from(row.querySelectorAll("th,td")).forEach((cell) => {
+      const tableId = blocks.filter((block) => block.tableCell).at(-1)?.tableCell.tableId + 1 || 0;
+      Array.from(node.querySelectorAll("tr")).forEach((row, rowIndex) => {
+        Array.from(row.querySelectorAll("th,td")).forEach((cell, columnIndex) => {
+          const tableCell = { tableId, rowIndex, columnIndex };
           const paragraphs = Array.from(cell.querySelectorAll("p,h1,h2,h3,h4,h5,h6,li"));
           if (paragraphs.length) {
-            paragraphs.forEach((paragraph) => blockText(paragraph).forEach((text) => addTextBlock(paragraph, text)));
+            paragraphs.forEach((paragraph) => blockText(paragraph).forEach((text) => addTextBlock(paragraph, text, tableCell)));
           } else {
-            blockText(cell).forEach((text) => blocks.push({ text, cells: null, strong: cell.children.length === 0 && Boolean(cell.querySelector("strong,b")), heading: false }));
+            blockText(cell).forEach((text) => blocks.push({ text, cells: null, strong: cell.children.length === 0 && Boolean(cell.querySelector("strong,b")), heading: false, tableCell }));
           }
         });
       });
@@ -211,20 +213,46 @@ const wordBlocksToRecords = (blocks, sourceFile) => {
     const looseNotes = [];
     let activeField = "";
     let sawPlayer = false;
+    const tableActiveFields = new Map();
+    const tableRowFields = new Map();
+    const appendFieldValue = (field, value) => {
+      const text = clean(value);
+      if (!text) return;
+      if (field === "player") {
+        if (!record.player) { record.player = text; sawPlayer = true; }
+      } else if (["club", "position", "game", "date", "viewing"].includes(field)) {
+        record[field] = [record[field], field === "date" ? toISODate(text) : text].filter(Boolean).join("\n");
+      } else {
+        const reportKey = field === "position" ? "playedPosition" : field;
+        record.report[reportKey] = [record.report[reportKey], text].filter(Boolean).join("\n");
+      }
+    };
+    const tableFieldFor = (tableCell) => {
+      if (!tableCell) return "";
+      const { tableId, rowIndex, columnIndex } = tableCell;
+      const rowFields = tableRowFields.get(`${tableId}:${rowIndex}`);
+      const sameCellField = rowFields?.get(columnIndex);
+      if (sameCellField) return sameCellField;
+      const earlier = rowFields
+        ? Array.from(rowFields.entries()).filter(([column]) => column < columnIndex).sort((a, b) => b[0] - a[0])
+        : [];
+      return earlier[0]?.[1] || tableActiveFields.get(`${tableId}:${columnIndex}`) || "";
+    };
     group.forEach((block, index) => {
       const parsed = parseWordBlock(block);
       if (parsed) {
-        activeField = parsed.field;
+        if (block.tableCell) {
+          const { tableId, rowIndex, columnIndex } = block.tableCell;
+          tableActiveFields.set(`${tableId}:${columnIndex}`, parsed.field);
+          const rowKey = `${tableId}:${rowIndex}`;
+          if (!tableRowFields.has(rowKey)) tableRowFields.set(rowKey, new Map());
+          tableRowFields.get(rowKey).set(columnIndex, parsed.field);
+        } else activeField = parsed.field;
         if (parsed.field === "player") {
-          if (!record.player) { record.player = parsed.value; sawPlayer = Boolean(parsed.value); }
+          if (parsed.value) appendFieldValue(parsed.field, parsed.value);
           return;
         }
-        if (["club", "position", "game", "date", "viewing"].includes(parsed.field)) {
-          if (parsed.value) record[parsed.field] = [record[parsed.field], parsed.value].filter(Boolean).join("\n");
-        } else if (parsed.value) {
-          const reportKey = parsed.field === "position" ? "playedPosition" : parsed.field;
-          record.report[reportKey] = [record.report[reportKey], parsed.value].filter(Boolean).join("\n");
-        }
+        if (parsed.value) appendFieldValue(parsed.field, parsed.value);
         return;
       }
       const text = clean(block.text);
@@ -235,19 +263,10 @@ const wordBlocksToRecords = (blocks, sourceFile) => {
         activeField = "";
         return;
       }
-      if (activeField) {
-        if (activeField === "player") {
-          record.player = text;
-          sawPlayer = true;
-          activeField = "";
-          return;
-        }
-        const reportKey = activeField === "position" ? "playedPosition" : activeField;
-        if (["club", "position", "game", "date", "viewing"].includes(activeField)) {
-          record[activeField] = [record[activeField], text].filter(Boolean).join("\n");
-        } else {
-          record.report[reportKey] = [record.report[reportKey], text].filter(Boolean).join("\n");
-        }
+      const field = block.tableCell ? tableFieldFor(block.tableCell) : activeField;
+      if (field) {
+        appendFieldValue(field, text);
+        if (!block.tableCell && field === "player") activeField = "";
         return;
       }
       if (sawPlayer && !record.club && index <= 3) record.club = text;
