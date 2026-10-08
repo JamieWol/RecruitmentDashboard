@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "./supabaseClient";
 import { useAuth } from "./AuthContext";
 import { removeBackground } from "@imgly/background-removal";
+import ReportImportModal from "./ReportImportModal";
 const clubFromReport = (...values) => {
   const club = values.find((value) => {
     if (typeof value !== "string") return false;
@@ -258,6 +259,7 @@ export default function ScoutingReportsPageFinal() {
   const [profileResults, setProfileResults] = useState([]);
   const [profilePlayerDirectory, setProfilePlayerDirectory] = useState({});
   const [dashboardView, setDashboardView] = useState(() => sessionStorage.getItem("scoutingDashboardView") || "reports");
+  const [reportImportOpen, setReportImportOpen] = useState(false);
   const [profileFilters, setProfileFilters] = useState(() => JSON.parse(sessionStorage.getItem("profileCheckerFilters") || '{"foot":"","age":"","position":"","performance":"","potential":""}'));
   const summaryKey = String(playerData?.id || playerData?.player_id || profile?.playerId || normalizePlayerName(profile?.player));
   const savedPlayerSummary = appState?.playerSummaries?.[summaryKey];
@@ -405,6 +407,45 @@ export default function ScoutingReportsPageFinal() {
   const saveItems = (n) => {
     setItems(n);
     updateAppState({ assignments: n, shortlists: appState?.shortlists || [], tags: appState?.tags || [] });
+  };
+  const importOldReports = async (records) => {
+    const createdAt = new Date().toISOString();
+    const imported = records.map((record, index) => {
+      const game = String(record.game || "").trim();
+      const date = String(record.date || "").trim();
+      const fixture = game ? [{ name: game, date }] : [];
+      return {
+        id: Date.now() + index,
+        playerId: record.playerId || record.playerMatch?.id || record.playerMatch?.player_id || null,
+        player: String(record.player || "").trim(),
+        club: String(record.club || "").trim(),
+        position: String(record.position || record.report?.playedPosition || "").trim(),
+        scout: accountProfile?.full_name || user?.email || "Imported report",
+        scoutId: user?.id || "",
+        game,
+        games: fixture,
+        fixtureDates: date ? [date] : [],
+        date,
+        viewing: record.viewing || "Video",
+        status: "Draft",
+        importedAt: createdAt,
+        importSource: record.sourceFile || "File upload",
+        importSheet: record.sourceSheet || "",
+        report: {
+          ...empty,
+          ...(record.report || {}),
+          type: record.report?.type || "Long Report",
+          playedPosition: record.report?.playedPosition || record.position || "",
+          __fixtures: fixture,
+          __fixtureDates: date ? [date] : [],
+          __importSource: record.sourceFile || "File upload",
+        },
+      };
+    });
+    saveItems([...items, ...imported]);
+    setTab("My Assignments");
+    setDashboardView("reports");
+    setReportImportOpen(false);
   };
   const deleteAssignment = async (assignment) => {
     const assignmentId = String(assignment?.id);
@@ -1265,6 +1306,9 @@ export default function ScoutingReportsPageFinal() {
           <button className="sr-outline" onClick={() => nav("/shortlists")}>
             View Shortlists
           </button>
+          <button className="sr-outline" onClick={() => setReportImportOpen(true)}>
+            Import Old Reports
+          </button>
           <button className="sr-cyan" onClick={() => nav("/create-assignment")}>
             Create New Assignment
           </button>
@@ -1336,6 +1380,7 @@ export default function ScoutingReportsPageFinal() {
         )}
         {profileQuery.trim() && !profileResults.length && <div className="sr-profile-no-results">No published reports match those criteria yet.</div>}
       </section>}
+      {reportImportOpen && <ReportImportModal onClose={() => setReportImportOpen(false)} onImport={importOldReports} />}
       {reportPage}
     </main>
   );
