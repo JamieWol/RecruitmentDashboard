@@ -1,6 +1,17 @@
-import { parseExcelSheetRows, parseWordHtml } from "./reportImport";
+import { parseExcelSheetRows, parseWordHtml, splitImportedFixtures } from "./reportImport";
 
 describe("old report import parsing", () => {
+  test("splits a multi-game imported report into separately dated fixtures", () => {
+    expect(splitImportedFixtures(
+      "FORTUNA DÜSSELDORF v HERTHA BSC 22/03/2026 | HERTHA BSC v BOCHUM 14/03/2026 | HERTHA BSC v FREIBURG 10/02/2026",
+      "2026-03-22",
+    )).toEqual([
+      { name: "FORTUNA DÜSSELDORF v HERTHA BSC", date: "2026-03-22" },
+      { name: "HERTHA BSC v BOCHUM", date: "2026-03-14" },
+      { name: "HERTHA BSC v FREIBURG", date: "2026-02-10" },
+    ]);
+  });
+
   test("maps spreadsheet columns and normalises UK match dates", () => {
     const [record] = parseExcelSheetRows([
       ["Player Name", "Player Club", "Position Played", "Opposition", "Match Date", "Preferred Foot", "Performance Grade", "Strengths", "Weaknesses", "Conclusion"],

@@ -22,6 +22,24 @@ export const importedReportFields = {
 };
 
 const clean = (value) => String(value ?? "").replace(/\u00a0/g, " ").trim();
+const fixtureDateToISO = (value) => {
+  const text = clean(value);
+  const iso = text.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+  if (iso) return `${iso[1]}-${iso[2].padStart(2, "0")}-${iso[3].padStart(2, "0")}`;
+  const uk = text.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);
+  if (uk) return `${uk[3].length === 2 ? `20${uk[3]}` : uk[3]}-${uk[2].padStart(2, "0")}-${uk[1].padStart(2, "0")}`;
+  return text;
+};
+export const splitImportedFixtures = (value, fallbackDate = "") => {
+  const entries = clean(value).split(/\s*(?:\||\r?\n|;)+\s*/).map(clean).filter(Boolean);
+  const fallbackDates = clean(fallbackDate).split(/\s*(?:\||\r?\n|;)+\s*/).map(fixtureDateToISO);
+  return entries.map((entry, index) => {
+    const match = entry.match(/\b(\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[/. -]\d{1,2}[/. -]\d{2,4})\b/);
+    const date = match ? fixtureDateToISO(match[1]) : fallbackDates[index] || fallbackDates[0] || "";
+    const name = clean(match ? entry.replace(match[0], " ").replace(/[|·,–—-]+$/g, "") : entry).replace(/^[|·,–—-]+|[|·,–—-]+$/g, "");
+    return name ? { name, date } : null;
+  }).filter(Boolean);
+};
 const toISODate = (value) => {
   if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10);
   const text = clean(value);

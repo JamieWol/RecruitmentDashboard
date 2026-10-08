@@ -1,10 +1,11 @@
 import { ClubName } from "./ClubBadge";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "./supabaseClient";
 import { useAuth } from "./AuthContext";
 import { removeBackground } from "@imgly/background-removal";
 import ReportImportModal from "./ReportImportModal";
+import { splitImportedFixtures } from "./reportImport";
 const clubFromReport = (...values) => {
   const club = values.find((value) => {
     if (typeof value !== "string") return false;
@@ -102,7 +103,16 @@ const profileEvidence = (item, terms) => {
   const report = item.report || {};
   return profileFields.map((field) => String(report[field] || "").trim()).find((value) => terms.some((term) => value.toLowerCase().includes(term))) || "Report matches the requested profile criteria.";
 };
-const fixtureRecords = (item) => Array.isArray(item?.games) && item.games.length ? item.games : (Array.isArray(item?.report?.__fixtures) ? item.report.__fixtures : []);
+const fixtureRecords = (item) => {
+  const saved = Array.isArray(item?.games) && item.games.length ? item.games : (Array.isArray(item?.report?.__fixtures) ? item.report.__fixtures : []);
+  const records = saved.length ? saved : (item?.game ? [{ name: item.game, date: item.fixtureDates?.[0] || item.date || "" }] : []);
+  return records.flatMap((fixture, index) => {
+    const name = typeof fixture === "string" ? fixture : fixture?.name || "";
+    const date = typeof fixture === "string" ? item?.fixtureDates?.[index] || item?.date || "" : fixture?.date || item?.fixtureDates?.[index] || item?.date || "";
+    const split = splitImportedFixtures(name, date);
+    return split.length ? split : (name ? [{ name, date }] : []);
+  });
+};
 const fixtureLabel = (item) => {
   const fixtures = fixtureRecords(item);
   if (fixtures.length > 1) return "Multiple";
@@ -263,6 +273,8 @@ export default function ScoutingReportsPageFinal() {
   const [dashboardView, setDashboardView] = useState(() => localStorage.getItem(`${reportViewStorageKey}:view`) || sessionStorage.getItem("scoutingDashboardView") || "reports");
   const [reportImportOpen, setReportImportOpen] = useState(() => sessionStorage.getItem(`${reportImportStorageKey}:open`) === "true");
   const [importNotice, setImportNotice] = useState("");
+  const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
+  const actionsMenuRef = useRef(null);
   const [profileFilters, setProfileFilters] = useState(() => JSON.parse(sessionStorage.getItem("profileCheckerFilters") || '{"foot":"","age":"","position":"","performance":"","potential":""}'));
   const summaryKey = String(playerData?.id || playerData?.player_id || profile?.playerId || normalizePlayerName(profile?.player));
   const savedPlayerSummary = appState?.playerSummaries?.[summaryKey];
@@ -287,6 +299,21 @@ export default function ScoutingReportsPageFinal() {
   useEffect(() => {
     sessionStorage.setItem(`${reportImportStorageKey}:open`, String(reportImportOpen));
   }, [reportImportOpen, reportImportStorageKey]);
+  useEffect(() => {
+    if (!actionsMenuOpen) return undefined;
+    const closeOnOutsideClick = (event) => {
+      if (!actionsMenuRef.current?.contains(event.target)) setActionsMenuOpen(false);
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setActionsMenuOpen(false);
+    };
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [actionsMenuOpen]);
   useEffect(() => { sessionStorage.setItem("profileCheckerFilters", JSON.stringify(profileFilters)); }, [profileFilters]);
   useEffect(() => { sessionStorage.setItem("profileCheckerQuery", profileQuery); }, [profileQuery]);
   useEffect(() => {
@@ -426,7 +453,8 @@ export default function ScoutingReportsPageFinal() {
     const imported = records.map((record, index) => {
       const game = String(record.game || "").trim();
       const date = String(record.date || "").trim();
-      const fixture = game ? [{ name: game, date }] : [];
+      const fixture = splitImportedFixtures(game, date);
+      const fixtureDates = fixture.map((item) => item.date).filter(Boolean);
       return {
         id: Date.now() + index,
         playerId: record.playerId || record.playerMatch?.id || record.playerMatch?.player_id || null,
@@ -437,7 +465,7 @@ export default function ScoutingReportsPageFinal() {
         scoutId: user?.id || "",
         game,
         games: fixture,
-        fixtureDates: date ? [date] : [],
+        fixtureDates,
         date,
         viewing: record.viewing || "Video",
         status: "Draft",
@@ -450,7 +478,7 @@ export default function ScoutingReportsPageFinal() {
           type: record.report?.type || "Long Report",
           playedPosition: record.report?.playedPosition || record.position || "",
           __fixtures: fixture,
-          __fixtureDates: date ? [date] : [],
+          __fixtureDates: fixtureDates,
           __importSource: record.sourceFile || "File upload",
         },
       };
@@ -1312,15 +1340,16 @@ export default function ScoutingReportsPageFinal() {
               </div>
             )}
           </div>
-          <button className={`sr-outline sr-profile-tab ${dashboardView === "checker" ? "selected" : ""}`} onClick={() => setDashboardView(dashboardView === "checker" ? "reports" : "checker")}>
-            Profile Checker
-          </button>
-          <button className="sr-outline" onClick={() => nav("/shortlists")}>
-            View Shortlists
-          </button>
-          <button className="sr-outline" onClick={() => setReportImportOpen(true)}>
-            Import Old Reports
-          </button>
+          <div className="sr-page-actions-menu" ref={actionsMenuRef}>
+            <button type="button" className={`sr-outline sr-page-actions-trigger ${actionsMenuOpen ? "selected" : ""}`} aria-haspopup="menu" aria-expanded={actionsMenuOpen} onClick={() => setActionsMenuOpen((open) => !open)}>
+              More <span aria-hidden="true">▾</span>
+            </button>
+            {actionsMenuOpen && <div className="sr-page-actions-dropdown" role="menu">
+              <button type="button" role="menuitem" onClick={() => { setDashboardView(dashboardView === "checker" ? "reports" : "checker"); setActionsMenuOpen(false); }}>{dashboardView === "checker" ? "Reports and Assignments" : "Profile Checker"}</button>
+              <button type="button" role="menuitem" onClick={() => { setActionsMenuOpen(false); nav("/shortlists"); }}>View Shortlists</button>
+              <button type="button" role="menuitem" onClick={() => { setActionsMenuOpen(false); setReportImportOpen(true); }}>Import Old Reports</button>
+            </div>}
+          </div>
           <button className="sr-cyan" onClick={() => nav("/create-assignment")}>
             Create New Assignment
           </button>
@@ -1347,7 +1376,8 @@ export default function ScoutingReportsPageFinal() {
           <article className="sr-card" key={x.id} onClick={() => { setProfile(null); openReport(x); }}>
             <div className="sr-card-top"><span className="sr-card-status">{x.status}</span><button className="sr-trash" onClick={(e) => { e.stopPropagation(); deleteAssignment(x); }}>Delete</button></div>
             <button type="button" className="sr-assignment-player-link" onClick={(e) => { e.stopPropagation(); setProfile(null); openReport(x); }}>{x.player}</button>
-            <p><ClubName club={clubFromReport(x.player_club, x.playerClub, x.club, x.Club, x.team, x.Team) || profilePlayerDirectory[normalizePlayerName(x.player)]?.club} /> · {x.position || "Position not added"}</p><div className="sr-fixture">{fixtureLabel(x)}</div>
+            <p><ClubName club={clubFromReport(x.player_club, x.playerClub, x.club, x.Club, x.team, x.Team) || profilePlayerDirectory[normalizePlayerName(x.player)]?.club} /> · {x.position || "Position not added"}</p>
+            {fixtureRecords(x).length > 1 ? <div className="sr-fixture sr-fixture-multiple"><div className="sr-fixture-list sr-card-fixture-list">{fixtureRecords(x).map((fixture, index) => <div className="sr-fixture-card" key={`${fixture.name}-${index}`}><strong>{fixture.name}</strong><small>{fixture.date || "Date not added"}</small></div>)}</div></div> : <div className="sr-fixture">{fixtureLabel(x)}</div>}
             <div className="sr-card-meta"><span>{x.date || "Date not added"}</span><span>{x.viewing}</span><span>Scout: {x.scout || "Unassigned"}</span></div>
           </article>
         ))}
