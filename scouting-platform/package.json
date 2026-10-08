@@ -12,6 +12,7 @@
     "html-to-image": "^1.11.13",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.0.0",
+    "mammoth": "^1.13.0",
     "papaparse": "^5.5.3",
     "react": "^19.2.3",
     "react-csv": "^2.2.2",
