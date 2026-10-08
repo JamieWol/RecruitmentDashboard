@@ -230,6 +230,7 @@ export default function ScoutingReportsPageFinal() {
   const nav = useNavigate();
   const { appState, updateAppState, user, profile: accountProfile } = useAuth();
   const reportViewStorageKey = `scoutingReportsView:${user?.id || user?.email || "guest"}`;
+  const reportImportStorageKey = `scoutingReportImport:${user?.id || user?.email || "guest"}`;
   const [items, setItems] = useState(() =>
     JSON.parse(localStorage.getItem("scoutingAssignments") || "[]"),
   );
@@ -260,7 +261,7 @@ export default function ScoutingReportsPageFinal() {
   const [profileResults, setProfileResults] = useState([]);
   const [profilePlayerDirectory, setProfilePlayerDirectory] = useState({});
   const [dashboardView, setDashboardView] = useState(() => localStorage.getItem(`${reportViewStorageKey}:view`) || sessionStorage.getItem("scoutingDashboardView") || "reports");
-  const [reportImportOpen, setReportImportOpen] = useState(false);
+  const [reportImportOpen, setReportImportOpen] = useState(() => sessionStorage.getItem(`${reportImportStorageKey}:open`) === "true");
   const [importNotice, setImportNotice] = useState("");
   const [profileFilters, setProfileFilters] = useState(() => JSON.parse(sessionStorage.getItem("profileCheckerFilters") || '{"foot":"","age":"","position":"","performance":"","potential":""}'));
   const summaryKey = String(playerData?.id || playerData?.player_id || profile?.playerId || normalizePlayerName(profile?.player));
@@ -283,6 +284,9 @@ export default function ScoutingReportsPageFinal() {
     localStorage.setItem(`${reportViewStorageKey}:tab`, tab);
     sessionStorage.setItem("scoutingReportsTab", tab);
   }, [tab, reportViewStorageKey]);
+  useEffect(() => {
+    sessionStorage.setItem(`${reportImportStorageKey}:open`, String(reportImportOpen));
+  }, [reportImportOpen, reportImportStorageKey]);
   useEffect(() => { sessionStorage.setItem("profileCheckerFilters", JSON.stringify(profileFilters)); }, [profileFilters]);
   useEffect(() => { sessionStorage.setItem("profileCheckerQuery", profileQuery); }, [profileQuery]);
   useEffect(() => {
@@ -1389,7 +1393,7 @@ export default function ScoutingReportsPageFinal() {
         )}
         {profileQuery.trim() && !profileResults.length && <div className="sr-profile-no-results">No published reports match those criteria yet.</div>}
       </section>}
-      {reportImportOpen && <ReportImportModal onClose={() => setReportImportOpen(false)} onImport={importOldReports} />}
+      {reportImportOpen && <ReportImportModal storageKey={reportImportStorageKey} onClose={() => setReportImportOpen(false)} onImport={importOldReports} />}
       {reportPage}
     </main>
   );

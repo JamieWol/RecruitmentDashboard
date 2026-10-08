@@ -9,3 +9,9 @@ describe("Italian club badge aliases", () => {
     expect(clubBadgePathFor(name)).toBe("logos/italy/milan.png");
   });
 });
+
+describe("Bayern Munich badge names", () => {
+  test.each(["Bayern Munich", "FC Bayern Munich", "Bayern München", "FC Bayern München", "Bayern Munchen"])("maps %s to the Bayern badge", (name) => {
+    expect(clubBadgePathFor(name)).toBe("logos/germany/bayern-munchen.png");
+  });
+});

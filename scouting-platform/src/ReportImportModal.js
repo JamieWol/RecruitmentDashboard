@@ -10,13 +10,18 @@ const editableReportFields = [
 ];
 const gradeOptions = (values) => [<option key="" value="">Not included</option>, ...values.map((value) => <option key={value} value={value}>{value}</option>)];
 
-export default function ReportImportModal({ onClose, onImport }) {
-  const [records, setRecords] = useState([]);
-  const [errors, setErrors] = useState([]);
+const readImportDraft = (storageKey) => {
+  try { return JSON.parse(sessionStorage.getItem(`${storageKey}:draft`) || "null") || {}; }
+  catch { return {}; }
+};
+
+export default function ReportImportModal({ onClose, onImport, storageKey = "scoutingReportImport:guest" }) {
+  const [records, setRecords] = useState(() => readImportDraft(storageKey).records || []);
+  const [errors, setErrors] = useState(() => readImportDraft(storageKey).errors || []);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
-  const [expanded, setExpanded] = useState({});
+  const [message, setMessage] = useState(() => readImportDraft(storageKey).message || "");
+  const [expanded, setExpanded] = useState(() => readImportDraft(storageKey).expanded || {});
   const duplicateKeys = useMemo(() => {
     const counts = new Map();
     records.forEach((record) => {
@@ -25,6 +30,10 @@ export default function ReportImportModal({ onClose, onImport }) {
     });
     return counts;
   }, [records]);
+  React.useEffect(() => {
+    try { sessionStorage.setItem(`${storageKey}:draft`, JSON.stringify({ records, errors, message, expanded })); }
+    catch { /* Keep the live import usable if browser session storage is full. */ }
+  }, [records, errors, message, expanded, storageKey]);
 
   const updateRecord = (index, updates) => setRecords((current) => current.map((record, row) => row === index ? { ...record, ...updates } : record));
   const updateReport = (index, field, value) => setRecords((current) => current.map((record, row) => row === index ? { ...record, report: { ...record.report, [field]: value } } : record));
@@ -50,8 +59,9 @@ export default function ReportImportModal({ onClose, onImport }) {
               if (!fallback.error) data = fallback.data || [];
             }
           }
-          const matches = data || [];
-          const exact = matches.filter((player) => normalizeImportedPlayerName(player.Name || player.name) === normalizeImportedPlayerName(record.player));
+          const rows = data || [];
+          const exact = rows.filter((player) => normalizeImportedPlayerName(player.Name || player.name) === normalizeImportedPlayerName(record.player));
+          const matches = rows.map((player) => ({ id: player.id, player_id: player.player_id, Name: player.Name, name: player.name, club: player.club, Club: player.Club, team: player.team, Team: player.Team }));
           if (exact.length === 1) {
             const player = exact[0];
             return { matches, playerId: player.id || player.player_id || "", player: player.Name || player.name || record.player, club: record.club || "", position: record.position || "" };
@@ -98,6 +108,7 @@ export default function ReportImportModal({ onClose, onImport }) {
     setSaving(true);
     try {
       await onImport(valid);
+      sessionStorage.removeItem(`${storageKey}:draft`);
     } catch (error) {
       setMessage(error?.message || "The reports could not be saved. Please try again.");
       setSaving(false);
