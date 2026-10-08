@@ -60,7 +60,19 @@ const toISODate = (value) => {
 };
 const normalizeLabel = (value) => clean(value).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
 const aliasToField = new Map(Object.entries(importedReportFields).flatMap(([field, aliases]) => aliases.map((alias) => [normalizeLabel(alias), field])));
-const getField = (label) => aliasToField.get(normalizeLabel(label));
+const getField = (label) => {
+  const normalized = normalizeLabel(label);
+  const exact = aliasToField.get(normalized);
+  if (exact) return exact;
+  const withoutParenthetical = normalizeLabel(String(label || "").replace(/\([^)]*\)/g, " "));
+  const parentheticalMatch = aliasToField.get(withoutParenthetical);
+  if (parentheticalMatch) return parentheticalMatch;
+  const base = normalized
+    .replace(/\s+\d+\s+(?:words?|bullets?|points?|items?|lines?).*$/i, "")
+    .replace(/\s+(?:points?|bullet points?|comments?|observations?|evaluation|section)$/i, "")
+    .trim();
+  return aliasToField.get(base);
+};
 const reportFields = ["foot", "playedPosition", "performance", "potential", "conclusion", "reasons", "inPossession", "outPossession", "physical", "behaviour", "strengths", "weaknesses"];
 
 const emptyRecord = (sourceFile) => ({
@@ -296,3 +308,28 @@ export async function parseOldReportFiles(files) {
 }
 
 export const normalizeImportedPlayerName = (value) => clean(value).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
+export const findImportedPlayerMatch = (name, candidates = []) => {
+  const query = normalizeImportedPlayerName(name);
+  if (!query) return null;
+  const queryTokens = query.split(" ");
+  const ranked = candidates.map((player) => {
+    const candidateName = normalizeImportedPlayerName(player.Name || player.name || player.full_name || player.fullName);
+    const candidateTokens = candidateName.split(" ");
+    let score = 0;
+    if (candidateName === query) score = 100;
+    else if (queryTokens.length >= 2 && queryTokens.every((token) => candidateTokens.includes(token))) score = 95;
+    else if (queryTokens.length >= 2 && candidateTokens.length >= 2) {
+      const sameOrder = queryTokens[0] === candidateTokens[0] && queryTokens.at(-1) === candidateTokens.at(-1);
+      const reversedOrder = queryTokens[0] === candidateTokens.at(-1) && queryTokens.at(-1) === candidateTokens[0];
+      const sameSurname = queryTokens.at(-1) === candidateTokens.at(-1) || reversedOrder;
+      const sameFirst = sameOrder || reversedOrder;
+      const initialMatch = queryTokens[0].length === 1 && candidateTokens[0].startsWith(queryTokens[0]);
+      if (sameSurname && (sameFirst || initialMatch)) score = 90;
+    }
+    return { player, score };
+  }).filter((entry) => entry.score >= 90);
+  if (!ranked.length) return null;
+  const bestScore = Math.max(...ranked.map((entry) => entry.score));
+  const best = ranked.filter((entry) => entry.score === bestScore);
+  return best.length === 1 ? best[0].player : null;
+};

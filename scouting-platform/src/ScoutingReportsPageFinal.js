@@ -127,6 +127,14 @@ const fixtureLabel = (item) => {
     ? `${item.fixtureDates[0]} · ${item.game}`
     : item?.game || item?.fixture_summary || "Fixture not added";
 };
+const cardFixtureLabel = (item) => {
+  const fixtures = fixtureRecords(item);
+  if (fixtures.length > 1) {
+    const reportDate = item?.completedAt || item?.completed_at || item?.date || fixtures[0]?.date;
+    return reportDate ? `${reportDate} · Multiple` : "Multiple";
+  }
+  return fixtureLabel(item);
+};
 const assignmentBelongsToScout = (assignment, user, accountProfile) => {
   if (!assignment?.scoutId) return true;
   const ids = [user?.id, accountProfile?.id].filter(Boolean).map((value) => String(value));
@@ -1377,7 +1385,7 @@ export default function ScoutingReportsPageFinal() {
             <div className="sr-card-top"><span className="sr-card-status">{x.status}</span><button className="sr-trash" onClick={(e) => { e.stopPropagation(); deleteAssignment(x); }}>Delete</button></div>
             <button type="button" className="sr-assignment-player-link" onClick={(e) => { e.stopPropagation(); setProfile(null); openReport(x); }}>{x.player}</button>
             <p><ClubName club={clubFromReport(x.player_club, x.playerClub, x.club, x.Club, x.team, x.Team) || profilePlayerDirectory[normalizePlayerName(x.player)]?.club} /> · {x.position || "Position not added"}</p>
-            {fixtureRecords(x).length > 1 ? <div className="sr-fixture sr-fixture-multiple"><div className="sr-fixture-list sr-card-fixture-list">{fixtureRecords(x).map((fixture, index) => <div className="sr-fixture-card" key={`${fixture.name}-${index}`}><strong>{fixture.name}</strong><small>{fixture.date || "Date not added"}</small></div>)}</div></div> : <div className="sr-fixture">{fixtureLabel(x)}</div>}
+            <div className="sr-fixture">{cardFixtureLabel(x)}</div>
             <div className="sr-card-meta"><span>{x.date || "Date not added"}</span><span>{x.viewing}</span><span>Scout: {x.scout || "Unassigned"}</span></div>
           </article>
         ))}

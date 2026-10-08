@@ -1,4 +1,4 @@
-import { parseExcelSheetRows, parseWordHtml, splitImportedFixtures } from "./reportImport";
+import { findImportedPlayerMatch, parseExcelSheetRows, parseWordHtml, splitImportedFixtures } from "./reportImport";
 
 describe("old report import parsing", () => {
   test("splits a multi-game imported report into separately dated fixtures", () => {
@@ -10,6 +10,17 @@ describe("old report import parsing", () => {
       { name: "HERTHA BSC v BOCHUM", date: "2026-03-14" },
       { name: "HERTHA BSC v FREIBURG", date: "2026-02-10" },
     ]);
+  });
+
+  test("matches a unique player despite an abbreviated first name and avoids ambiguous matches", () => {
+    expect(findImportedPlayerMatch("Y. Ohashi", [
+      { id: 7, Name: "Yuki Ohashi" },
+      { id: 8, Name: "Other Player" },
+    ])).toMatchObject({ id: 7, Name: "Yuki Ohashi" });
+    expect(findImportedPlayerMatch("Yuki Ohashi", [
+      { id: 7, Name: "Yuki Ohashi" },
+      { id: 9, Name: "Yuki Ohashi" },
+    ])).toBeNull();
   });
 
   test("maps spreadsheet columns and normalises UK match dates", () => {
@@ -70,6 +81,25 @@ describe("old report import parsing", () => {
         physical: "Competes well in duels.",
         behaviour: "Works hard for the team.",
       },
+    });
+  });
+
+  test("recognises decorated section titles and keeps each section in its own field", () => {
+    const [record] = parseWordHtml([
+      "<p><strong>Yuki Ohashi</strong></p><p>Lommel</p>",
+      "<p><strong>Weaknesses</strong></p><p>Needs to improve his finishing.</p>",
+      "<p><strong>Strengths points</strong></p><p>Good first touch and intelligent movement.</p>",
+      "<p><strong>Physical points</strong></p><p>Competes well in physical duels.</p>",
+      "<p><strong>On-pitch behaviour&#x20;</strong></p><p>Works hard for the team.</p>",
+      "<p><strong>Conclusion (75 words)</strong></p><p>A hard-working striker with good movement.</p>",
+    ].join(""));
+
+    expect(record.report).toMatchObject({
+      weaknesses: "Needs to improve his finishing.",
+      strengths: "Good first touch and intelligent movement.",
+      physical: "Competes well in physical duels.",
+      behaviour: "Works hard for the team.",
+      conclusion: "A hard-working striker with good movement.",
     });
   });
 

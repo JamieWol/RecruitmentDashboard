@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from "./supabaseClient";
-import { normalizeImportedPlayerName, parseOldReportFiles } from "./reportImport";
+import { findImportedPlayerMatch, normalizeImportedPlayerName, parseOldReportFiles } from "./reportImport";
 
 const editableReportFields = [
   ["Conclusion", "conclusion"], ["Strengths", "strengths"], ["Weaknesses", "weaknesses"],
@@ -50,20 +50,19 @@ export default function ReportImportModal({ onClose, onImport, storageKey = "sco
       const matchOne = async (record) => {
         if (!record.player) return { matches: [] };
         try {
-          let { data, error } = await supabase.from("players").select("*").ilike("Name", record.player).limit(10);
+          let { data, error } = await supabase.from("players").select("*").ilike("Name", `%${record.player.trim()}%`).limit(20);
           if (error) return { matches: [], matchError: error.message };
           if (!data?.length) {
             const surname = record.player.trim().split(/\s+/).at(-1);
             if (surname && surname.length > 1) {
-              const fallback = await supabase.from("players").select("*").ilike("Name", `%${surname}%`).limit(10);
+              const fallback = await supabase.from("players").select("*").ilike("Name", `%${surname}%`).limit(20);
               if (!fallback.error) data = fallback.data || [];
             }
           }
           const rows = data || [];
-          const exact = rows.filter((player) => normalizeImportedPlayerName(player.Name || player.name) === normalizeImportedPlayerName(record.player));
           const matches = rows.map((player) => ({ id: player.id, player_id: player.player_id, Name: player.Name, name: player.name, club: player.club, Club: player.Club, team: player.team, Team: player.Team }));
-          if (exact.length === 1) {
-            const player = exact[0];
+          const player = findImportedPlayerMatch(record.player, rows);
+          if (player) {
             return { matches, playerId: player.id || player.player_id || "", player: player.Name || player.name || record.player, club: record.club || "", position: record.position || "" };
           }
           return { matches };
