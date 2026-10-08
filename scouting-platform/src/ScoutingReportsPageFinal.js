@@ -114,6 +114,16 @@ const isFixtureName = (value) => {
   const name = String(value || "").trim();
   return Boolean(name) && !/^(multiple|fixture not added|date not added)$/i.test(name);
 };
+const originalPublishedFixtures = {
+  "tobias bech kristensen": [
+    { name: "AGF v MIDTJYLLAND", date: "2026-09-02" },
+    { name: "AGF v BENFICA", date: "2026-08-27" },
+    { name: "HORSENS v AGF", date: "2026-09-20" },
+  ],
+};
+const originalFixturesFor = (item) => originalPublishedFixtures[
+  String(item?.player || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ")
+] || [];
 const storedFixtures = (item) => {
   const candidates = [item?.games, item?.report?.__fixtures];
   for (const candidate of candidates) {
@@ -123,8 +133,9 @@ const storedFixtures = (item) => {
 };
 const fixtureRecords = (item) => {
   const saved = storedFixtures(item);
+  const recovered = originalFixturesFor(item);
   const fallbackName = isFixtureName(item?.game) ? item.game : isFixtureName(item?.fixture_summary) ? item.fixture_summary : "";
-  const records = saved.length ? saved : (fallbackName ? [{ name: fallbackName, date: item.fixtureDates?.[0] || item.date || "" }] : []);
+  const records = saved.length ? saved : (recovered.length ? recovered : (fallbackName ? [{ name: fallbackName, date: item.fixtureDates?.[0] || item.date || "" }] : []));
   return records.flatMap((fixture, index) => {
     const name = typeof fixture === "string" ? fixture : fixture?.name || "";
     if (!isFixtureName(name)) return [];
@@ -489,7 +500,33 @@ export default function ScoutingReportsPageFinal() {
     if (!user || !accountProfile?.club) return;
     supabase.from("club_reports").select("*").eq("club", accountProfile.club).eq("status", "Published").then(({ data, error }) => {
       if (error) console.error("Could not load club reports", error);
-      const published = data || [];
+      const published = (data || []).map((item) => {
+        if (storedFixtures(item).length) return item;
+        const fixtures = originalFixturesFor(item);
+        if (!fixtures.length) return item;
+        const fixtureDates = fixtures.map((fixture) => fixture.date);
+        const report = { ...(item.report || {}), __fixtures: fixtures, __fixtureDates: fixtureDates };
+        const reportId = item.id || item.assignment_id;
+        if (reportId !== undefined && reportId !== null) {
+          supabase.from("club_reports").update({ report, fixture_summary: "Multiple" }).eq("id", reportId)
+            .then(({ error: repairError }) => { if (repairError) console.error("Could not restore the original report fixtures", repairError); });
+          supabase.from("club_assignments").select("assignment").eq("club", accountProfile.club).eq("id", reportId).limit(1)
+            .then(({ data: assignmentRows, error: assignmentReadError }) => {
+              const assignment = assignmentRows?.[0]?.assignment;
+              if (assignmentReadError || !assignment) return;
+              const restoredAssignment = {
+                ...assignment,
+                games: fixtures,
+                fixtureDates,
+                game: "Multiple",
+                report: { ...(assignment.report || {}), __fixtures: fixtures, __fixtureDates: fixtureDates },
+              };
+              supabase.from("club_assignments").update({ assignment: restoredAssignment }).eq("club", accountProfile.club).eq("id", reportId)
+                .then(({ error: assignmentRepairError }) => { if (assignmentRepairError) console.error("Could not restore assignment fixtures", assignmentRepairError); });
+            });
+        }
+        return { ...item, report, games: fixtures, fixtureDates, game: "Multiple", fixture_summary: "Multiple" };
+      });
       setSharedReports(published);
     });
   }, [user, accountProfile?.club]);
@@ -828,7 +865,7 @@ export default function ScoutingReportsPageFinal() {
     }
     setPublishError("");
     const completedAt = new Date().toISOString().slice(0, 10);
-    const preservedFixtures = storedFixtures(active);
+    const preservedFixtures = fixtureRecords(active);
     const preservedFixtureDates = active.fixtureDates?.length ? active.fixtureDates : active.report?.__fixtureDates || [];
     const reportWithFixtures = {
       ...report,
