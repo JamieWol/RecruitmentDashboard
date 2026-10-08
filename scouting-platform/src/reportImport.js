@@ -2,23 +2,23 @@ import * as XLSX from "xlsx";
 import mammoth from "mammoth";
 
 export const importedReportFields = {
-  player: ["player", "player name", "name", "scouted player", "player full name"],
-  club: ["club", "current club", "team", "player club", "club name"],
-  position: ["position", "playing position", "primary position", "position played", "role"],
-  game: ["fixture", "game", "match", "opposition", "opponent", "fixture game", "match fixture"],
-  date: ["date", "match date", "game date", "report date", "viewing date"],
-  viewing: ["viewing", "viewing type", "context", "live or video"],
-  foot: ["foot", "preferred foot", "dominant foot"],
-  performance: ["performance", "performance grade", "performance rating", "grade performance"],
-  potential: ["potential", "potential grade", "potential rating", "grade potential"],
-  reasons: ["reasons", "reason", "reasons why", "grade reasons", "reasoning"],
-  inPossession: ["in possession", "in possession notes", "in possession analysis"],
-  outPossession: ["out of possession", "out possession", "out of possession notes", "defensive notes"],
-  physical: ["physical", "physical notes", "athleticism"],
-  behaviour: ["on pitch behaviour", "on pitch attitude", "behaviour", "behavior", "mentality"],
-  strengths: ["strengths", "key strengths", "positive points", "positives"],
-  weaknesses: ["weaknesses", "areas to improve", "areas for improvement", "development areas", "negatives"],
-  conclusion: ["conclusion", "summary", "scout summary", "overall assessment", "overall report"],
+  player: ["player", "player name", "name", "scouted player", "player full name", "player being scouted", "scouted player name"],
+  club: ["club", "current club", "team", "player club", "club name", "club at time", "team at time", "club team"],
+  position: ["position", "playing position", "primary position", "position played", "player position", "role"],
+  game: ["fixture", "fixtures", "fixture(s)", "game", "games", "game(s)", "match", "matches", "match(es)", "opposition", "opponent", "fixture game", "match fixture", "games watched", "matches watched", "opposition played", "teams played against"],
+  date: ["date", "dates", "match date", "match date(s)", "game date", "game date(s)", "fixture date", "report date", "viewing date", "date watched"],
+  viewing: ["viewing", "viewing type", "viewing method", "context", "live or video", "live video", "scouting context"],
+  foot: ["foot", "preferred foot", "dominant foot", "strong foot"],
+  performance: ["performance", "performance grade", "performance rating", "grade performance", "performance score", "performance grade 1 5"],
+  potential: ["potential", "potential grade", "potential rating", "grade potential", "potential score", "potential grade a f"],
+  reasons: ["reasons", "reason", "reasons why", "reason why", "grade reasons", "reasoning", "reason for grade", "reason for rating"],
+  inPossession: ["in possession", "in possession notes", "in possession analysis", "on the ball", "with the ball", "attacking play", "technical analysis"],
+  outPossession: ["out of possession", "out possession", "out of possession notes", "without the ball", "off the ball", "defensive notes", "defensive analysis"],
+  physical: ["physical", "physical notes", "physical attributes", "athleticism"],
+  behaviour: ["on pitch behaviour", "on pitch behavior", "on pitch attitude", "on pitch character", "behaviour", "behavior", "mentality"],
+  strengths: ["strengths", "key strengths", "positive points", "positives", "strength", "what went well"],
+  weaknesses: ["weaknesses", "areas to improve", "areas for improvement", "development areas", "development needs", "negatives", "weakness", "areas to develop"],
+  conclusion: ["conclusion", "summary", "scout summary", "overall assessment", "overall report", "overall summary", "player summary", "evaluation"],
 };
 
 const clean = (value) => String(value ?? "").replace(/\u00a0/g, " ").trim();
@@ -109,24 +109,49 @@ export const parseExcelSheetRows = (rows, sourceFile = "Workbook.xlsx", sheetNam
 const collectWordBlocks = (html) => {
   const documentNode = new DOMParser().parseFromString(html, "text/html");
   const blocks = [];
-  Array.from(documentNode.body.children).forEach((node) => {
+  const blockText = (node) => {
+    const parts = [];
+    const walk = (current) => {
+      if (current.nodeType === 3) { parts.push(current.nodeValue || ""); return; }
+      if (current.nodeType !== 1) return;
+      if (current.tagName === "BR") { parts.push("\n"); return; }
+      const isBlock = /^(P|DIV|LI|H[1-6])$/.test(current.tagName);
+      if (isBlock && parts.length && !parts.at(-1).endsWith("\n")) parts.push("\n");
+      Array.from(current.childNodes).forEach(walk);
+      if (isBlock && !parts.at(-1)?.endsWith("\n")) parts.push("\n");
+    };
+    walk(node);
+    return parts.join("").split(/\r?\n/).map(clean).filter(Boolean);
+  };
+  const addTextBlock = (node, text) => {
+    if (!text) return;
+    const heading = /^H[1-6]$/.test(node.tagName);
+    const strong = heading || Boolean(node.querySelector?.("strong,b")) || (node.tagName === "STRONG" || node.tagName === "B");
+    blocks.push({ text, cells: null, strong, heading });
+  };
+  const walk = (node) => {
     if (node.tagName === "TABLE") {
       Array.from(node.querySelectorAll("tr")).forEach((row) => {
-        const cells = Array.from(row.querySelectorAll("th,td")).map((cell) => clean(cell.textContent));
-        if (cells.some(Boolean)) blocks.push({ text: cells.join(" | "), cells, strong: cells.length === 1 && Boolean(row.querySelector("strong,b")), heading: false });
+        Array.from(row.querySelectorAll("th,td")).forEach((cell) => {
+          const paragraphs = Array.from(cell.querySelectorAll("p,h1,h2,h3,h4,h5,h6,li"));
+          if (paragraphs.length) {
+            paragraphs.forEach((paragraph) => blockText(paragraph).forEach((text) => addTextBlock(paragraph, text)));
+          } else {
+            blockText(cell).forEach((text) => blocks.push({ text, cells: null, strong: cell.children.length === 0 && Boolean(cell.querySelector("strong,b")), heading: false }));
+          }
+        });
       });
       return;
     }
-    const text = clean(node.textContent);
-    if (text) blocks.push({ text, cells: null, strong: Boolean(node.querySelector("strong,b")) || /^H[1-6]$/.test(node.tagName), heading: /^H[1-6]$/.test(node.tagName) });
-  });
-  // Mammoth may wrap body content in a div, so collect paragraph and heading descendants when needed.
-  if (!blocks.length) {
-    Array.from(documentNode.body.querySelectorAll("p,h1,h2,h3,h4,h5,h6,li")).forEach((node) => {
-      const text = clean(node.textContent);
-      if (text) blocks.push({ text, cells: null, strong: Boolean(node.querySelector("strong,b")) || /^H[1-6]$/.test(node.tagName), heading: /^H[1-6]$/.test(node.tagName) });
-    });
-  }
+    if (/^(P|H[1-6]|LI)$/.test(node.tagName)) {
+      blockText(node).forEach((text) => addTextBlock(node, text));
+      return;
+    }
+    const children = Array.from(node.children || []);
+    if (children.length) children.forEach(walk);
+    else blockText(node).forEach((text) => addTextBlock(node, text));
+  };
+  Array.from(documentNode.body.children).forEach(walk);
   return blocks;
 };
 
@@ -236,7 +261,10 @@ export const parseWordHtml = (html, sourceFile = "Report.docx") => wordBlocksToR
 const parseWordFile = async (file) => {
   const arrayBuffer = await file.arrayBuffer();
   const { value: html } = await mammoth.convertToHtml({ arrayBuffer });
-  return parseWordHtml(html, file.name);
+  const records = parseWordHtml(html, file.name);
+  const filenamePlayer = clean(file.name.replace(/\.docx$/i, "")).replace(/[_]+/g, " ").trim();
+  if (records.length === 1 && !records[0].player && /^[\p{L}\p{M}.'’\-\s]+$/u.test(filenamePlayer)) records[0].player = filenamePlayer;
+  return records;
 };
 
 export async function parseOldReportFiles(files) {

@@ -50,6 +50,29 @@ describe("old report import parsing", () => {
     expect(records[1]).toMatchObject({ player: "B. Example", club: "Other FC", report: { conclusion: "Good technical profile" } });
   });
 
+  test("reads Game(s) and separates adjacent table sections into their correct fields", () => {
+    const [record] = parseWordHtml(`<table>
+      <tr><td><p>Player</p></td><td><p>Y. Ohashi</p></td><td><p>Club</p></td><td><p>Lommel</p></td></tr>
+      <tr><td><p>Game(s)</p></td><td><p>BLACKBURN ROVERS v COVENTRY CITY 17/04/2026</p><p>BLACKBURN ROVERS v MILLWALL 10/04/2026</p></td></tr>
+      <tr><td><p>Reason why</p></td><td><p>Technically good striker.</p></td></tr>
+      <tr><td><p>Strengths</p><p>Good first touch.</p><p>Runs in behind well.</p><p>Weaknesses</p><p>Needs to be more clinical.</p></td></tr>
+      <tr><td><p>Physical</p><p>Competes well in duels.</p><p>On Pitch Behaviour</p><p>Works hard for the team.</p></td></tr>
+    </table>`);
+
+    expect(record).toMatchObject({
+      player: "Y. Ohashi",
+      club: "Lommel",
+      game: "BLACKBURN ROVERS v COVENTRY CITY 17/04/2026\nBLACKBURN ROVERS v MILLWALL 10/04/2026",
+      report: {
+        reasons: "Technically good striker.",
+        strengths: "Good first touch.\nRuns in behind well.",
+        weaknesses: "Needs to be more clinical.",
+        physical: "Competes well in duels.",
+        behaviour: "Works hard for the team.",
+      },
+    });
+  });
+
   test("recognises the existing player, club, fixture, date and notes layout", () => {
     const [record] = parseWordHtml([
       "<p><strong>D. KOWNACKI</strong></p><p>Werder Bremen</p>",
