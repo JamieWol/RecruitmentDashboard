@@ -925,9 +925,9 @@ export default function ScoutingReportsPageFinal() {
               </p>
             </div>
           </div>
-          {editing && active.status !== "Published" && (
+          {editing && (
             <button className="sr-cyan sr-banner-publish" onClick={saveReport}>
-              Publish Report
+              {active.status === "Published" ? "Republish Report" : "Publish Report"}
             </button>
           )}
           {!editing && active.status !== "Published" && <p className="sr-readonly-note">Read-only: this assignment belongs to another scout.</p>}
