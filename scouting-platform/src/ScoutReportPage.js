@@ -187,11 +187,17 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
         .trim()
         .replace(/[^a-zA-Z0-9]+/g, "_")
         .replace(/^_+|_+$/g, ""));
+      const legacyDownloaderSlugs = rawCandidates.map((value) => String(value)
+        .trim()
+        .replace(/[^a-z0-9]/gi, "_")
+        .toLowerCase()
+        .replace(/^_+|_+$/g, ""));
       const bases = uniquePreserveOrder([
         ...rawCandidates.map(slugify),
         ...rawCandidates.map(slugifyLegacy),
         ...originalCaseSlugs,
         ...originalCaseSlugs.map((value) => value.toUpperCase()),
+        ...legacyDownloaderSlugs,
       ].filter(Boolean));
 
       const variants = uniquePreserveOrder(

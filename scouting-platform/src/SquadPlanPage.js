@@ -24,8 +24,10 @@ const photoCandidates = (name) => {
   const short = parts.length > 2 ? `${parts[0]} ${parts.at(-1)}` : raw;
   const twoNameVariants = parts.length > 2 ? parts.slice(0, -1).map((_, index) => parts.slice(index, index + 2).join(" ")) : [];
   const nameVariants = [raw, ...twoNameVariants, short, raw.replace(/macaulay/gi, "macauley"), ...twoNameVariants.map((x) => x.replace(/macaulay/gi, "macauley")), short.replace(/macaulay/gi, "macauley"), raw.replace(/macauley/gi, "macaulay"), ...twoNameVariants.map((x) => x.replace(/macauley/gi, "macaulay")), short.replace(/macauley/gi, "macaulay")];
-  const bases = [...new Set(nameVariants.map((x) => x.replace(/[^\p{L}\p{N}]+/gu, "_").replace(/^_+|_+$/g, "")))];
-  return [...new Set(bases.flatMap((x) => [x, x.toLowerCase(), x.toUpperCase(), `_${x}`, `_${x.toLowerCase()}`, `__${x}`, x.normalize("NFD").replace(/[̀-ͯ]/g, "")]).map((x) => `${photoBase}${x}.png`))];
+  const unicodeBases = nameVariants.map((x) => x.replace(/[^\p{L}\p{N}]+/gu, "_").replace(/^_+|_+$/g, ""));
+  const legacyBases = nameVariants.map((x) => x.trim().replace(/[^a-z0-9]/gi, "_").toLowerCase().replace(/^_+|_+$/g, ""));
+  const bases = [...new Set([...unicodeBases, ...legacyBases, ...unicodeBases.map((x) => x.normalize("NFD").replace(/[̀-ͯ]/g, ""))])];
+  return [...new Set(bases.flatMap((x) => [x, x.toLowerCase(), x.toUpperCase(), `_${x}`, `_${x.toLowerCase()}`, `__${x}`]).map((x) => `${photoBase}${x}.png`))];
 };
 const imageSource = (p) => p.Photo || p.photo || p._photoUrl || p.photoUrl || p.photo_url || p.playerPhoto || p.player_photo || p.profile_photo || p.profilePhoto || p.headshot || p.headshot_url || p.Image || p.image || p["Photo URL"] || p["Photo Url"] || p["Image URL"] || p.image_url || photoFor(playerName(p));
 const imageFallback = (e, name) => { const image = e.currentTarget; const candidates = photoCandidates(name); const next = Number(image.dataset.photoFallback || 0) + 1; if (candidates[next - 1]) { image.dataset.photoFallback = String(next); image.src = candidates[next - 1]; } else image.style.display = "none"; };

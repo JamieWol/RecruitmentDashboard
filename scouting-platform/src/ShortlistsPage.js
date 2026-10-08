@@ -124,8 +124,11 @@ const shortlistPhotoCandidates = (name) => {
   const parts = raw.split(/\s+/).filter(Boolean);
   const display = parts.length > 2 ? `${parts[0]} ${parts.at(-1)}` : raw;
   const twoNameVariants = parts.length > 2 ? parts.slice(0, -1).map((_, index) => parts.slice(index, index + 2).join(" ")) : [];
-  const rawBases = [raw, ...twoNameVariants, display].map((value) => value.replace(/[^\p{L}\p{N}]+/gu, "_").replace(/^_+|_+$/g, ""));
-  const bases = [...new Set([...rawBases, ...rawBases.map((value) => value.normalize("NFD").replace(/[̀-ͯ]/g, ""))].filter(Boolean))];
+  const nameVariants = [raw, ...twoNameVariants, display];
+  const rawBases = nameVariants.map((value) => value.replace(/[^\p{L}\p{N}]+/gu, "_").replace(/^_+|_+$/g, ""));
+  const normalizedBases = rawBases.map((value) => value.normalize("NFD").replace(/[̀-ͯ]/g, ""));
+  const legacyBases = nameVariants.map((value) => value.trim().replace(/[^a-z0-9]/gi, "_").toLowerCase().replace(/^_+|_+$/g, ""));
+  const bases = [...new Set([...rawBases, ...normalizedBases, ...legacyBases].filter(Boolean))];
   return [...new Set(bases.flatMap((base) => [base, base.toLowerCase(), base.toUpperCase(), `_${base}`, `_${base.toLowerCase()}`, `__${base}`]).map((base) => `${"https://syjsmvvsvvprxibqoizw.supabase.co/storage/v1/object/public/player-photos/player-photos/"}${base}.png`))];
 };
 const retryShortlistPhoto = (e, name) => {

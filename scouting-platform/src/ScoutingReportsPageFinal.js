@@ -50,15 +50,20 @@ const playerPhotoFor = (record) => {
   const direct = ["Photo", "photo", "_photoUrl", "photoUrl", "playerPhoto", "Image", "image", "Photo URL"]
     .map((key) => record?.[key])
     .find((value) => typeof value === "string" && value.trim());
-  return direct || playerPhoto(record?.player || record?.Name || record?.name);
+  return direct || playerPhoto(record?.Name || record?.name || record?.player);
 };
 const photoCandidates = (name) => {
   const raw = String(name || "").trim();
   const parts = raw.split(/\s+/).filter(Boolean);
   const display = parts.length > 2 ? `${parts[0]} ${parts.at(-1)}` : raw;
   const twoNameVariants = parts.length > 2 ? parts.slice(0, -1).map((_, index) => parts.slice(index, index + 2).join(" ")) : [];
-  const rawBases = [raw, ...twoNameVariants, display].map((value) => value.replace(/[^\p{L}\p{N}]+/gu, "_").replace(/^_+|_+$/g, ""));
-  const bases = [...new Set([...rawBases, ...rawBases.map((value) => value.normalize("NFD").replace(/[̀-ͯ]/g, ""))].filter(Boolean))];
+  const nameVariants = [raw, ...twoNameVariants, display];
+  const rawBases = nameVariants.map((value) => value.replace(/[^\p{L}\p{N}]+/gu, "_").replace(/^_+|_+$/g, ""));
+  const normalizedBases = rawBases.map((value) => value.normalize("NFD").replace(/[̀-ͯ]/g, ""));
+  // The original photo downloader made filenames by replacing each non-ASCII
+  // character with an underscore (for example, Rúben Dias -> r_ben_dias).
+  const legacyBases = nameVariants.map((value) => value.trim().replace(/[^a-z0-9]/gi, "_").toLowerCase().replace(/^_+|_+$/g, ""));
+  const bases = [...new Set([...rawBases, ...normalizedBases, ...legacyBases].filter(Boolean))];
   return [...new Set(bases.flatMap((base) => [base, base.toLowerCase(), base.toUpperCase(), `_${base}`, `_${base.toLowerCase()}`, `__${base}`]).map((base) => `${photoBase}${base}.png`))];
 };
 const retryPhoto = (e, name) => {
@@ -158,6 +163,27 @@ const assignmentBelongsToScout = (assignment, user, accountProfile) => {
 };
 const playerDobKeys = ["DOB", "Date of Birth", "date_of_birth", "dateOfBirth", "date of birth", "birth_date", "birthDate"];
 const normalizePlayerName = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
+const playerNameMatchScore = (reportedName, databaseName) => {
+  const reported = normalizePlayerName(reportedName);
+  const canonical = normalizePlayerName(databaseName);
+  if (!reported || !canonical) return 0;
+  if (reported === canonical) return 100;
+  const queryTokens = reported.split(" ");
+  const playerTokens = canonical.split(" ");
+  let cursor = 0;
+  for (const token of queryTokens) {
+    let found = false;
+    while (cursor < playerTokens.length) {
+      const candidate = playerTokens[cursor++];
+      if (token === candidate || (token.length === 1 && candidate.startsWith(token))) {
+        found = true;
+        break;
+      }
+    }
+    if (!found) return 0;
+  }
+  return queryTokens.length >= 2 ? 90 + queryTokens.length : 0;
+};
 const ageFromValue = (value) => {
   if (value === null || value === undefined || String(value).trim() === "") return null;
   const text = String(value).trim();
@@ -351,20 +377,39 @@ export default function ScoutingReportsPageFinal() {
       setPlayerData(null);
       return;
     }
-    supabase
-      .from("players")
-      .select("*")
-      .ilike("Name", selectedPlayer.player)
-      .limit(5)
-      .then(({ data }) => {
-        const exact = (data || []).find(
-          (row) =>
-            String(row.Name || row.name || "").toLowerCase() ===
-            selectedPlayer.player.toLowerCase(),
-        );
-        setPlayerData(exact || data?.[0] || null);
-      })
-      .catch(() => setPlayerData(null));
+    let cancelled = false;
+    const loadMatchedPlayer = async () => {
+      const playerId = selectedPlayer.playerId || selectedPlayer.player_id || selectedPlayer["Player Id"];
+      let rows = [];
+      if (playerId !== undefined && playerId !== null && String(playerId).trim()) {
+        const { data } = await supabase.from("players").select("*").eq("id", playerId).limit(2);
+        rows = data || [];
+        if (rows.length === 1) {
+          if (!cancelled) setPlayerData(rows[0]);
+          return;
+        }
+      }
+      if (!rows.length) {
+        const exactResult = await supabase.from("players").select("*").ilike("Name", selectedPlayer.player).limit(10);
+        rows = exactResult.data || [];
+        if (!rows.some((row) => playerNameMatchScore(selectedPlayer.player, row.Name || row.name) > 0)) {
+          const lastName = normalizePlayerName(selectedPlayer.player).split(" ").filter(Boolean).at(-1);
+          if (lastName && lastName.length > 1) {
+            const lastNameResult = await supabase.from("players").select("*").ilike("Name", `%${lastName}%`).limit(100);
+            rows = [...rows, ...(lastNameResult.data || [])];
+          }
+        }
+      }
+      const uniqueRows = [...new Map(rows.map((row) => [String(row.id || `${row.Name || row.name}:${row.Photo || row.photo || ""}`), row])).values()];
+      const ranked = uniqueRows
+        .map((row) => ({ row, score: playerNameMatchScore(selectedPlayer.player, row.Name || row.name) }))
+        .filter((candidate) => candidate.score > 0)
+        .sort((a, b) => b.score - a.score);
+      const uniqueBest = ranked.length && (ranked.length === 1 || ranked[0].score > ranked[1].score) ? ranked[0].row : null;
+      if (!cancelled) setPlayerData(uniqueBest);
+    };
+    loadMatchedPlayer().catch(() => { if (!cancelled) setPlayerData(null); });
+    return () => { cancelled = true; };
   }, [profile, active]);
   const uploadProfilePhoto = async (event) => {
     const file = event.target.files?.[0];
@@ -919,7 +964,7 @@ export default function ScoutingReportsPageFinal() {
               className="sr-report-banner-photo"
               src={playerPhotoFor({ ...active, ...(playerData || {}) })}
               alt=""
-              onError={(e) => retryPhoto(e, active.player)}
+              onError={(e) => retryPhoto(e, playerData?.Name || playerData?.name || active.player)}
             />
             <div>
               <div className="sr-kicker">PLAYER REPORT</div>
@@ -1139,7 +1184,7 @@ export default function ScoutingReportsPageFinal() {
               onLoad={(e) => {
                 e.currentTarget.nextElementSibling.style.display = "none";
               }}
-              onError={(e) => retryPhoto(e, profile.player)}
+              onError={(e) => retryPhoto(e, playerData?.Name || playerData?.name || profile.player)}
             />
             <span>{profile.player.slice(0, 2).toUpperCase()}</span>
             {!profileHasDirectPhoto && <label className="sr-add-photo" title="Add player photo"><input type="file" accept="image/*" onChange={uploadProfilePhoto} disabled={photoUploading} />{photoUploading ? "…" : "+"}</label>}
