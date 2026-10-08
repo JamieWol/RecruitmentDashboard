@@ -126,6 +126,32 @@ describe("old report import parsing", () => {
     });
   });
 
+  test("keeps each game date with its fixture when dates are listed separately", () => {
+    const [record] = parseWordHtml(`<table>
+      <tr><td><p>Player</p></td><td><p>Yuki Ohashi</p></td></tr>
+      <tr><td><p>Game(s)</p></td><td><p>BLACKBURN ROVERS v COVENTRY CITY 22/04/2026</p><p>SHEFFIELD UNITED v BLACKBURN ROVERS 15/04/2026</p></td></tr>
+    </table>`);
+
+    expect(record).toMatchObject({
+      game: "BLACKBURN ROVERS v COVENTRY CITY 22/04/2026\nSHEFFIELD UNITED v BLACKBURN ROVERS 15/04/2026",
+    });
+    expect(splitImportedFixtures(record.game, record.date)).toEqual([
+      { name: "BLACKBURN ROVERS v COVENTRY CITY", date: "2026-04-22" },
+      { name: "SHEFFIELD UNITED v BLACKBURN ROVERS", date: "2026-04-15" },
+    ]);
+  });
+
+  test("splits adjacent fixtures when Word export collapses their line breaks", () => {
+    expect(splitImportedFixtures(
+      "BLACKBURN ROVERS v COVENTRY CITY BLACKBURN ROVERS v LEICESTER CITY SHEFFIELD UNITED v BLACKBURN ROVERS 22/04/2026",
+      "2026-05-02",
+    )).toEqual([
+      { name: "BLACKBURN ROVERS v COVENTRY CITY", date: "2026-05-02" },
+      { name: "BLACKBURN ROVERS v LEICESTER CITY", date: "" },
+      { name: "SHEFFIELD UNITED v BLACKBURN ROVERS", date: "2026-04-22" },
+    ]);
+  });
+
   test("recognises the existing player, club, fixture, date and notes layout", () => {
     const [record] = parseWordHtml([
       "<p><strong>D. KOWNACKI</strong></p><p>Werder Bremen</p>",

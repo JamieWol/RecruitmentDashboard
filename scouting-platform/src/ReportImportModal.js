@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from "./supabaseClient";
-import { findImportedPlayerMatch, normalizeImportedPlayerName, parseOldReportFiles } from "./reportImport";
+import { findImportedPlayerMatch, normalizeImportedPlayerName, parseOldReportFiles, splitImportedFixtures } from "./reportImport";
 
 const editableReportFields = [
   ["Conclusion", "conclusion"], ["Strengths", "strengths"], ["Weaknesses", "weaknesses"],
@@ -38,6 +38,16 @@ export default function ReportImportModal({ onClose, onImport, storageKey = "sco
 
   const updateRecord = (index, updates) => setRecords((current) => current.map((record, row) => row === index ? { ...record, ...updates } : record));
   const updateReport = (index, field, value) => setRecords((current) => current.map((record, row) => row === index ? { ...record, report: { ...record.report, [field]: value } } : record));
+  const updateFixture = (index, fixtureIndex, field, value) => setRecords((current) => current.map((record, row) => {
+    if (row !== index) return record;
+    const fixtures = splitImportedFixtures(record.game, record.date);
+    const nextFixtures = fixtures.map((fixture, fixtureRow) => fixtureRow === fixtureIndex ? { ...fixture, [field]: value } : fixture);
+    return {
+      ...record,
+      game: nextFixtures.map((fixture) => fixture.name).join("\n"),
+      date: nextFixtures.map((fixture) => fixture.date).join("\n"),
+    };
+  }));
 
   const parseFiles = async (event) => {
     const files = Array.from(event.target.files || []);
@@ -135,6 +145,7 @@ export default function ReportImportModal({ onClose, onImport, storageKey = "sco
           {records.map((record, index) => {
             const duplicateKey = [normalizeImportedPlayerName(record.player), record.date, normalizeImportedPlayerName(record.game)].join("|");
             const duplicate = Boolean(record.player && duplicateKeys.get(duplicateKey) > 1);
+            const fixtures = splitImportedFixtures(record.game, record.date);
             return <article className="sr-import-card" key={`${record.sourceFile}-${record.sourceSheet || ""}-${index}`}>
               <div className="sr-import-card-top"><strong>{record.sourceFile}{record.sourceSheet ? ` · ${record.sourceSheet}` : ""}</strong><button type="button" className="sr-import-remove" onClick={() => setRecords((current) => current.filter((_, row) => row !== index))}>Remove</button></div>
               {duplicate && <p className="sr-import-warning">Possible duplicate player, fixture and date. Check before importing.</p>}
@@ -144,8 +155,7 @@ export default function ReportImportModal({ onClose, onImport, storageKey = "sco
                 {!!record.player && !record.playerId && <small className="sr-import-unmatched">No exact player selected. This report will stay attached to the name you entered.</small>}
                 <label className="sr-field"><span>Club at the time</span><input value={record.club} onChange={(event) => updateRecord(index, { club: event.target.value })} /></label>
                 <label className="sr-field"><span>Position</span><select value={record.position || ""} onChange={(event) => updateRecord(index, { position: event.target.value, report: { ...record.report, playedPosition: event.target.value } })}><option value="">Select position</option>{record.position && !reportPositions.includes(record.position) && <option value={record.position}>{record.position}</option>}{reportPositions.map((position) => <option key={position} value={position}>{position}</option>)}</select></label>
-                <label className="sr-field"><span>Fixture / opponent</span><input value={record.game} onChange={(event) => updateRecord(index, { game: event.target.value })} /></label>
-                <label className="sr-field"><span>Match date</span><input type="date" value={record.date || ""} onChange={(event) => updateRecord(index, { date: event.target.value })} /></label>
+                {fixtures.length > 1 ? fixtures.map((fixture, fixtureIndex) => <React.Fragment key={`fixture-${fixtureIndex}`}><label className="sr-field"><span>Fixture {fixtureIndex + 1}</span><input value={fixture.name} onChange={(event) => updateFixture(index, fixtureIndex, "name", event.target.value)} /></label><label className="sr-field"><span>Date {fixtureIndex + 1}</span><input type="date" value={fixture.date || ""} onChange={(event) => updateFixture(index, fixtureIndex, "date", event.target.value)} /></label></React.Fragment>) : <><label className="sr-field"><span>Fixture / opponent</span><input value={record.game} onChange={(event) => updateRecord(index, { game: event.target.value })} /></label><label className="sr-field"><span>Match date</span><input type="date" value={record.date || ""} onChange={(event) => updateRecord(index, { date: event.target.value })} /></label></>}
                 <label className="sr-field"><span>Viewing</span><select value={record.viewing || "Video"} onChange={(event) => updateRecord(index, { viewing: event.target.value })}><option>Video</option><option>Live</option></select></label>
                 <label className="sr-field"><span>Preferred foot</span><select value={record.report.foot || ""} onChange={(event) => updateReport(index, "foot", event.target.value)}>{gradeOptions(["Right", "Left", "Both"])}</select></label>
                 <label className="sr-field"><span>Performance grade</span><select value={record.report.performance || ""} onChange={(event) => updateReport(index, "performance", event.target.value)}>{gradeOptions([5, 4, 3, 2, 1])}</select></label>

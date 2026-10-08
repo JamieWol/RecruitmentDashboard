@@ -1,5 +1,5 @@
 // Badge object paths in the public Supabase Storage bucket "Club Badges".
-const clubBadgePaths = Object.freeze({
+export const clubBadgePaths = Object.freeze({
   '07-vestur': 'logos/faroe-islands/07-vestur.png',
   '1-cfr-pforzheim': 'logos/germany/1-cfr-pforzheim.png',
   '1-fc-gera-03': 'logos/germany/1-fc-gera-03.png',

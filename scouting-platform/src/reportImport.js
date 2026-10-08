@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import mammoth from "mammoth";
+import { clubBadgePaths } from "./clubBadgePaths";
 
 export const importedReportFields = {
   player: ["player", "player name", "name", "scouted player", "player full name", "player being scouted", "scouted player name"],
@@ -22,6 +23,64 @@ export const importedReportFields = {
 };
 
 const clean = (value) => String(value ?? "").replace(/\u00a0/g, " ").trim();
+const fixtureDatePattern = /\b(?:\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[/. -]\d{1,2}[/. -]\d{2,4})\b/g;
+const baseFixtureClubNames = [...new Set(Object.values(clubBadgePaths)
+  .filter((path) => typeof path === "string" && path.startsWith("logos/"))
+  .map((path) => path.split("/").at(-1).replace(/\.png$/i, "").replace(/[-_]+/g, " ").trim())
+  .filter((name) => name.length > 2 && !/\b(?:league|division|cup|championship)\b/i.test(name)))]
+  .sort((a, b) => b.length - a.length);
+const fixtureClubNames = [...new Set([
+  ...baseFixtureClubNames,
+  ...baseFixtureClubNames.filter((name) => !name.includes(" ")).flatMap((name) => ["city", "united", "town", "rovers", "wanderers", "albion", "athletic", "county", "rangers", "fc", "afc"].map((suffix) => `${name} ${suffix}`)),
+])].sort((a, b) => b.length - a.length);
+const fixtureClubMatchers = fixtureClubNames.map((name) => {
+  const pattern = name.split(/\s+/).map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\\\./g, "\\.?" )).join("\\s+");
+  return {
+    suffix: new RegExp(`(?:^|\\s)(${pattern})\\s*$`, "i"),
+    prefix: new RegExp(`^\\s*(${pattern})(?=\\s|$)`, "i"),
+  };
+});
+
+const splitAdjacentFixtures = (value, fallbackDate = "") => {
+  const original = clean(value);
+  const embeddedDates = original.match(fixtureDatePattern) || [];
+  const text = original.replace(fixtureDatePattern, "").replace(/[ \t]+/g, " ").trim();
+  const markers = [...text.matchAll(/\s+(?:v|vs|versus)\s+/gi)];
+  if (markers.length < 2) return null;
+  let cursor = 0;
+  const matches = [];
+  for (const marker of markers) {
+    const prefix = text.slice(cursor, marker.index);
+    let left = null;
+    for (const matcher of fixtureClubMatchers) {
+      const candidate = prefix.match(matcher.suffix);
+      if (candidate) { left = { name: candidate[1].trim(), index: cursor + candidate.index + candidate[0].lastIndexOf(candidate[1]) }; break; }
+    }
+    if (!left || text.slice(cursor, left.index).trim()) return null;
+    const suffix = text.slice(marker.index + marker[0].length);
+    let right = null;
+    for (const matcher of fixtureClubMatchers) {
+      const candidate = suffix.match(matcher.prefix);
+      if (candidate) { right = { name: candidate[1].trim(), end: marker.index + marker[0].length + candidate[0].length }; break; }
+    }
+    if (!right) return null;
+    matches.push({ name: `${left.name} v ${right.name}`, start: left.index, end: right.end });
+    cursor = right.end;
+  }
+  if (text.slice(cursor).trim()) return null;
+  if (matches.length < 2) return null;
+  const fallbackDates = clean(fallbackDate).split(/\s*(?:\||\r?\n|;)+\s*/).map(fixtureDateToISO).filter(Boolean);
+  return matches.map((fixture, index) => ({
+    name: fixture.name,
+    date: embeddedDates.length === matches.length
+      ? fixtureDateToISO(embeddedDates[index])
+      : embeddedDates.length === 1 && index === matches.length - 1
+        ? fixtureDateToISO(embeddedDates[0])
+        : fallbackDates.length === 1
+          ? index === 0 ? fallbackDates[0] : ""
+          : fallbackDates[index] || "",
+  }));
+};
 const fixtureDateToISO = (value) => {
   const text = clean(value);
   const iso = text.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
@@ -31,11 +90,15 @@ const fixtureDateToISO = (value) => {
   return text;
 };
 export const splitImportedFixtures = (value, fallbackDate = "") => {
-  const entries = clean(value).split(/\s*(?:\||\r?\n|;)+\s*/).map(clean).filter(Boolean);
+  const entries = clean(value).split(/\s*(?:\||\r?\n|;|\u2022)+\s*/).map(clean).filter(Boolean);
   const fallbackDates = clean(fallbackDate).split(/\s*(?:\||\r?\n|;)+\s*/).map(fixtureDateToISO);
+  if (entries.length === 1) {
+    const adjacent = splitAdjacentFixtures(entries[0], fallbackDate);
+    if (adjacent) return adjacent;
+  }
   return entries.map((entry, index) => {
     const match = entry.match(/\b(\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[/. -]\d{1,2}[/. -]\d{2,4})\b/);
-    const date = match ? fixtureDateToISO(match[1]) : fallbackDates[index] || fallbackDates[0] || "";
+    const date = match ? fixtureDateToISO(match[1]) : fallbackDates.length === 1 ? index === 0 ? fallbackDates[0] : "" : fallbackDates[index] || "";
     const name = clean(match ? entry.replace(match[0], " ").replace(/[|·,–—-]+$/g, "") : entry).replace(/^[|·,–—-]+|[|·,–—-]+$/g, "");
     return name ? { name, date } : null;
   }).filter(Boolean);
@@ -216,8 +279,15 @@ const wordBlocksToRecords = (blocks, sourceFile) => {
     const tableActiveFields = new Map();
     const tableRowFields = new Map();
     const appendFieldValue = (field, value) => {
-      const text = clean(value);
+      let text = clean(value);
       if (!text) return;
+      if (field === "game") {
+        const standaloneDate = text.match(new RegExp(`^(${fixtureDatePattern.source})$`));
+        if (standaloneDate && record.game) {
+          record.game = `${record.game.trimEnd()} ${standaloneDate[1]}`;
+          return;
+        }
+      }
       if (field === "player") {
         if (!record.player) { record.player = text; sawPlayer = true; }
       } else if (["club", "position", "game", "date", "viewing"].includes(field)) {
