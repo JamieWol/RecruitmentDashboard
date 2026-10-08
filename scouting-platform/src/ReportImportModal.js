@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "./supabaseClient";
 import { normalizeImportedPlayerName, parseOldReportFiles } from "./reportImport";
 
@@ -103,7 +104,7 @@ export default function ReportImportModal({ onClose, onImport }) {
     }
   };
 
-  return (
+  return createPortal((
     <div className="sr-modal sr-import-modal" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <section className="sr-form sr-import-form" role="dialog" aria-modal="true" aria-labelledby="sr-import-title">
         <div className="sr-form-head">
@@ -147,5 +148,5 @@ export default function ReportImportModal({ onClose, onImport }) {
         <div className="sr-actions sr-import-actions"><button type="button" className="sr-outline" onClick={onClose} disabled={saving}>Cancel</button><button type="button" className="sr-cyan" onClick={submit} disabled={!records.length || loading || saving}>{saving ? "Saving drafts…" : `Import ${records.length || ""} draft reports`}</button></div>
       </section>
     </div>
-  );
+  ), document.body);
 }

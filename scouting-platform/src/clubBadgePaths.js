@@ -4640,9 +4640,16 @@ const clubBadgePaths = Object.freeze({
 });
 
 const clubBadgeAliases = Object.freeze({
+  'ac-milan': 'milan',
+  'ac-milano': 'milan',
   'afc-bournemouth': 'bournemouth',
   'brighton-and-hove-albion': 'brighton',
   'crystal-palace-fc': 'crystal-palace',
+  'fc-internazionale-milano': 'inter',
+  'inter-milan': 'inter',
+  'inter-milano': 'inter',
+  'internazionale': 'inter',
+  'internazionale-milano': 'inter',
   'man-city': 'manchester-city',
   'man-utd': 'manchester-united',
   'manchester-city-fc': 'manchester-city',

@@ -229,10 +229,11 @@ const playerSummaryText = (player, profile, reports = []) => {
 export default function ScoutingReportsPageFinal() {
   const nav = useNavigate();
   const { appState, updateAppState, user, profile: accountProfile } = useAuth();
+  const reportViewStorageKey = `scoutingReportsView:${user?.id || user?.email || "guest"}`;
   const [items, setItems] = useState(() =>
     JSON.parse(localStorage.getItem("scoutingAssignments") || "[]"),
   );
-  const [tab, setTab] = useState("My Assignments");
+  const [tab, setTab] = useState(() => localStorage.getItem(`${reportViewStorageKey}:tab`) || sessionStorage.getItem("scoutingReportsTab") || "My Assignments");
   const [query, setQuery] = useState("");
   const [playerSearch, setPlayerSearch] = useState("");
   const [playerMatches, setPlayerMatches] = useState([]);
@@ -258,8 +259,9 @@ export default function ScoutingReportsPageFinal() {
   const [profileQuery, setProfileQuery] = useState(() => sessionStorage.getItem("profileCheckerQuery") || "");
   const [profileResults, setProfileResults] = useState([]);
   const [profilePlayerDirectory, setProfilePlayerDirectory] = useState({});
-  const [dashboardView, setDashboardView] = useState(() => sessionStorage.getItem("scoutingDashboardView") || "reports");
+  const [dashboardView, setDashboardView] = useState(() => localStorage.getItem(`${reportViewStorageKey}:view`) || sessionStorage.getItem("scoutingDashboardView") || "reports");
   const [reportImportOpen, setReportImportOpen] = useState(false);
+  const [importNotice, setImportNotice] = useState("");
   const [profileFilters, setProfileFilters] = useState(() => JSON.parse(sessionStorage.getItem("profileCheckerFilters") || '{"foot":"","age":"","position":"","performance":"","potential":""}'));
   const summaryKey = String(playerData?.id || playerData?.player_id || profile?.playerId || normalizePlayerName(profile?.player));
   const savedPlayerSummary = appState?.playerSummaries?.[summaryKey];
@@ -273,7 +275,14 @@ export default function ScoutingReportsPageFinal() {
     setSummaryDraft(shownPlayerSummary);
     setSummaryEditing(false);
   }, [summaryKey, playerData, savedPlayerSummary, shownPlayerSummary]);
-  useEffect(() => { sessionStorage.setItem("scoutingDashboardView", dashboardView); }, [dashboardView]);
+  useEffect(() => {
+    localStorage.setItem(`${reportViewStorageKey}:view`, dashboardView);
+    sessionStorage.setItem("scoutingDashboardView", dashboardView);
+  }, [dashboardView, reportViewStorageKey]);
+  useEffect(() => {
+    localStorage.setItem(`${reportViewStorageKey}:tab`, tab);
+    sessionStorage.setItem("scoutingReportsTab", tab);
+  }, [tab, reportViewStorageKey]);
   useEffect(() => { sessionStorage.setItem("profileCheckerFilters", JSON.stringify(profileFilters)); }, [profileFilters]);
   useEffect(() => { sessionStorage.setItem("profileCheckerQuery", profileQuery); }, [profileQuery]);
   useEffect(() => {
@@ -443,8 +452,7 @@ export default function ScoutingReportsPageFinal() {
       };
     });
     saveItems([...items, ...imported]);
-    setTab("My Assignments");
-    setDashboardView("reports");
+    setImportNotice(`${imported.length} old report${imported.length === 1 ? "" : "s"} imported as drafts.`);
     setReportImportOpen(false);
   };
   const deleteAssignment = async (assignment) => {
@@ -1314,6 +1322,7 @@ export default function ScoutingReportsPageFinal() {
           </button>
         </div>
       </section>
+      {importNotice && <div className="sr-import-notice" role="status"><span>{importNotice}</span><button type="button" onClick={() => { setDashboardView("reports"); setTab("My Assignments"); setImportNotice(""); }}>Review drafts</button><button type="button" className="sr-import-notice-close" onClick={() => setImportNotice("")} aria-label="Dismiss">×</button></div>}
       {dashboardView === "reports" && <><input
         className="sr-search"
         placeholder="Search scout or player..."
