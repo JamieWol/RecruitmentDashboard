@@ -105,11 +105,24 @@ const profileEvidence = (item, terms) => {
   const report = item.report || {};
   return profileFields.map((field) => String(report[field] || "").trim()).find((value) => terms.some((term) => value.toLowerCase().includes(term))) || "Report matches the requested profile criteria.";
 };
+const isFixtureName = (value) => {
+  const name = String(value || "").trim();
+  return Boolean(name) && !/^(multiple|fixture not added|date not added)$/i.test(name);
+};
+const storedFixtures = (item) => {
+  const candidates = [item?.games, item?.report?.__fixtures];
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate) && candidate.some((fixture) => isFixtureName(typeof fixture === "string" ? fixture : fixture?.name))) return candidate;
+  }
+  return [];
+};
 const fixtureRecords = (item) => {
-  const saved = Array.isArray(item?.games) && item.games.length ? item.games : (Array.isArray(item?.report?.__fixtures) ? item.report.__fixtures : []);
-  const records = saved.length ? saved : (item?.game ? [{ name: item.game, date: item.fixtureDates?.[0] || item.date || "" }] : []);
+  const saved = storedFixtures(item);
+  const fallbackName = isFixtureName(item?.game) ? item.game : isFixtureName(item?.fixture_summary) ? item.fixture_summary : "";
+  const records = saved.length ? saved : (fallbackName ? [{ name: fallbackName, date: item.fixtureDates?.[0] || item.date || "" }] : []);
   return records.flatMap((fixture, index) => {
     const name = typeof fixture === "string" ? fixture : fixture?.name || "";
+    if (!isFixtureName(name)) return [];
     const date = typeof fixture === "string" ? item?.fixtureDates?.[index] || item?.date || "" : fixture?.date || item?.fixtureDates?.[index] || item?.date || "";
     const split = splitImportedFixtures(name, date);
     return split.length ? split : (name ? [{ name, date }] : []);
@@ -563,10 +576,21 @@ export default function ScoutingReportsPageFinal() {
   };
   const shown = useMemo(
     () => {
-      const shared = sharedReports.map((x) => ({
+      const shared = sharedReports.map((x) => {
+        const assignmentId = x.assignment_id || x.id;
+        const assignment = sharedAssignments.find((candidate) => String(candidate.sharedAssignmentId || candidate.id) === String(assignmentId))
+          || sharedAssignments.find((candidate) => normalizePlayerName(candidate.player) === normalizePlayerName(x.player));
+        const fixtures = storedFixtures(x).length ? storedFixtures(x) : storedFixtures(assignment);
+        const fixtureDates = [x.fixtureDates, assignment?.fixtureDates, x.report?.__fixtureDates, assignment?.report?.__fixtureDates].find((dates) => Array.isArray(dates) && dates.length) || [];
+        const report = fixtures.length ? { ...(x.report || {}), __fixtures: fixtures, __fixtureDates: fixtureDates } : (x.report || {});
+        return {
+        ...assignment,
         ...x,
-        id: x.assignment_id || x.id,
-        report: x.report,
+        id: assignmentId,
+        report,
+        games: fixtures,
+        fixtureDates,
+        game: isFixtureName(x.game) ? x.game : isFixtureName(assignment?.game) ? assignment.game : fixtures.length > 1 ? "Multiple" : fixtures[0]?.name || "",
         status: "Published",
         club: clubFromReport(
           x.player_club, x.playerClub, x.team, x.Team,
@@ -575,9 +599,9 @@ export default function ScoutingReportsPageFinal() {
         ) || "Club not added",
         position: x.position || x.report?.playedPosition || "",
         date: x.completed_at,
-        game: x.fixture_summary,
         scout: x.scout,
-      }));
+      };
+      });
       const source = tab === "Published" ? shared : items;
       const currentIds = [user?.id, accountProfile?.id].filter(Boolean).map((value) => String(value));
       const currentNames = [accountProfile?.full_name, user?.email].filter(Boolean).map((value) => String(value).trim().toLowerCase());
@@ -602,7 +626,7 @@ export default function ScoutingReportsPageFinal() {
             : x.status !== "Published",
         );
     },
-    [items, query, tab, sharedReports, profilePlayerDirectory, user?.id, user?.email, accountProfile?.id, accountProfile?.full_name],
+    [items, query, tab, sharedReports, sharedAssignments, profilePlayerDirectory, user?.id, user?.email, accountProfile?.id, accountProfile?.full_name],
   );
   const profileCandidates = useMemo(() => {
     const publishedLocal = items.filter((item) => item.status === "Published");
@@ -759,10 +783,12 @@ export default function ScoutingReportsPageFinal() {
     }
     setPublishError("");
     const completedAt = new Date().toISOString().slice(0, 10);
+    const preservedFixtures = storedFixtures(active);
+    const preservedFixtureDates = active.fixtureDates?.length ? active.fixtureDates : active.report?.__fixtureDates || [];
     const reportWithFixtures = {
       ...report,
-      __fixtures: active.games || [],
-      __fixtureDates: active.fixtureDates || [],
+      __fixtures: preservedFixtures,
+      __fixtureDates: preservedFixtureDates,
     };
     const n = items.map((x) =>
       x.id === active.id ? { ...x, report: reportWithFixtures, status: "Published", completedAt } : x,
@@ -777,9 +803,9 @@ export default function ScoutingReportsPageFinal() {
       status: "Published",
       completed_at: completedAt,
       scout: active.scout || "",
-      games: active.games || [],
-      game: active.game || active.fixture_summary || "",
-      fixtureDates: active.fixtureDates || [],
+      games: preservedFixtures,
+      game: isFixtureName(active.game) ? active.game : preservedFixtures.length > 1 ? "Multiple" : preservedFixtures[0]?.name || "",
+      fixtureDates: preservedFixtureDates,
       viewing: active.viewing || "",
       date: active.date || completedAt,
     };
@@ -792,7 +818,7 @@ export default function ScoutingReportsPageFinal() {
       supabase.from("club_reports").upsert({
         id: Number(active.id), assignment_id: Number(active.id), player_id: active.playerId || null,
         player: active.player, club: accountProfile.club, player_club: active.club || "", author_id: user.id, report: reportWithFixtures, status: "Published",
-        updated_at: new Date().toISOString(), completed_at: active.completedAt || active.date || new Date().toISOString().slice(0, 10), scout: active.scout || "", fixture_summary: (active.games || []).length > 1 ? "Multiple" : (active.games?.[0] ? `${active.games[0].date || ""} · ${active.games[0].name || active.games[0]}` : active.game || ""),
+        updated_at: new Date().toISOString(), completed_at: active.completedAt || active.date || new Date().toISOString().slice(0, 10), scout: active.scout || "", fixture_summary: preservedFixtures.length > 1 ? "Multiple" : (preservedFixtures[0] ? `${preservedFixtures[0].date || ""} · ${preservedFixtures[0].name || preservedFixtures[0]}` : isFixtureName(active.game) ? active.game : ""),
       }, { onConflict: "id" }).then(async ({ error }) => {
         if (error) {
           console.error("Could not publish shared report", error);
@@ -800,7 +826,7 @@ export default function ScoutingReportsPageFinal() {
         }
         const { error: assignmentError } = await supabase
           .from("club_assignments")
-          .update({ status: "Published", assignment: { ...active, report: reportWithFixtures, status: "Published", games: active.games || [], fixtureDates: active.fixtureDates || [] } })
+          .update({ status: "Published", assignment: { ...active, report: reportWithFixtures, status: "Published", games: preservedFixtures, fixtureDates: preservedFixtureDates } })
           .eq("club", accountProfile.club)
           .eq("id", Number(active.id));
         if (assignmentError) console.error("Could not mark shared assignment published", assignmentError);
