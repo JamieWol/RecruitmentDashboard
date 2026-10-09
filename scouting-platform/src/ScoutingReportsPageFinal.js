@@ -31,12 +31,13 @@ const empty = {
   weaknesses: "",
 };
 const readProfileCheckerFilters = () => {
-  const defaults = { foot: "", age: "", position: "", performance: "", potential: [] };
+  const defaults = { foot: "", age: "", position: "", performance: [], potential: [] };
   try {
     const saved = JSON.parse(sessionStorage.getItem("profileCheckerFilters") || "{}");
     return {
       ...defaults,
       ...saved,
+      performance: Array.isArray(saved.performance) ? saved.performance.map(String) : saved.performance ? [String(saved.performance)] : [],
       potential: Array.isArray(saved.potential) ? saved.potential : saved.potential ? [saved.potential] : [],
     };
   } catch {
@@ -332,7 +333,7 @@ export default function ScoutingReportsPageFinal() {
   const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
   const actionsMenuRef = useRef(null);
   const [profileFilters, setProfileFilters] = useState(readProfileCheckerFilters);
-  const profileFiltersActive = Object.entries(profileFilters).some(([key, value]) => key === "potential" ? value.length > 0 : Boolean(value));
+  const profileFiltersActive = Object.entries(profileFilters).some(([key, value]) => ["performance", "potential"].includes(key) ? value.length > 0 : Boolean(value));
   const summaryKey = String(playerData?.id || playerData?.player_id || profile?.playerId || normalizePlayerName(profile?.player));
   const savedPlayerSummary = appState?.playerSummaries?.[summaryKey];
   const summaryReports = [...new Map([
@@ -817,13 +818,13 @@ export default function ScoutingReportsPageFinal() {
       const age = ageFromDob(directoryEntry?.dob) ?? ageFromValue(directoryEntry?.age) ??
         ageFromDob(itemDobKey ? report[itemDobKey] ?? item[itemDobKey] : null) ??
         ageFromValue(report.age ?? item.age ?? item.Age ?? item.player_age);
-      const performance = String(report.performance || item.performance || "");
+      const performance = String(report.performance || item.performance || "").match(/[1-5]/)?.[0] || "";
       const potential = String(report.potential || item.potential || "");
       const position = String(report.playedPosition || item.position || item.primary_position || "").toLowerCase();
       return (!profileFilters.foot || foot === profileFilters.foot.toLowerCase()) &&
         matchesAgeFilter(age, profileFilters.age) &&
         (!profileFilters.position || position === profileFilters.position.toLowerCase()) &&
-        (!profileFilters.performance || (Number(performance) >= Number(profileFilters.performance))) &&
+        (!profileFilters.performance.length || profileFilters.performance.includes(performance)) &&
         (!profileFilters.potential.length || profileFilters.potential.includes(potential.trim().toUpperCase()));
     };
     profileCandidates.filter(matchesFilters).forEach((item) => {
@@ -1566,10 +1567,16 @@ export default function ScoutingReportsPageFinal() {
           <select value={profileFilters.foot} onChange={(e) => setProfileFilters({ ...profileFilters, foot: e.target.value })}><option value="">Any foot</option><option>Right</option><option>Left</option><option>Both</option></select>
           <select value={profileFilters.age} onChange={(e) => setProfileFilters({ ...profileFilters, age: e.target.value })}><option value="">Any age</option><option value="under21">Under 21</option><option value="21to24">21–24</option><option value="25to29">25–29</option><option value="30plus">30+</option></select>
           <select value={profileFilters.position} onChange={(e) => setProfileFilters({ ...profileFilters, position: e.target.value })}><option value="">Any position</option>{["GK","LB","LCB","CB","RCB","RB","DM","LM","LCM","CM","RCM","RM","LW","AM","RW","CF","ST"].map((x) => <option key={x}>{x}</option>)}</select>
-          <select value={profileFilters.performance} onChange={(e) => setProfileFilters({ ...profileFilters, performance: e.target.value })}><option value="">Any performance grade</option>{[1,2,3,4,5].map((x) => <option key={x} value={String(x)}>{x}/5 or higher</option>)}</select>
-          <details className="sr-potential-grade-filter">
+          <details className="sr-profile-grade-filter">
+            <summary>{profileFilters.performance.length ? `Performance grade${profileFilters.performance.length > 1 ? "s" : ""}: ${profileFilters.performance.join(", ")}` : "Any performance grade"}</summary>
+            <div className="sr-profile-grade-menu" role="group" aria-label="Choose performance grades">
+              {["1", "2", "3", "4", "5"].map((grade) => <label key={grade}><input type="checkbox" checked={profileFilters.performance.includes(grade)} onChange={(event) => setProfileFilters({ ...profileFilters, performance: event.target.checked ? [...profileFilters.performance, grade] : profileFilters.performance.filter((value) => value !== grade) })} />{grade}/5</label>)}
+              {profileFilters.performance.length > 0 && <button type="button" onClick={() => setProfileFilters({ ...profileFilters, performance: [] })}>Clear grades</button>}
+            </div>
+          </details>
+          <details className="sr-profile-grade-filter">
             <summary>{profileFilters.potential.length ? `Potential grade${profileFilters.potential.length > 1 ? "s" : ""}: ${profileFilters.potential.join(", ")}` : "Any potential grade"}</summary>
-            <div className="sr-potential-grade-menu" role="group" aria-label="Choose potential grades">
+            <div className="sr-profile-grade-menu" role="group" aria-label="Choose potential grades">
               {["A", "B", "C", "D", "E", "F"].map((grade) => <label key={grade}><input type="checkbox" checked={profileFilters.potential.includes(grade)} onChange={(event) => setProfileFilters({ ...profileFilters, potential: event.target.checked ? [...profileFilters.potential, grade] : profileFilters.potential.filter((value) => value !== grade) })} />{grade} grade</label>)}
               {profileFilters.potential.length > 0 && <button type="button" onClick={() => setProfileFilters({ ...profileFilters, potential: [] })}>Clear grades</button>}
             </div>
