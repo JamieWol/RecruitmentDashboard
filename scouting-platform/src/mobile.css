@@ -338,8 +338,7 @@
     max-height: 230px;
   }
 
-  .sr-squad-plan .sr-real-pitch,
-  .sr-shortlist-view .sr-real-pitch {
+  .sr-squad-plan .sr-real-pitch {
     width: calc(100vw - 32px);
     max-width: none;
     height: 900px;
@@ -352,13 +351,7 @@
     -webkit-overflow-scrolling: touch;
   }
 
-  .sr-shortlist-view .sr-real-pitch {
-    height: 920px;
-    min-height: 920px;
-  }
-
-  .sr-squad-plan .sr-real-pitch .sr-pitch-row,
-  .sr-shortlist-view .sr-real-pitch .sr-pitch-row {
+  .sr-squad-plan .sr-real-pitch .sr-pitch-row {
     width: max-content;
     min-width: 100%;
     flex: 0 0 auto;
@@ -366,20 +359,14 @@
     gap: 10px;
   }
 
-  .sr-squad-plan .sr-real-pitch .sr-zone,
-  .sr-shortlist-view .sr-real-pitch .sr-zone {
+  .sr-squad-plan .sr-real-pitch .sr-zone {
     width: 174px;
     min-width: 174px;
     min-height: 108px;
   }
 
-  .sr-squad-plan .sr-real-pitch .sr-zone-list,
-  .sr-shortlist-view .sr-real-pitch .sr-zone-list {
+  .sr-squad-plan .sr-real-pitch .sr-zone-list {
     max-height: 140px;
-  }
-
-  .sr-shortlist-view .sr-pitch-player-card {
-    min-height: 54px;
   }
 
   .sr-squad-plan .sr-real-pitch .sr-pitch-row {
@@ -442,5 +429,30 @@
     margin-left: -12px;
     padding-right: 12px;
     padding-left: 12px;
+  }
+}
+
+/* Keep the Shortlists mobile spacing and pitch sizing from its earlier layout. */
+@media (max-width: 768px) {
+  .sr-shortlists-page.sr-page {
+    padding: 42px 22px calc(42px + env(safe-area-inset-bottom));
+  }
+
+  .sr-shortlists-page h1 {
+    font-size: 36px;
+  }
+
+  .sr-shortlists-page .sr-list-grid {
+    gap: 24px;
+  }
+
+  .sr-shortlists-page .sr-list-card {
+    padding: 24px;
+  }
+
+  .sr-shortlists-page .sr-cyan,
+  .sr-shortlists-page .sr-outline {
+    min-height: initial;
+    padding: 13px 19px;
   }
 }

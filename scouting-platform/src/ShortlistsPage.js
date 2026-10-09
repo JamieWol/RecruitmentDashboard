@@ -721,7 +721,7 @@ export default function ShortlistsPage() {
   );
   if (current)
     return (
-      <main className="sr-page sr-shortlist-view">
+      <main className="sr-page sr-shortlist-view sr-shortlists-page">
         <button className="sr-back" onClick={() => setCurrent(null)}>
           ‹ Back to Your Shortlists
         </button>
@@ -811,7 +811,7 @@ export default function ShortlistsPage() {
     setCurrent({ ...list, players });
   };
   return (
-    <main className="sr-page">
+    <main className="sr-page sr-shortlists-page">
       <section className="sr-dashboard-head">
         <div>
           <div className="sr-kicker">SCOUTING PLATFORM</div>

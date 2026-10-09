@@ -1203,10 +1203,18 @@ export default function ScoutingReportsPageFinal() {
             ) {
               localStorage.removeItem("scoutingProfilePlayer");
               localStorage.removeItem("scoutingProfileOrigin");
+              localStorage.removeItem("scoutingProfileReturnPath");
               nav("/shortlists");
+            } else if (localStorage.getItem("scoutingProfileOrigin") === "squad-plan") {
+              const returnPath = localStorage.getItem("scoutingProfileReturnPath") || "/squad-plan?new=1";
+              localStorage.removeItem("scoutingProfilePlayer");
+              localStorage.removeItem("scoutingProfileOrigin");
+              localStorage.removeItem("scoutingProfileReturnPath");
+              nav(returnPath);
             } else {
               localStorage.removeItem("scoutingProfilePlayer");
               localStorage.removeItem("scoutingProfileOrigin");
+              localStorage.removeItem("scoutingProfileReturnPath");
               setProfile(null);
             }
           }}
@@ -1214,7 +1222,9 @@ export default function ScoutingReportsPageFinal() {
           ‹{" "}
           {localStorage.getItem("scoutingProfileOrigin") === "shortlists"
             ? "Back to previous page"
-            : "Back to assignments"}
+            : localStorage.getItem("scoutingProfileOrigin") === "squad-plan"
+              ? "Back to Squad Analysis"
+              : "Back to assignments"}
         </button>
         <section className="sr-profile-head">
           <div>
