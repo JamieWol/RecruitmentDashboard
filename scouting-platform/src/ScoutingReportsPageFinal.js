@@ -6,6 +6,7 @@ import { useAuth } from "./AuthContext";
 import { removeBackground } from "@imgly/background-removal";
 import ReportImportModal from "./ReportImportModal";
 import { splitImportedFixtures } from "./reportImport";
+import { choosePlayerRecord, normalizePlayerName, playerNameMatchScore } from "./playerProfileMatching";
 const clubFromReport = (...values) => {
   const club = values.find((value) => {
     if (typeof value !== "string") return false;
@@ -178,28 +179,6 @@ const assignmentBelongsToScout = (assignment, user, accountProfile) => {
   return ids.includes(String(assignment.scoutId)) || names.includes(String(assignment.scout || "").trim().toLowerCase());
 };
 const playerDobKeys = ["DOB", "Date of Birth", "date_of_birth", "dateOfBirth", "date of birth", "birth_date", "birthDate"];
-const normalizePlayerName = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
-const playerNameMatchScore = (reportedName, databaseName) => {
-  const reported = normalizePlayerName(reportedName);
-  const canonical = normalizePlayerName(databaseName);
-  if (!reported || !canonical) return 0;
-  if (reported === canonical) return 100;
-  const queryTokens = reported.split(" ");
-  const playerTokens = canonical.split(" ");
-  let cursor = 0;
-  for (const token of queryTokens) {
-    let found = false;
-    while (cursor < playerTokens.length) {
-      const candidate = playerTokens[cursor++];
-      if (token === candidate || (token.length === 1 && candidate.startsWith(token))) {
-        found = true;
-        break;
-      }
-    }
-    if (!found) return 0;
-  }
-  return queryTokens.length >= 2 ? 90 + queryTokens.length : 0;
-};
 const ageFromValue = (value) => {
   if (value === null || value === undefined || String(value).trim() === "") return null;
   const text = String(value).trim();
@@ -327,6 +306,8 @@ export default function ScoutingReportsPageFinal() {
   const [sharedReports, setSharedReports] = useState([]);
   const [sharedAssignments, setSharedAssignments] = useState([]);
   const [playerData, setPlayerData] = useState(null);
+  const [playerDataLoading, setPlayerDataLoading] = useState(false);
+  const [playerDataError, setPlayerDataError] = useState("");
   const [ageDate, setAgeDate] = useState(() => new Date());
   const [summaryDraft, setSummaryDraft] = useState("");
   const [summaryEditing, setSummaryEditing] = useState(false);
@@ -391,40 +372,72 @@ export default function ScoutingReportsPageFinal() {
     const selectedPlayer = profile || active;
     if (!selectedPlayer?.player) {
       setPlayerData(null);
+      setPlayerDataLoading(false);
+      setPlayerDataError("");
       return;
     }
     let cancelled = false;
     const loadMatchedPlayer = async () => {
+      setPlayerData(null);
+      setPlayerDataLoading(true);
+      setPlayerDataError("");
       const playerId = selectedPlayer.playerId || selectedPlayer.player_id || selectedPlayer["Player Id"];
-      let rows = [];
+      const expectedClub = selectedPlayer.player_club || selectedPlayer.playerClub || selectedPlayer.club || selectedPlayer.Club || selectedPlayer.team || selectedPlayer.Team;
+      let directRow = null;
       if (playerId !== undefined && playerId !== null && String(playerId).trim()) {
         const { data } = await supabase.from("players").select("*").eq("id", playerId).limit(2);
-        rows = data || [];
-        if (rows.length === 1) {
-          if (!cancelled) setPlayerData(rows[0]);
-          return;
-        }
+        const match = (data || []).find((row) => playerNameMatchScore(selectedPlayer.player, row.Name || row.name || row.player_name || row.player) > 0);
+        if (match) directRow = match;
       }
-      if (!rows.length) {
-        const exactResult = await supabase.from("players").select("*").ilike("Name", selectedPlayer.player).limit(10);
-        rows = exactResult.data || [];
-        if (!rows.some((row) => playerNameMatchScore(selectedPlayer.player, row.Name || row.name) > 0)) {
-          const lastName = normalizePlayerName(selectedPlayer.player).split(" ").filter(Boolean).at(-1);
-          if (lastName && lastName.length > 1) {
-            const lastNameResult = await supabase.from("players").select("*").ilike("Name", `%${lastName}%`).limit(100);
-            rows = [...rows, ...(lastNameResult.data || [])];
+      if (directRow) {
+        if (!cancelled) {
+          setPlayerData(directRow);
+          setPlayerDataLoading(false);
+        }
+        return;
+      }
+
+      let lastQueryError = null;
+      const queryMatchingPlayers = async (pattern, limit) => {
+        let successfulQuery = false;
+        for (const column of ["Name", "name", "player_name", "player"]) {
+          const { data, error } = await supabase.from("players").select("*").ilike(column, pattern).limit(limit);
+          if (error) {
+            lastQueryError = error;
+            continue;
           }
+          successfulQuery = true;
+          const matches = (data || []).filter((row) => playerNameMatchScore(selectedPlayer.player, row.Name || row.name || row.player_name || row.player) > 0);
+          if (matches.length) return { rows: matches, error: null };
+        }
+        return { rows: [], error: successfulQuery ? null : lastQueryError };
+      };
+
+      let { rows, error } = await queryMatchingPlayers(selectedPlayer.player, 100);
+      if (!rows.length) {
+        const lastName = normalizePlayerName(selectedPlayer.player).split(" ").filter(Boolean).at(-1);
+        if (lastName && lastName.length > 1) {
+          const fallback = await queryMatchingPlayers(`%${lastName}%`, 100);
+          rows = fallback.rows;
+          error = fallback.error;
         }
       }
-      const uniqueRows = [...new Map(rows.map((row) => [String(row.id || `${row.Name || row.name}:${row.Photo || row.photo || ""}`), row])).values()];
-      const ranked = uniqueRows
-        .map((row) => ({ row, score: playerNameMatchScore(selectedPlayer.player, row.Name || row.name) }))
-        .filter((candidate) => candidate.score > 0)
-        .sort((a, b) => b.score - a.score);
-      const uniqueBest = ranked.length && (ranked.length === 1 || ranked[0].score > ranked[1].score) ? ranked[0].row : null;
-      if (!cancelled) setPlayerData(uniqueBest);
+      const matchedRecord = choosePlayerRecord(rows, selectedPlayer.player, expectedClub);
+      if (!cancelled) {
+        setPlayerData(matchedRecord);
+        setPlayerDataError(error?.message || (!matchedRecord && rows.length > 1
+          ? "Several database records match this name, but none could be selected confidently. Check the player’s name and club in the player database."
+          : ""));
+        setPlayerDataLoading(false);
+      }
     };
-    loadMatchedPlayer().catch(() => { if (!cancelled) setPlayerData(null); });
+    loadMatchedPlayer().catch((error) => {
+      if (!cancelled) {
+        setPlayerData(null);
+        setPlayerDataError(error?.message || "Could not load this player from the database.");
+        setPlayerDataLoading(false);
+      }
+    });
     return () => { cancelled = true; };
   }, [profile, active]);
   const uploadProfilePhoto = async (event) => {
@@ -935,11 +948,12 @@ export default function ScoutingReportsPageFinal() {
     </label>
   );
   const dataValue = (...keys) => {
-    const source = playerData || profile || active || {};
-    const key = keys.find(
-      (k) => source[k] !== undefined && source[k] !== null && source[k] !== "",
-    );
-    return key ? source[key] : "—";
+    for (const source of [playerData, profile, active]) {
+      if (!source) continue;
+      const key = keys.find((k) => source[k] !== undefined && source[k] !== null && source[k] !== "");
+      if (key) return source[key];
+    }
+    return "—";
   };
   const savePlayerSummary = () => {
     const playerSummaries = { ...(appState?.playerSummaries || {}), [summaryKey]: summaryDraft.trim() };
@@ -1290,7 +1304,7 @@ export default function ScoutingReportsPageFinal() {
               {[
                 ["Name", ["Name", "name"]],
                 ["Club", ["club", "Club", "team", "Team"]],
-                ["DOB", ["DOB", "Date of Birth", "date_of_birth"]],
+                ["DOB", ["DOB", "Date of Birth", "date_of_birth", "dateOfBirth", "dob", "birth_date", "birthDate"]],
                 ["Age", ["Age", "age"]],
                 ["Nationality", ["Nationality", "nationality"]],
                 [
@@ -1315,7 +1329,9 @@ export default function ScoutingReportsPageFinal() {
                 <div className="sr-detail-row" key={label}>
                   <strong>{label}:</strong>
                   <span>
-                    {label === "Club" ? (
+                    {label === "Name" ? (
+                      profile.player || dataValue(...keys)
+                    ) : label === "Club" ? (
                       <ClubName club={dataValue(...keys)} size={20} />
                     ) : label === "Age" ? (
                       ageFromDob(dataValue(...playerDobKeys)) ?? dataValue(...keys)
@@ -1328,6 +1344,9 @@ export default function ScoutingReportsPageFinal() {
                 </div>
               ))}
             </div>
+            {playerDataLoading && <p className="sr-player-data-notice" role="status">Loading player details…</p>}
+            {!playerDataLoading && playerDataError && <p className="sr-player-data-notice error" role="alert">Could not load player details: {playerDataError}</p>}
+            {!playerDataLoading && !playerDataError && !playerData && <p className="sr-player-data-notice">The report is available, but no matching player record was found in the master player database. Add the player there to show their date of birth, age and other details.</p>}
           </section>
           <section className="sr-profile-reports">
             <h2>Reports</h2>
