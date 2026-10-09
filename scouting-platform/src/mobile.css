@@ -1,0 +1,446 @@
+/* Phone layout and installed iOS Home Screen safe areas. */
+@media (max-width: 768px) {
+  html,
+  body,
+  #root {
+    width: 100%;
+    min-height: 100%;
+    overflow-x: clip;
+  }
+
+  header.sr-app-header {
+    height: calc(64px + env(safe-area-inset-top)) !important;
+    padding: env(safe-area-inset-top) calc(16px + env(safe-area-inset-right)) 0 calc(16px + env(safe-area-inset-left)) !important;
+    z-index: 100;
+  }
+
+  header.sr-app-header > div:first-child span {
+    font-size: 21px !important;
+  }
+
+  header.sr-app-header .hamburger {
+    display: flex;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    justify-content: center;
+    gap: 5px;
+    padding: 11px 10px;
+    border: 1px solid #ffffff55;
+    border-radius: 10px;
+    background: transparent;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  header.sr-app-header .hamburger span {
+    display: block;
+    width: 22px;
+    flex: 0 0 3px;
+  }
+
+  header.sr-app-header .hamburger.open span:nth-child(1) {
+    transform: translateY(8px) rotate(45deg);
+  }
+
+  header.sr-app-header .hamburger.open span:nth-child(2) {
+    opacity: 0;
+  }
+
+  header.sr-app-header .hamburger.open span:nth-child(3) {
+    transform: translateY(-8px) rotate(-45deg);
+  }
+
+  header.sr-app-header .mobile-menu.open {
+    top: calc(64px + env(safe-area-inset-top));
+    bottom: 0;
+    width: 100%;
+    max-height: calc(100dvh - 64px - env(safe-area-inset-top)) !important;
+    box-sizing: border-box;
+    align-items: stretch;
+    gap: 2px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 10px calc(16px + env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left)) !important;
+    z-index: 99;
+  }
+
+  header.sr-app-header .mobile-menu .nav-link {
+    display: flex;
+    align-items: center;
+    min-height: 48px;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 11px 13px;
+    border-bottom: 1px solid #ffffff24;
+    font-size: 16px;
+    opacity: 1 !important;
+    animation: none !important;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  header.sr-app-header .mobile-menu .header-signout {
+    min-height: 48px;
+    margin: 10px 0 0;
+  }
+
+  .sr-app-shell {
+    padding-top: calc(64px + env(safe-area-inset-top)) !important;
+  }
+
+  .sr-page {
+    min-height: calc(100dvh - 64px - env(safe-area-inset-top));
+    padding: 23px calc(16px + env(safe-area-inset-right)) calc(30px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
+  }
+
+  .sr-page h1 {
+    font-size: clamp(27px, 8vw, 36px);
+    line-height: 1.08;
+    overflow-wrap: anywhere;
+  }
+
+  .sr-page h2 {
+    font-size: clamp(21px, 6vw, 28px);
+  }
+
+  .sr-dashboard-head,
+  .sr-profile-head,
+  .sr-section-line {
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .sr-dashboard-head > div:first-child {
+    min-width: 0;
+  }
+
+  .sr-head-actions,
+  .sr-shortlist-head-actions,
+  .sr-profile-results-actions,
+  .sr-profile-checker-search,
+  .sr-list-create,
+  .sr-shortlist-actions {
+    width: 100%;
+    min-width: 0;
+    gap: 9px;
+  }
+
+  .sr-head-actions > *,
+  .sr-shortlist-head-actions > *,
+  .sr-profile-checker-search > button,
+  .sr-list-create > button,
+  .sr-shortlist-actions > button {
+    min-height: 44px;
+  }
+
+  .sr-cyan,
+  .sr-outline,
+  .sr-primary {
+    min-height: 44px;
+    padding: 11px 15px;
+    touch-action: manipulation;
+  }
+
+  .sr-tabs {
+    display: flex;
+    width: calc(100% + 32px);
+    max-width: none;
+    gap: 8px;
+    margin: 0 -16px 24px;
+    padding: 2px 16px 8px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .sr-tabs button {
+    min-height: 44px;
+    flex: 0 0 auto;
+    padding: 10px 16px;
+    font-size: 14px;
+  }
+
+  .sr-grid,
+  .sr-list-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 14px;
+  }
+
+  .sr-card,
+  .sr-list-card {
+    min-width: 0;
+    padding: 17px;
+  }
+
+  .sr-card h3,
+  .sr-assignment-player-link {
+    font-size: 23px;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+  }
+
+  .sr-card-meta {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .sr-profile-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .sr-profile-filters select,
+  .sr-field input,
+  .sr-field select,
+  .sr-field textarea,
+  .sr-search,
+  .sr-player-search,
+  .sr-squad-global-search {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .sr-profile-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .sr-profile-summary {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: 13px;
+    padding: 17px;
+  }
+
+  .sr-avatar {
+    width: 72px;
+    height: 72px;
+    font-size: 27px;
+  }
+
+  .sr-profile-summary .sr-outline {
+    grid-column: 1 / -1;
+    width: 100%;
+    margin: 0;
+  }
+
+  .sr-detail-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 10px;
+    font-size: 14px;
+  }
+
+  .sr-report-table {
+    max-width: calc(100vw - 32px);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .sr-table-head,
+  .sr-table-row {
+    min-width: 700px;
+  }
+
+  .sr-profile-checker {
+    padding: 17px;
+  }
+
+  .sr-profile-result {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 12px;
+    padding: 12px;
+  }
+
+  .sr-profile-result-evidence {
+    grid-column: 1 / -1;
+    white-space: normal;
+  }
+
+  .sr-modal {
+    align-items: flex-start;
+    padding: calc(10px + env(safe-area-inset-top)) 10px calc(10px + env(safe-area-inset-bottom));
+  }
+
+  .sr-form {
+    max-height: calc(100dvh - 20px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    padding: 18px;
+    border-radius: 14px;
+  }
+
+  .sr-form-head {
+    gap: 12px;
+  }
+
+  .sr-form-grid,
+  .sr-grade-row,
+  .sr-report-columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+
+  .sr-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sr-list-create input,
+  .sr-player-search {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .sr-player-search-results {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .sr-profile-checker-search {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sr-profile-results-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .sr-squad-plan .sr-dashboard-head {
+    display: block;
+  }
+
+  .sr-squad-plan .sr-shortlist-head-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: end;
+    margin-top: 14px;
+  }
+
+  .sr-squad-plan .sr-shortlist-head-actions .sr-squad-save,
+  .sr-squad-plan .sr-shortlist-head-actions .sr-saved-message {
+    grid-column: 1 / -1;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .sr-squad-plan .sr-field {
+    min-width: 0;
+    margin: 4px 0;
+  }
+
+  .sr-squad-plan-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .sr-squad-roster {
+    max-height: 230px;
+  }
+
+  .sr-squad-plan .sr-real-pitch,
+  .sr-shortlist-view .sr-real-pitch {
+    width: calc(100vw - 32px);
+    max-width: none;
+    height: 900px;
+    min-height: 900px;
+    box-sizing: border-box;
+    overflow-x: auto;
+    overflow-y: visible;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .sr-shortlist-view .sr-real-pitch {
+    height: 920px;
+    min-height: 920px;
+  }
+
+  .sr-squad-plan .sr-real-pitch .sr-pitch-row,
+  .sr-shortlist-view .sr-real-pitch .sr-pitch-row {
+    width: max-content;
+    min-width: 100%;
+    flex: 0 0 auto;
+    justify-content: space-evenly;
+    gap: 10px;
+  }
+
+  .sr-squad-plan .sr-real-pitch .sr-zone,
+  .sr-shortlist-view .sr-real-pitch .sr-zone {
+    width: 174px;
+    min-width: 174px;
+    min-height: 108px;
+  }
+
+  .sr-squad-plan .sr-real-pitch .sr-zone-list,
+  .sr-shortlist-view .sr-real-pitch .sr-zone-list {
+    max-height: 140px;
+  }
+
+  .sr-shortlist-view .sr-pitch-player-card {
+    min-height: 54px;
+  }
+
+  .sr-squad-plan .sr-real-pitch .sr-pitch-row {
+    min-height: 130px;
+  }
+
+  .sr-import-modal {
+    padding-top: calc(8px + env(safe-area-inset-top));
+  }
+
+  .sr-import-form {
+    max-height: calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    padding: 16px;
+  }
+
+  .sr-import-actions {
+    bottom: -16px;
+    margin: 14px -16px -16px;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  }
+
+  .sr-import-actions button {
+    width: 100%;
+  }
+
+  .sr-home-hero {
+    margin-top: 42px !important;
+  }
+
+  .sr-home-hero h1 {
+    font-size: clamp(32px, 9vw, 44px) !important;
+    line-height: 1.08;
+  }
+
+  .sr-home-hero p {
+    font-size: 1rem !important;
+    line-height: 1.5;
+  }
+
+  .sr-home-hero button {
+    min-height: 48px;
+    width: min(100%, 340px);
+    padding: 12px 18px !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .sr-page {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .sr-profile-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sr-tabs {
+    width: calc(100% + 24px);
+    margin-right: -12px;
+    margin-left: -12px;
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+}

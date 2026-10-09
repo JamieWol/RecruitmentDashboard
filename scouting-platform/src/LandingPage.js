@@ -25,6 +25,7 @@ function LandingPage() {
 
   return (
     <div
+      className="sr-home"
       style={{
         minHeight: "100vh",
         width: "100%",
@@ -56,6 +57,7 @@ function LandingPage() {
 
       {/* HERO */}
       <div
+        className="sr-home-hero"
         style={{
           position: "relative",
           zIndex: 2,

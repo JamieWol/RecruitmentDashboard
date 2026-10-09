@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AuthProvider, useAuth } from "./AuthContext";
 import { supabase } from "./supabaseClient";
 import LandingPage from "./LandingPage";
@@ -11,28 +11,74 @@ import SquadPlanPage from "./SquadPlanPage";
 import SquadPlansPage from "./SquadPlansPage";
 import CreateAssignmentPage from "./CreateAssignmentPage";
 import TeamAnalysisPage from "./TeamAnalysisPage";
+import { ClubBadge } from "./ClubBadge";
 import "./App.css";
+import "./mobile.css";
 
 function LoginGate() {
   const { user, profile, profileError, loading } = useAuth();
-  const [signup, setSignup] = useState(false), [email, setEmail] = useState(""), [password, setPassword] = useState(""), [name, setName] = useState(""), [club, setClub] = useState(""), [clubs, setClubs] = useState([]), [error, setError] = useState("");
+  const [signup, setSignup] = useState(false), [email, setEmail] = useState(""), [password, setPassword] = useState(""), [name, setName] = useState(""), [club, setClub] = useState(""), [clubs, setClubs] = useState([]), [clubsLoading, setClubsLoading] = useState(false), [clubMenuOpen, setClubMenuOpen] = useState(false), [clubActiveIndex, setClubActiveIndex] = useState(-1), [error, setError] = useState("");
+  const matchingClubs = useMemo(() => {
+    const query = club.trim().toLocaleLowerCase();
+    if (!query) return [];
+    return clubs
+      .filter((name) => name.toLocaleLowerCase().includes(query))
+      .sort((a, b) => {
+        const aStarts = a.toLocaleLowerCase().startsWith(query);
+        const bStarts = b.toLocaleLowerCase().startsWith(query);
+        return Number(bStarts) - Number(aStarts) || a.localeCompare(b);
+      })
+      .slice(0, 8);
+  }, [club, clubs]);
   useEffect(() => {
     if (!signup) return;
-    supabase.from("players").select("Team,team,club,Club").limit(10000).then(({ data }) => {
-      const names = [...new Set((data || []).map((item) => item.Team || item.team || item.club || item.Club).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-      setClubs(names);
+    let active = true;
+    setClubsLoading(true);
+    supabase.from("players").select("Team,team,club,Club").limit(10000).then(({ data, error: loadError }) => {
+      if (!active) return;
+      if (loadError) {
+        console.error("Could not load club options", loadError);
+        setClubs([]);
+      } else {
+        const names = [...new Set((data || []).map((item) => String(item.Team || item.team || item.club || item.Club || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+        setClubs(names);
+      }
+      setClubsLoading(false);
+    }).catch((loadError) => {
+      if (!active) return;
+      console.error("Could not load club options", loadError);
+      setClubs([]);
+      setClubsLoading(false);
     });
+    return () => { active = false; };
   }, [signup]);
   if (loading) return <div className="sr-auth-screen">Loading…</div>;
   if (user && profile?.approved) return <AppRoutes />;
   if (user) return <div className="sr-auth-screen"><div className="sr-pending-card"><h1>Awaiting admin approval</h1><p>{profileError || "Your account has been created. An administrator must assign your club before you can access the platform."}</p><small>Signed-in user ID: {user.id}</small><button className="sr-cyan" onClick={() => supabase.auth.signOut()}>Sign out</button></div></div>;
-  const submit = async (e) => { e.preventDefault(); setError(""); const result = signup ? await supabase.auth.signUp({ email, password, options: { data: { full_name: name, club } } }) : await supabase.auth.signInWithPassword({ email, password }); if (result.error) setError(result.error.message); };
-  return <main className="sr-auth-screen"><section className="sr-auth-landing"><div className="sr-auth-copy"><div className="sr-auth-brand">⚽ ScoutPro</div><h1>Football Recruitment<br />Organised Properly.</h1><p>Manage assignments, reports and shortlists securely with your scouting team.</p></div><form className="sr-form sr-auth-form" onSubmit={submit}><h2>{signup ? "Request access" : "Welcome back"}</h2>{signup && <><input placeholder="Full name" value={name} onChange={e => setName(e.target.value)} required /><input list="signup-clubs" placeholder="Start typing your club" value={club} onChange={e => setClub(e.target.value)} required /><datalist id="signup-clubs">{clubs.map((name) => <option key={name} value={name} />)}</datalist><small className="sr-auth-note">Your club admin will review your request.</small></>}<input type="email" placeholder="Email address" value={email} onChange={e => setEmail(e.target.value)} required /><input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />{error && <p className="sr-auth-error">{error}</p>}<button className="sr-cyan">{signup ? "Request account" : "Sign in"}</button><button type="button" className="sr-outline" onClick={() => setSignup(!signup)}>{signup ? "Already have an account? Sign in" : "Create an account"}</button></form></section></main>;
+  const selectClub = (clubName) => { setClub(clubName); setClubMenuOpen(false); setClubActiveIndex(-1); };
+  const handleClubKeyDown = (event) => {
+    if (event.key === "ArrowDown" && matchingClubs.length) {
+      event.preventDefault(); setClubMenuOpen(true); setClubActiveIndex((index) => (index + 1) % matchingClubs.length);
+    } else if (event.key === "ArrowUp" && matchingClubs.length) {
+      event.preventDefault(); setClubMenuOpen(true); setClubActiveIndex((index) => (index <= 0 ? matchingClubs.length - 1 : index - 1));
+    } else if (event.key === "Enter" && clubMenuOpen && matchingClubs.length) {
+      event.preventDefault(); selectClub(matchingClubs[Math.max(0, clubActiveIndex)]);
+    } else if (event.key === "Escape") setClubMenuOpen(false);
+  };
+  const submit = async (e) => {
+    e.preventDefault(); setError("");
+    if (signup && !clubs.some((item) => item.toLocaleLowerCase() === club.trim().toLocaleLowerCase())) {
+      setError("Choose your club from the suggestions so its badge and club name match."); setClubMenuOpen(true); return;
+    }
+    const result = signup ? await supabase.auth.signUp({ email, password, options: { data: { full_name: name, club } } }) : await supabase.auth.signInWithPassword({ email, password });
+    if (result.error) setError(result.error.message);
+  };
+  return <main className="sr-auth-screen"><section className="sr-auth-landing"><div className="sr-auth-copy"><div className="sr-auth-brand">⚽ ScoutPro</div><h1>Football Recruitment<br />Organised Properly.</h1><p>Manage assignments, reports and shortlists securely with your scouting team.</p></div><form className="sr-form sr-auth-form" onSubmit={submit}><h2>{signup ? "Request access" : "Welcome back"}</h2>{signup && <><input placeholder="Full name" value={name} onChange={e => setName(e.target.value)} required /><div className="sr-club-picker"><input role="combobox" aria-autocomplete="list" aria-expanded={clubMenuOpen && matchingClubs.length > 0} aria-controls="signup-clubs" aria-activedescendant={clubActiveIndex >= 0 ? `signup-club-${clubActiveIndex}` : undefined} autoComplete="off" placeholder="Start typing your club" value={club} onFocus={() => setClubMenuOpen(true)} onBlur={() => window.setTimeout(() => setClubMenuOpen(false), 120)} onChange={e => { setClub(e.target.value); setClubMenuOpen(true); setClubActiveIndex(-1); }} onKeyDown={handleClubKeyDown} required />{clubMenuOpen && club.trim() && <div className="sr-club-options" id="signup-clubs" role="listbox">{matchingClubs.length ? matchingClubs.map((clubName, index) => <button id={`signup-club-${index}`} className={`sr-club-option${index === clubActiveIndex ? " active" : ""}`} type="button" role="option" aria-selected={index === clubActiveIndex} key={clubName} onMouseDown={(event) => event.preventDefault()} onClick={() => selectClub(clubName)}><ClubBadge club={clubName} size={30} /><span>{clubName}</span></button>) : <div className="sr-club-no-results">{clubsLoading ? "Loading clubs…" : clubs.length ? "No matching clubs found" : "Club list is unavailable right now"}</div>}</div>}</div><small className="sr-auth-note">Your club admin will review your request.</small></>}<input type="email" placeholder="Email address" value={email} onChange={e => setEmail(e.target.value)} required /><input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />{error && <p className="sr-auth-error">{error}</p>}<button className="sr-cyan">{signup ? "Request account" : "Sign in"}</button><button type="button" className="sr-outline" onClick={() => { setSignup(!signup); setClubMenuOpen(false); setError(""); }}>{signup ? "Already have an account? Sign in" : "Create an account"}</button></form></section></main>;
 }
 
 function AppRoutes() {
   const [shadowSquad, setShadowSquad] = useState([]);
-  return <><Header /><div style={{ paddingTop: 80 }}><Routes><Route path="/" element={<LandingPage />} /><Route path="/scout-report" element={<ScoutReportPage shadowSquad={shadowSquad} setShadowSquad={setShadowSquad} />} /><Route path="/scouting-reports" element={<ScoutingReportsPage />} /><Route path="/shortlists" element={<ShortlistsPage />} /><Route path="/squad-plans" element={<SquadPlansPage />} /><Route path="/squad-plan" element={<SquadPlanPage />} /><Route path="/create-assignment" element={<CreateAssignmentPage />} /><Route path="/team-analysis" element={<TeamAnalysisPage />} /><Route path="/recruitment-dashboard" element={<RecruitmentDashboardPage />} /></Routes></div></>;
+  return <><Header /><div className="sr-app-shell" style={{ paddingTop: 80 }}><Routes><Route path="/" element={<LandingPage />} /><Route path="/scout-report" element={<ScoutReportPage shadowSquad={shadowSquad} setShadowSquad={setShadowSquad} />} /><Route path="/scouting-reports" element={<ScoutingReportsPage />} /><Route path="/shortlists" element={<ShortlistsPage />} /><Route path="/squad-plans" element={<SquadPlansPage />} /><Route path="/squad-plan" element={<SquadPlanPage />} /><Route path="/create-assignment" element={<CreateAssignmentPage />} /><Route path="/team-analysis" element={<TeamAnalysisPage />} /><Route path="/recruitment-dashboard" element={<RecruitmentDashboardPage />} /></Routes></div></>;
 }
 
 // ------------------- HEADER COMPONENT -------------------
@@ -60,6 +106,7 @@ function Header() {
 
   return (
     <header
+      className="sr-app-header"
       style={{
         width: "100%",
         height: 70,
@@ -106,13 +153,13 @@ function Header() {
         {user && <button className="header-signout" onClick={() => supabase.auth.signOut()}>Sign out</button>}
       </nav>
 
-      <div className={`hamburger ${menuOpen ? "open" : ""}`} onClick={() => setMenuOpen(!menuOpen)}>
-        <div />
-        <div />
-        <div />
-      </div>
+      <button type="button" className={`hamburger ${menuOpen ? "open" : ""}`} aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"} aria-expanded={menuOpen} aria-controls="mobile-navigation" onClick={() => setMenuOpen(!menuOpen)}>
+        <span />
+        <span />
+        <span />
+      </button>
 
-      <div className={`mobile-menu ${menuOpen ? "open" : ""}`}>
+      <nav id="mobile-navigation" className={`mobile-menu ${menuOpen ? "open" : ""}`} aria-label="Main navigation">
         {links.map((link, i) => (
           <span
             key={link.label}
@@ -132,11 +179,12 @@ function Header() {
           rel="noopener noreferrer"
           className="nav-link"
           style={{ animationDelay: `${links.length * 0.1}s` }}
+          onClick={() => setMenuOpen(false)}
         >
           Recruitment Dashboard
         </a>
         {user && <button className="header-signout" onClick={() => supabase.auth.signOut()}>Sign out</button>}
-      </div>
+      </nav>
 
       <style>{`
         .nav-link { color: #fff; cursor: pointer; margin-left: 25px; font-weight: 600; position: relative; }
@@ -145,10 +193,10 @@ function Header() {
         .nav-link:hover { color: #ffb74d; }
 
         .hamburger { display: none; flex-direction: column; justify-content: space-between; width: 25px; height: 20px; cursor: pointer; z-index: 4; }
-        .hamburger div { height: 3px; background: #fff; border-radius: 2px; transition: all 0.3s ease; }
-        .hamburger.open div:nth-child(1) { transform: rotate(45deg) translate(5px, 5px); }
-        .hamburger.open div:nth-child(2) { opacity: 0; }
-        .hamburger.open div:nth-child(3) { transform: rotate(-45deg) translate(5px, -5px); }
+        .hamburger span { height: 3px; background: #fff; border-radius: 2px; transition: all 0.3s ease; }
+        .hamburger.open span:nth-child(1) { transform: rotate(45deg) translate(5px, 5px); }
+        .hamburger.open span:nth-child(2) { opacity: 0; }
+        .hamburger.open span:nth-child(3) { transform: rotate(-45deg) translate(5px, -5px); }
 
         .mobile-menu { position: fixed; top: 70px; left: 0; width: 100%; background: #1a4d8f; display: flex; flex-direction: column; align-items: center; gap: 15px; padding: 0; max-height: 0; overflow: hidden; transition: max-height 0.4s ease; z-index: 2; }
         .mobile-menu.open { max-height: 300px; padding: 15px 0; }
