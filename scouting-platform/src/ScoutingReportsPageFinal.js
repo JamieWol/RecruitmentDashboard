@@ -120,6 +120,11 @@ const originalPublishedFixtures = {
     { name: "AGF v BENFICA", date: "2026-08-27" },
     { name: "HORSENS v AGF", date: "2026-09-20" },
   ],
+  "ignacio maestro puch": [
+    { name: "PUEBLA v ATLANTE", date: "2026-09-19" },
+    { name: "PUEBLA v TOLUCA", date: "2026-09-16" },
+    { name: "TIGRES UANL v PUEBLA", date: "2026-09-27" },
+  ],
 };
 const originalFixturesFor = (item) => originalPublishedFixtures[
   String(item?.player || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ")
