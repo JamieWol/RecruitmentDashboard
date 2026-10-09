@@ -371,12 +371,16 @@ export default function ShortlistsPage() {
     setNewPlayerQuery("");
     setNewPlayerOpen(false);
   };
-  const reorder = (pos, targetId) => {
+  const reorder = (pos, targetId, clientY, targetRect) => {
     if (!dragging || dragging.pos !== pos || dragging.id === targetId) return;
     const inPos = current.players.filter((x) => x.slot === pos);
     const from = inPos.findIndex((x) => x.id === dragging.id);
-    const to = inPos.findIndex((x) => x.id === targetId);
-    if (from < 0 || to < 0) return;
+    const targetIndex = inPos.findIndex((x) => x.id === targetId);
+    if (from < 0 || targetIndex < 0) return;
+    const droppedBelow = targetRect && clientY > targetRect.top + targetRect.height / 2;
+    let to = targetIndex + (droppedBelow ? 1 : 0);
+    if (from < to) to -= 1;
+    if (from === to) { setDragging(null); return; }
     const ordered = [...inPos];
     const [moved] = ordered.splice(from, 1);
     ordered.splice(to, 0, moved);
@@ -523,8 +527,9 @@ export default function ShortlistsPage() {
               key={p.id}
               draggable
               onDragStart={() => setDragging({ id: p.id, pos })}
+              onDragEnd={() => setDragging(null)}
               onDragOver={(e) => e.preventDefault()}
-              onDrop={() => reorder(pos, p.id)}
+              onDrop={(e) => { e.preventDefault(); e.stopPropagation(); reorder(pos, p.id, e.clientY, e.currentTarget.getBoundingClientRect()); }}
               style={{
                 "--tag-color":
                   tags.find((t) => (p.tags || []).includes(t.id))?.color ||

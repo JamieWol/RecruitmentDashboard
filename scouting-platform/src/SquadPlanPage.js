@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import { supabase } from "./supabaseClient";
+import "./squadPlan.css";
 
 const formations = ["4-2-3-1", "4-3-3", "4-4-2", "3-5-2", "3-4-3", "4-1-4-1"];
 const formationRows = {
@@ -44,6 +45,8 @@ export default function SquadPlanPage() {
   const [players, setPlayers] = useState([]);
   const [clubs, setClubs] = useState([]);
   const [club, setClub] = useState(accountProfile?.club || "");
+  const [clubMenuOpen, setClubMenuOpen] = useState(false);
+  const [clubActiveIndex, setClubActiveIndex] = useState(-1);
   const [formation, setFormation] = useState("4-2-3-1");
   const [squad, setSquad] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -100,8 +103,10 @@ export default function SquadPlanPage() {
       setSquad(Array.isArray(saved.players) ? saved.players : []); setPositionLabels(saved.positionLabels || {});
       setTags(Array.isArray(saved.tags) ? saved.tags : defaultTags); setRemovedIds(saved.removedIds || {});
     } else if (isNewPlan) {
-      setSquadName(""); setClub(""); setFormation("4-2-3-1"); setSquad([]);
-      setPositionLabels({}); setTags(defaultTags); setRemovedIds({});
+      const draft = state.draft;
+      setSquadName(draft?.name || ""); setClub(draft?.club || ""); setFormation(draft?.formation || "4-2-3-1");
+      setSquad(Array.isArray(draft?.players) ? draft.players : []);
+      setPositionLabels(draft?.positionLabels || {}); setTags(draft?.tags || defaultTags); setRemovedIds(draft?.removedIds || {});
     } else {
       setSquadName(state.name || ""); setClub(state.club || accountProfile?.club || "");
       setFormation(state.formation || "4-2-3-1"); setSquad(Array.isArray(state.players) ? state.players : []);
@@ -119,6 +124,7 @@ export default function SquadPlanPage() {
         const { data, error } = await supabase.from("players").select("*").range(offset, offset + 999);
         if (error) { console.error("Squad plan player database error", error); break; }
         all.push(...(data || []));
+        if (!cancelled) setClubs([...new Set(all.map(playerClub).filter(Boolean))].sort((a, b) => a.localeCompare(b)));
         if (!data || data.length < 1000) break;
         offset += 1000;
       }
@@ -138,6 +144,26 @@ export default function SquadPlanPage() {
     return [...new Map(matching.map((p) => [String(p["Player Id"] || p.player_id || p.playerId || p.id || playerName(p)), p])).values()];
   }, [players, club]);
   const rows = formationRows[formation] || formationRows["4-2-3-1"];
+  const pitchHeight = Math.max(620, rows.length * 155 + 80);
+  const clubQuery = normalise(club).normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const matchingClubs = clubQuery
+    ? clubs.filter((name) => normalise(name).normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(clubQuery))
+      .sort((a, b) => Number(normalise(b).toLowerCase().startsWith(clubQuery)) - Number(normalise(a).toLowerCase().startsWith(clubQuery)) || a.localeCompare(b))
+      .slice(0, 10)
+    : clubs.slice(0, 10);
+  const selectClub = (value) => {
+    setClub(value); setClubMenuOpen(false); setClubActiveIndex(-1);
+    persist(squad, { club: value });
+  };
+  const handleClubKeyDown = (event) => {
+    if (event.key === "ArrowDown" && matchingClubs.length) {
+      event.preventDefault(); setClubMenuOpen(true); setClubActiveIndex((index) => (index + 1) % matchingClubs.length);
+    } else if (event.key === "ArrowUp" && matchingClubs.length) {
+      event.preventDefault(); setClubMenuOpen(true); setClubActiveIndex((index) => index <= 0 ? matchingClubs.length - 1 : index - 1);
+    } else if (event.key === "Enter" && clubMenuOpen && matchingClubs.length) {
+      event.preventDefault(); selectClub(matchingClubs[Math.max(0, clubActiveIndex)]);
+    } else if (event.key === "Escape") setClubMenuOpen(false);
+  };
   const planKey = club;
   const labelKey = (slot) => `${planKey}:${formation}:${slot}`;
   const setPositionLabel = (slot, value) => {
@@ -161,7 +187,30 @@ export default function SquadPlanPage() {
         .then(({ error }) => { if (error) console.error("Could not update the shared squad plan", error); });
       return;
     }
-    return updateAppState({ ...appState, squadPlan: { ...(appState?.squadPlan || {}), club, formation, players: next, tags, removedIds, positionLabels, ...extra } });
+    const oldPlanState = appState?.squadPlan || {};
+    const squadPlan = { ...oldPlanState, club, formation, players: next, tags, removedIds, positionLabels, ...extra };
+    if (planId) {
+      const savedPlans = extra.savedPlans || oldPlanState.savedPlans || [];
+      const existing = savedPlans.find((item) => String(item.id) === String(planId));
+      const activeClub = extra.club ?? club;
+      const updatedRecord = {
+        ...(existing || {}),
+        id: planId,
+        name: existing?.name || squadName || `${activeClub || "Squad"} Squad Plan`,
+        club: activeClub,
+        formation: extra.formation ?? formation,
+        players: next.filter((player) => player.planKey === activeClub),
+        tags: extra.tags ?? tags,
+        removedIds: extra.removedIds ?? removedIds,
+        positionLabels: extra.positionLabels ?? positionLabels,
+        updatedAt: new Date().toISOString(),
+      };
+      squadPlan.savedPlans = [...savedPlans.filter((item) => String(item.id) !== String(planId)), updatedRecord];
+    }
+    if (isNewPlan && !planId && !Object.prototype.hasOwnProperty.call(extra, "draft")) {
+      squadPlan.draft = { club: extra.club ?? club, formation: extra.formation ?? formation, players: next, tags: extra.tags ?? tags, removedIds: extra.removedIds ?? removedIds, positionLabels: extra.positionLabels ?? positionLabels, name: squadName };
+    }
+    return updateAppState({ ...appState, squadPlan });
   };
   const toggleTag = (id, tagId) => {
     const next = squad.map((p) => p.planKey === planKey && String(p.id) === String(id) ? { ...p, tags: p.tags?.includes(tagId) ? [] : [tagId] } : p);
@@ -192,7 +241,7 @@ export default function SquadPlanPage() {
   const remove = (id) => {
     if (readOnly) return;
     const key = String(id);
-    const nextRemoved = { ...removedIds, [planKey]: [...new Set([...(removedIds[planKey] || []), key])] };
+    const nextRemoved = { ...removedIds, [planKey]: (removedIds[planKey] || []).filter((value) => String(value) !== key) };
     setRemovedIds(nextRemoved);
     persist(squad.filter((p) => !(p.planKey === planKey && String(p.id) === key)), { removedIds: nextRemoved });
   };
@@ -204,7 +253,7 @@ export default function SquadPlanPage() {
     const record = { id, name: enteredName.trim(), club, formation, players: currentPlayers, positionLabels, tags, removedIds, updatedAt: new Date().toISOString() };
     const savedPlans = [...(appState?.squadPlan?.savedPlans || []).filter((item) => String(item.id) !== String(id)), record];
     try {
-      await persist(squad, { savedPlans });
+      await persist(squad, { savedPlans, draft: null });
       setSquadName(record.name);
       setSavedMessage("Squad plan saved");
       window.setTimeout(() => setSavedMessage(""), 3000);
@@ -226,7 +275,7 @@ export default function SquadPlanPage() {
   const rosterCard = (p) => {
     const id = p["Player Id"] || p.player_id || p.playerId || p.id || playerName(p);
     const selected = currentPlayers.find((x) => String(x.id) === String(id));
-    return <div className="sr-squad-roster-wrap" key={String(id)}><div className="sr-pitch-player-card sr-squad-roster-card" style={selected ? tagStyle(selected) : undefined} draggable={!readOnly} onDragStart={() => !readOnly && setDragging(p)} onClick={() => openPlayer(p)}><img className="sr-shortlist-player-photo" src={imageSource(p)} alt="" onError={(e) => imageFallback(e, playerName(p))} /><span><strong>{playerName(p)}</strong><small>{p.primary_position || p.position || "Player"}</small></span>{selected && !readOnly && <button type="button" className="sr-squad-tag-button" onClick={(e) => { e.stopPropagation(); setTagPicker(tagPicker === String(id) ? null : String(id)); }}>●</button>}{selected && !readOnly && <button type="button" className="sr-slot-remove" title="Remove from squad plan" onClick={(e) => { e.stopPropagation(); remove(id); }}>×</button>}</div>{selected && tagMenu(selected)}</div>;
+    return <div className="sr-squad-roster-wrap" key={String(id)}><div className="sr-pitch-player-card sr-squad-roster-card" style={selected ? tagStyle(selected) : undefined} draggable={!readOnly} onDragStart={() => !readOnly && setDragging(p)} onClick={() => openPlayer(p)}><img className="sr-shortlist-player-photo" src={imageSource(p)} alt="" onError={(e) => imageFallback(e, playerName(p))} /><span><strong>{playerName(p)}</strong><small>{p.primary_position || p.position || "Player"}</small></span>{selected && !readOnly && <button type="button" className="sr-squad-tag-button" aria-label={`Tag ${playerName(p)}`} onClick={(e) => { e.stopPropagation(); setTagPicker(tagPicker === String(id) ? null : String(id)); }}>●</button>}{selected && !readOnly && <button type="button" className="sr-squad-roster-remove" title="Remove from squad plan" aria-label={`Remove ${playerName(p)} from this squad plan`} onClick={(e) => { e.stopPropagation(); remove(id); }}>×</button>}</div>{selected && tagMenu(selected)}</div>;
   };
   const zone = (position, index) => {
     const slot = `${position}-${index}`;
@@ -238,9 +287,9 @@ export default function SquadPlanPage() {
     <button className="sr-back" onClick={() => window.history.back()}>‹ Back</button>
     {sharedPlanLoading && <div className="sr-empty">Loading shared squad plan…</div>}
     {sharedPlanError && <div className="sr-empty">{sharedPlanError}</div>}
-    <section className="sr-dashboard-head"><div><div className="sr-kicker">{sharedId ? "SHARED SQUAD PLAN" : "SQUAD PLAN"}</div><h1>{squadName || "Plan Your Squad"}</h1><p>{sharedId ? readOnly ? "Shared with you by another scout · View only" : "Shared with you · You can edit this plan" : "Choose a club, then add players yourself to each position. Use + to add any player from the database."}</p></div><div className="sr-shortlist-head-actions"><label className="sr-field"><span>Club</span><input list="squad-plan-clubs" className="sr-formation-select" placeholder="Start typing your club" value={club} disabled={readOnly} onChange={(e) => setClub(e.target.value)} onBlur={() => persist(squad, { club })} /><datalist id="squad-plan-clubs">{clubs.map((x) => <option key={x} value={x} />)}</datalist></label><label className="sr-field"><span>Formation</span><select className="sr-formation-select" value={formation} disabled={readOnly} onChange={(e) => changeFormation(e.target.value)}>{formations.map((x) => <option key={x}>{x}</option>)}</select></label>{!sharedId && <button type="button" className="sr-cyan sr-squad-save" onClick={savePlan}>Save Squad Plan</button>}{savedMessage && <small className="sr-saved-message">{savedMessage}</small>}</div></section>
+    <section className="sr-dashboard-head"><div><div className="sr-kicker">{sharedId ? "SHARED SQUAD PLAN" : "SQUAD PLAN"}</div><h1>{squadName || "Plan Your Squad"}</h1><p>{sharedId ? readOnly ? "Shared with you by another scout · View only" : "Shared with you · You can edit this plan" : "Choose a club, then add players yourself to each position. Use + to add any player from the database."}</p></div><div className="sr-shortlist-head-actions"><label className="sr-field sr-squad-club-field"><span>Club</span><div className="sr-squad-club-picker"><input role="combobox" aria-autocomplete="list" aria-expanded={clubMenuOpen && !readOnly} aria-controls="squad-plan-club-options" aria-activedescendant={clubActiveIndex >= 0 ? `squad-club-${clubActiveIndex}` : undefined} autoComplete="off" className="sr-formation-select" placeholder="Search for a club" value={club} disabled={readOnly} onFocus={() => setClubMenuOpen(true)} onBlur={() => { window.setTimeout(() => setClubMenuOpen(false), 120); persist(squad, { club }); }} onChange={(e) => { setClub(e.target.value); setClubMenuOpen(true); setClubActiveIndex(-1); }} onKeyDown={handleClubKeyDown} />{clubMenuOpen && !readOnly && <div className="sr-squad-club-options" id="squad-plan-club-options" role="listbox">{matchingClubs.length ? matchingClubs.map((clubName, index) => <button type="button" id={`squad-club-${index}`} role="option" aria-selected={clubName === club} className={index === clubActiveIndex ? "active" : ""} key={clubName} onPointerDown={(event) => event.preventDefault()} onClick={() => selectClub(clubName)}><ClubName club={clubName} size={24} /></button>) : <div className="sr-squad-club-no-results">{loading ? "Loading club list…" : club.trim() ? "No matching clubs found" : "No clubs available"}</div>}</div>}</div></label><label className="sr-field"><span>Formation</span><select className="sr-formation-select" value={formation} disabled={readOnly} onChange={(e) => changeFormation(e.target.value)}>{formations.map((x) => <option key={x}>{x}</option>)}</select></label>{!sharedId && <button type="button" className="sr-cyan sr-squad-save" onClick={savePlan}>Save Squad Plan</button>}{savedMessage && <small className="sr-saved-message">{savedMessage}</small>}</div></section>
     {loading && <div className="sr-empty">Loading players…</div>}{!loading && club && !clubPlayers.length && <div className="sr-empty">No players found for this club.</div>}{club && clubPlayers.length > 0 && <div className="sr-tag-legend"><span>{visibleClubPlayers.length} players available</span><span>{currentPlayers.length} added to squad plan</span></div>}
     {!readOnly && <div className="sr-squad-tag-tools"><strong>Custom tags</strong>{tags.map((tag) => <span key={tag.id}><i style={{ background: tag.color }} />{tag.name}</span>)}<input placeholder="Create tag" value={newTagName} onChange={(e) => setNewTagName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); createTag(); } }} /><input className="sr-tag-color" type="color" value={newTagColor} onChange={(e) => setNewTagColor(e.target.value)} /><button type="button" className="sr-outline" onClick={createTag}>Add tag</button></div>}
-    {(!sharedId || sharedPlan) && !sharedPlanLoading && <div className="sr-squad-plan-layout"><aside className="sr-squad-roster"><h2><ClubName club={club} fallback="Club" /></h2><p>{readOnly ? "Players in this squad plan." : "Remove players from this plan with ×."}</p>{visibleClubPlayers.map(rosterCard)}{!readOnly && <><h3 className="sr-squad-any-title">Add any player</h3><input className="sr-squad-global-search" placeholder="Search any player" value={pickerSearch} onChange={(e) => setPickerSearch(e.target.value)} />{pickerSearch && pickerPlayers.slice(0, 15).map(rosterCard)}</>}</aside><div className="sr-real-pitch"><div className="sr-goal-box top" />{rows.map((row, i) => <div className="sr-pitch-row" key={i}>{row.map((pos, j) => zone(pos, j))}</div>)}<div className="sr-centre-circle" /><div className="sr-halfway-line" /><div className="sr-goal-box bottom" /></div></div>}
+    {(!sharedId || sharedPlan) && !sharedPlanLoading && <div className="sr-squad-plan-layout"><aside className="sr-squad-roster"><h2><ClubName club={club} fallback="Club" /></h2><p>{readOnly ? "Players in this squad plan." : "Tap × to remove a selected player from this plan."}</p>{visibleClubPlayers.map(rosterCard)}{!readOnly && <><h3 className="sr-squad-any-title">Add any player</h3><input className="sr-squad-global-search" placeholder="Search any player" value={pickerSearch} onChange={(e) => setPickerSearch(e.target.value)} />{pickerSearch && pickerPlayers.slice(0, 15).map(rosterCard)}</>}</aside><div className="sr-real-pitch" style={{ "--pitch-height": `${pitchHeight}px` }}><div className="sr-goal-box top" />{rows.map((row, i) => <div className="sr-pitch-row" key={i}>{row.map((pos, j) => zone(pos, j))}</div>)}<div className="sr-centre-circle" /><div className="sr-halfway-line" /><div className="sr-goal-box bottom" /></div></div>}
   </main>;
 }

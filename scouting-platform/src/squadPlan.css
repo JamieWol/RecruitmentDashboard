@@ -1,0 +1,103 @@
+.sr-squad-club-picker {
+  position: relative;
+  width: 100%;
+}
+
+.sr-squad-club-picker > input {
+  width: 100%;
+  min-height: 48px;
+  box-sizing: border-box;
+  background: #fff;
+  color: #123b67;
+  border: 1px solid #b9d8f1;
+  border-radius: 8px;
+  padding: 11px 14px;
+  font: inherit;
+}
+
+.sr-squad-club-options {
+  position: absolute;
+  z-index: 1200;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: min(360px, 55vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
+  background: #fff;
+  border: 1px solid #a9c9df;
+  border-radius: 10px;
+  box-shadow: 0 14px 30px #00152e66;
+}
+
+.sr-squad-club-options button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 48px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 7px;
+  background: #fff;
+  color: #173e67;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.sr-squad-club-options button:hover,
+.sr-squad-club-options button.active {
+  background: #eaf6fc;
+}
+
+.sr-squad-club-no-results {
+  padding: 14px 12px;
+  color: #536980;
+  font-size: 14px;
+}
+
+.sr-squad-roster-remove {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid #b94646;
+  border-radius: 50%;
+  background: #fff;
+  color: #a52525;
+  font-size: 23px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.sr-squad-roster-remove:hover {
+  background: #fff0ef;
+}
+
+main.sr-page.sr-squad-plan .sr-real-pitch {
+  height: var(--pitch-height) !important;
+  min-height: var(--pitch-height) !important;
+  max-height: none !important;
+  justify-content: space-around;
+  padding-top: 24px;
+  padding-bottom: 24px;
+}
+
+main.sr-page.sr-squad-plan .sr-real-pitch > .sr-pitch-row {
+  flex: 0 0 auto;
+  min-height: 112px;
+}
+
+@media (max-width: 900px) {
+  .sr-squad-club-options {
+    max-height: 42vh;
+  }
+
+  main.sr-page.sr-squad-plan .sr-real-pitch {
+    padding-top: 18px;
+    padding-bottom: 18px;
+  }
+}
