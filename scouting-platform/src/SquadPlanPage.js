@@ -267,7 +267,11 @@ export default function SquadPlanPage() {
       window.setTimeout(() => setSavedMessage(""), 3000);
       navigate(`/squad-plan?plan=${encodeURIComponent(id)}`, { replace: true });
     } catch (error) {
-      setSavedMessage("Could not save the squad plan. Check your connection and try again.");
+      const reason = String(error?.message || error || "Unknown save error");
+      const missingSquadPlanColumn = /PGRST204|column[^\n]*squadPlan|squadPlan[^\n]*column/i.test(reason);
+      setSavedMessage(missingSquadPlanColumn
+        ? "Supabase is missing the squad plan storage field. Apply the included database migration, then try again."
+        : `Could not save the squad plan: ${reason}`);
     }
   };
   const place = (source, slot) => {
