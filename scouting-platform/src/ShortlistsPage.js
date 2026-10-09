@@ -162,7 +162,7 @@ export default function ShortlistsPage() {
       const ids = (data || []).map((x) => String(x.shortlist_id));
       if (!ids.length) return setSharedLists([]);
       const result = await supabase.from("shared_shortlists").select("*").in("shortlist_id", ids);
-      const sharedItems = result.data || [];
+      const sharedItems = (result.data || []).filter((item) => item.shortlist?.kind !== "squad-plan");
       setSharedLists(sharedItems.map((x) => ({ ...x.shortlist, owner_id: x.owner_id, sharedPermission: data.find((s) => String(s.shortlist_id) === String(x.shortlist_id))?.permission || "view", shared: true })));
       const sharedTags = sharedItems.flatMap((x) => x.shortlist?.tags || []);
       if (sharedTags.length) setTags((previous) => [...new Map([...previous, ...sharedTags].map((tag) => [tag.id, tag])).values()]);
@@ -171,9 +171,7 @@ export default function ShortlistsPage() {
     window.addEventListener("focus", loadSharedLists);
     return () => window.removeEventListener("focus", loadSharedLists);
   }, [user]);
-  const [lists, setLists] = useState(() =>
-    JSON.parse(localStorage.getItem("scoutingShortlists") || "[]"),
-  );
+  const [lists, setLists] = useState(() => JSON.parse(localStorage.getItem("scoutingShortlists") || "[]"));
   const [current, setCurrent] = useState(null);
   useEffect(() => {
     if (!user) return;
@@ -203,11 +201,7 @@ export default function ShortlistsPage() {
     [newPlayerOpen, setNewPlayerOpen] = useState(false),
     [newPlayerQuery, setNewPlayerQuery] = useState(""),
     [newPlayers, setNewPlayers] = useState([]),
-    [tags, setTags] = useState(() =>
-      JSON.parse(
-        localStorage.getItem("scoutingTags") || JSON.stringify(defaultTags),
-      ),
-    ),
+    [tags, setTags] = useState(() => JSON.parse(localStorage.getItem("scoutingTags") || JSON.stringify(defaultTags))),
     [manageTags, setManageTags] = useState(false),
     [newTagName, setNewTagName] = useState(""),
     [newTagColor, setNewTagColor] = useState("#62dcff");
@@ -261,7 +255,7 @@ export default function ShortlistsPage() {
   }, [databasePlayers, published]);
   const persist = async (n, sharedUpdate = null) => {
     setLists(n);
-    updateAppState({ assignments: appState?.assignments || [], shortlists: n, tags });
+    updateAppState({ ...appState, assignments: appState?.assignments || [], shortlists: n, tags });
     if (current?.shared && user && (current.owner_id === user.id || current.sharedPermission === "edit")) {
       const changed = sharedUpdate || n.find((list) => list.id === current.id) || current;
       const sharedPayload = { ...changed };
@@ -338,7 +332,7 @@ export default function ShortlistsPage() {
     };
     const next = [...tags, n];
     setTags(next);
-    updateAppState({ assignments: appState?.assignments || [], shortlists: appState?.shortlists || [], tags: next });
+    updateAppState({ ...appState, assignments: appState?.assignments || [], shortlists: appState?.shortlists || [], tags: next });
     if (current?.shared && user && (current.owner_id === user.id || current.sharedPermission === "edit")) {
       supabase.from("shared_shortlists").update({ shortlist: { ...current, tags: next, shared: undefined, sharedPermission: undefined, owner_id: undefined }, updated_at: new Date().toISOString() }).eq("shortlist_id", String(current.id)).eq("owner_id", current.owner_id).then(({ error }) => { if (error) console.error("Could not save shared shortlist tags", error); });
     }

@@ -285,16 +285,13 @@ export default function ScoutingReportsPageFinal() {
   const { appState, updateAppState, user, profile: accountProfile } = useAuth();
   const reportViewStorageKey = `scoutingReportsView:${user?.id || user?.email || "guest"}`;
   const reportImportStorageKey = `scoutingReportImport:${user?.id || user?.email || "guest"}`;
-  const [items, setItems] = useState(() =>
-    JSON.parse(localStorage.getItem("scoutingAssignments") || "[]"),
-  );
+  const [items, setItems] = useState(() => JSON.parse(localStorage.getItem("scoutingAssignments") || "[]"));
   const [tab, setTab] = useState(() => localStorage.getItem(`${reportViewStorageKey}:tab`) || sessionStorage.getItem("scoutingReportsTab") || "My Assignments");
   const [query, setQuery] = useState("");
   const [playerSearch, setPlayerSearch] = useState("");
   const [playerMatches, setPlayerMatches] = useState([]);
   const [profile, setProfile] = useState(() => {
-    const n = JSON.parse(localStorage.getItem("scoutingAssignments") || "[]"),
-      name = localStorage.getItem("scoutingProfilePlayer");
+    const n = JSON.parse(localStorage.getItem("scoutingAssignments") || "[]"), name = localStorage.getItem("scoutingProfilePlayer");
     return name ? n.find((x) => x.player === name) || { player: name } : null;
   });
   const [active, setActive] = useState(() => {
@@ -569,7 +566,7 @@ export default function ScoutingReportsPageFinal() {
   }, [active]);
   const saveItems = (n) => {
     setItems(n);
-    updateAppState({ assignments: n, shortlists: appState?.shortlists || [], tags: appState?.tags || [] });
+    updateAppState({ ...appState, assignments: n });
   };
   const importOldReports = async (records) => {
     const createdAt = new Date().toISOString();
@@ -671,7 +668,7 @@ export default function ScoutingReportsPageFinal() {
         player,
       ],
     };
-    updateAppState({ assignments: appState?.assignments || [], shortlists: lists.map((x) => (String(x.id) === String(list.id) ? next : x)), tags: appState?.tags || [] });
+    updateAppState({ ...appState, shortlists: lists.map((x) => (String(x.id) === String(list.id) ? next : x)) });
     setShortlistPicker(false);
   };
   const shown = useMemo(
@@ -1466,10 +1463,7 @@ export default function ScoutingReportsPageFinal() {
                         });
                         setPlayerSearch("");
                         setPlayerMatches([]);
-                        localStorage.setItem(
-                          "scoutingProfileOrigin",
-                          "assignments",
-                        );
+                        localStorage.setItem("scoutingProfileOrigin", "assignments");
                       }}
                     >
                       {name}

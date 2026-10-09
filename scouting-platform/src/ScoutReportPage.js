@@ -921,7 +921,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
       tags: [],
     };
     const next = { ...list, players: [...(list.players || []).filter((item) => !(String(item.id) === String(playerId) && item.slot === selectedPosition)), player] };
-    updateAppState({ assignments: appState?.assignments || [], shortlists: lists.map((item) => String(item.id) === String(list.id) ? next : item), tags: appState?.tags || [] });
+    updateAppState({ ...appState, shortlists: lists.map((item) => String(item.id) === String(list.id) ? next : item) });
     setShortlistPicker(false);
   };
   const shortlistModal = shortlistPicker && (

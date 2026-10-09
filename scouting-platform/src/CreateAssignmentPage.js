@@ -148,7 +148,7 @@ export default function CreateAssignmentPage() {
         .map((x) => String(x.id) === String(editing.id) ? { ...x, ...assignment, id: x.id } : x)
         .filter((x) => String(x.id) === String(editing.id) || String(x.player || "").trim().toLowerCase() !== String(player).trim().toLowerCase())
       : [...old, assignment];
-    updateAppState({ assignments: nextAssignments, shortlists: appState?.shortlists || [], tags: appState?.tags || [] });
+    updateAppState({ ...appState, assignments: nextAssignments });
     if (profile?.club && scout) await supabase.from("club_assignments").upsert({ id: Number(assignment.id), club: profile.club, assigned_to: scout, created_by: (await supabase.auth.getUser()).data.user.id, assignment: { ...assignment, id: Number(assignment.id) }, status: assignment.status }, { onConflict: "id" });
     localStorage.removeItem("editingAssignment");
     window.history.back();

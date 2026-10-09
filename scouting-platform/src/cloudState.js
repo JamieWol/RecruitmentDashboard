@@ -1,6 +1,7 @@
 import { supabase } from "./supabaseClient";
 
 const keys = ["scoutingAssignments", "scoutingShortlists", "scoutingTags"];
+const legacySquadKeys = ["squadPlans", "squadPlanClub", "squadPlanFormation", "squadPlanPlayers", "squadPlanTags", "squadPlanRemoved", "squadPlanPositionLabels", "squadPlanActiveId"];
 const readLocal = (key, fallback) => {
   try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch { return fallback; }
 };
@@ -11,16 +12,56 @@ export async function migrateAndLoadState(user) {
     assignments: readLocal("scoutingAssignments", []),
     shortlists: readLocal("scoutingShortlists", []),
     tags: readLocal("scoutingTags", []),
+    squadPlan: {
+      club: localStorage.getItem("squadPlanClub") || "",
+      formation: localStorage.getItem("squadPlanFormation") || "4-2-3-1",
+      players: readLocal("squadPlanPlayers", []),
+      tags: readLocal("squadPlanTags", []),
+      removedIds: readLocal("squadPlanRemoved", {}),
+      positionLabels: readLocal("squadPlanPositionLabels", {}),
+      savedPlans: readLocal("squadPlans", []),
+    },
   };
   const { data: existing, error: readError } = await supabase.from("user_app_state").select("*").eq("user_id", user.id).maybeSingle();
   if (readError) throw readError;
-  const state = existing || { user_id: user.id, assignments: local.assignments, shortlists: local.shortlists, tags: local.tags };
-  if (!existing && (local.assignments.length || local.shortlists.length || local.tags.length)) {
+  const hasLocalData = local.assignments.length || local.shortlists.length || local.tags.length;
+  let state = existing || {
+    user_id: user.id,
+    assignments: local.assignments,
+    shortlists: local.shortlists,
+    tags: local.tags,
+    squadPlan: { savedPlans: [] },
+  };
+  if (!existing && hasLocalData) {
     const { error } = await supabase.from("user_app_state").upsert(state, { onConflict: "user_id" });
     if (error) throw error;
     keys.forEach((key) => localStorage.removeItem(key));
+  } else if (existing?.squadPlan && local.squadPlan.savedPlans.length) {
+    // Saved squad plans used to live in a browser-wide key. Attach only plans that
+    // match this account's already-cloud-saved active plan, then discard the legacy key.
+    const planPlayerIds = (plan) => (plan?.players || []).map((player) => String(player.id || player.playerId || player.player_id || player.player || player.Name || player.name || "")).filter(Boolean).sort();
+    const activeIds = planPlayerIds(existing.squadPlan);
+    const matchingLegacyPlans = local.squadPlan.savedPlans.filter((plan) => {
+      const sameClub = String(plan.club || "").trim().toLowerCase() === String(existing.squadPlan.club || "").trim().toLowerCase();
+      const ids = planPlayerIds(plan);
+      return sameClub && plan.formation === existing.squadPlan.formation && ids.length === activeIds.length && ids.every((id, index) => id === activeIds[index]);
+    });
+    if (matchingLegacyPlans.length) {
+      state = { ...existing, squadPlan: { ...existing.squadPlan, savedPlans: [...(existing.squadPlan.savedPlans || []), ...matchingLegacyPlans.filter((plan) => !(existing.squadPlan.savedPlans || []).some((saved) => String(saved.id) === String(plan.id)))] } };
+      const { error } = await supabase.from("user_app_state").upsert(state, { onConflict: "user_id" });
+      if (error) throw error;
+    }
   }
-  return { assignments: state.assignments || [], shortlists: state.shortlists || [], tags: state.tags || [] };
+  // Squad plan draft/list data used to be shared by every account on this device.
+  // Remove those browser-wide keys so another account cannot inherit them.
+  legacySquadKeys.forEach((key) => localStorage.removeItem(key));
+  return {
+    assignments: state.assignments || [],
+    shortlists: state.shortlists || [],
+    tags: state.tags || [],
+    squadPlan: state.squadPlan || { savedPlans: [] },
+    playerSummaries: state.playerSummaries || {},
+  };
 }
 
 export async function saveCloudState(user, state) {
