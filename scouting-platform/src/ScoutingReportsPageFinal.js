@@ -30,6 +30,19 @@ const empty = {
   strengths: "",
   weaknesses: "",
 };
+const readProfileCheckerFilters = () => {
+  const defaults = { foot: "", age: "", position: "", performance: "", potential: [] };
+  try {
+    const saved = JSON.parse(sessionStorage.getItem("profileCheckerFilters") || "{}");
+    return {
+      ...defaults,
+      ...saved,
+      potential: Array.isArray(saved.potential) ? saved.potential : saved.potential ? [saved.potential] : [],
+    };
+  } catch {
+    return defaults;
+  }
+};
 const photoBase =
   "https://syjsmvvsvvprxibqoizw.supabase.co/storage/v1/object/public/player-photos/player-photos/";
 const photoSlug = (name, lower = false) =>
@@ -318,7 +331,8 @@ export default function ScoutingReportsPageFinal() {
   const [importNotice, setImportNotice] = useState("");
   const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
   const actionsMenuRef = useRef(null);
-  const [profileFilters, setProfileFilters] = useState(() => JSON.parse(sessionStorage.getItem("profileCheckerFilters") || '{"foot":"","age":"","position":"","performance":"","potential":""}'));
+  const [profileFilters, setProfileFilters] = useState(readProfileCheckerFilters);
+  const profileFiltersActive = Object.entries(profileFilters).some(([key, value]) => key === "potential" ? value.length > 0 : Boolean(value));
   const summaryKey = String(playerData?.id || playerData?.player_id || profile?.playerId || normalizePlayerName(profile?.player));
   const savedPlayerSummary = appState?.playerSummaries?.[summaryKey];
   const summaryReports = [...new Map([
@@ -793,7 +807,7 @@ export default function ScoutingReportsPageFinal() {
   }, [profileCandidates, items, sharedReports]);
   const runProfileCheck = () => {
     const terms = profileTerms(profileQuery);
-    if (!terms.length && !Object.values(profileFilters).some(Boolean)) { setProfileResults([]); return; }
+    if (!terms.length && !profileFiltersActive) { setProfileResults([]); return; }
     const grouped = new Map();
     const matchesFilters = (item) => {
       const report = item.report || {};
@@ -806,12 +820,11 @@ export default function ScoutingReportsPageFinal() {
       const performance = String(report.performance || item.performance || "");
       const potential = String(report.potential || item.potential || "");
       const position = String(report.playedPosition || item.position || item.primary_position || "").toLowerCase();
-      const potentialRank = { A: 1, B: 2, C: 3, D: 4, E: 5, F: 6 };
       return (!profileFilters.foot || foot === profileFilters.foot.toLowerCase()) &&
         matchesAgeFilter(age, profileFilters.age) &&
         (!profileFilters.position || position === profileFilters.position.toLowerCase()) &&
         (!profileFilters.performance || (Number(performance) >= Number(profileFilters.performance))) &&
-        (!profileFilters.potential || (potentialRank[potential.toUpperCase()] >= potentialRank[profileFilters.potential]));
+        (!profileFilters.potential.length || profileFilters.potential.includes(potential.trim().toUpperCase()));
     };
     profileCandidates.filter(matchesFilters).forEach((item) => {
       const text = reportSearchText(item);
@@ -828,7 +841,7 @@ export default function ScoutingReportsPageFinal() {
     setProfileResults([...grouped.values()].sort((a, b) => b.score - a.score || b.reports - a.reports));
   };
   useEffect(() => {
-    if (profileQuery.trim() || Object.values(profileFilters).some(Boolean)) runProfileCheck();
+    if (profileQuery.trim() || profileFiltersActive) runProfileCheck();
     // Keep results in sync when a filter, player data or the local date changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileFilters, profilePlayerDirectory, ageDate]);
@@ -1554,7 +1567,13 @@ export default function ScoutingReportsPageFinal() {
           <select value={profileFilters.age} onChange={(e) => setProfileFilters({ ...profileFilters, age: e.target.value })}><option value="">Any age</option><option value="under21">Under 21</option><option value="21to24">21–24</option><option value="25to29">25–29</option><option value="30plus">30+</option></select>
           <select value={profileFilters.position} onChange={(e) => setProfileFilters({ ...profileFilters, position: e.target.value })}><option value="">Any position</option>{["GK","LB","LCB","CB","RCB","RB","DM","LM","LCM","CM","RCM","RM","LW","AM","RW","CF","ST"].map((x) => <option key={x}>{x}</option>)}</select>
           <select value={profileFilters.performance} onChange={(e) => setProfileFilters({ ...profileFilters, performance: e.target.value })}><option value="">Any performance grade</option>{[1,2,3,4,5].map((x) => <option key={x} value={String(x)}>{x}/5 or higher</option>)}</select>
-          <select value={profileFilters.potential} onChange={(e) => setProfileFilters({ ...profileFilters, potential: e.target.value })}><option value="">Any potential grade</option>{["A","B","C","D","E","F"].map((x) => <option key={x} value={x}>{x} grade and below</option>)}</select>
+          <details className="sr-potential-grade-filter">
+            <summary>{profileFilters.potential.length ? `Potential grade${profileFilters.potential.length > 1 ? "s" : ""}: ${profileFilters.potential.join(", ")}` : "Any potential grade"}</summary>
+            <div className="sr-potential-grade-menu" role="group" aria-label="Choose potential grades">
+              {["A", "B", "C", "D", "E", "F"].map((grade) => <label key={grade}><input type="checkbox" checked={profileFilters.potential.includes(grade)} onChange={(event) => setProfileFilters({ ...profileFilters, potential: event.target.checked ? [...profileFilters.potential, grade] : profileFilters.potential.filter((value) => value !== grade) })} />{grade} grade</label>)}
+              {profileFilters.potential.length > 0 && <button type="button" onClick={() => setProfileFilters({ ...profileFilters, potential: [] })}>Clear grades</button>}
+            </div>
+          </details>
         </div>
         {!!profileResults.length && (
           <><div className="sr-profile-results-actions"><strong>{profileResults.length} matching players</strong><button className="sr-outline" onClick={exportProfileNames}>Export Names</button></div><div className="sr-profile-results">
