@@ -31,7 +31,13 @@ export function AuthProvider({ children }) {
     setLoading(true);
     loadProfile(session.user).finally(() => setLoading(false));
   }, [session]);
-  const updateAppState = (next) => { setAppState(next); saveCloudState(session?.user, next).catch((error) => console.error("Could not save cloud data", error)); };
+  const updateAppState = (next) => {
+    setAppState(next);
+    return saveCloudState(session?.user, next).catch((error) => {
+      console.error("Could not save cloud data", error);
+      throw error;
+    });
+  };
   return <AuthContext.Provider value={{ session, user: session?.user || null, profile, profileError, appState, updateAppState, loading, refreshProfile: () => loadProfile(session?.user) }}>{children}</AuthContext.Provider>;
 }
 export const useAuth = () => useContext(AuthContext);

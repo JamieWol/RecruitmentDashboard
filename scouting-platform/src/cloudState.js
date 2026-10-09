@@ -1,7 +1,6 @@
 import { supabase } from "./supabaseClient";
 
 const keys = ["scoutingAssignments", "scoutingShortlists", "scoutingTags"];
-const legacySquadKeys = ["squadPlans", "squadPlanClub", "squadPlanFormation", "squadPlanPlayers", "squadPlanTags", "squadPlanRemoved", "squadPlanPositionLabels", "squadPlanActiveId"];
 const readLocal = (key, fallback) => {
   try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch { return fallback; }
 };
@@ -37,8 +36,9 @@ export async function migrateAndLoadState(user) {
     if (error) throw error;
     keys.forEach((key) => localStorage.removeItem(key));
   } else if (existing?.squadPlan && local.squadPlan.savedPlans.length) {
-    // Saved squad plans used to live in a browser-wide key. Attach only plans that
-    // match this account's already-cloud-saved active plan, then discard the legacy key.
+    // Saved squad plans used to live in browser-wide storage. Only migrate them
+    // when the cloud draft identifies the same club; otherwise leave the legacy
+    // copy untouched so it can be recovered without exposing it to another account.
     const planPlayerIds = (plan) => (plan?.players || []).map((player) => String(player.id || player.playerId || player.player_id || player.player || player.Name || player.name || "")).filter(Boolean).sort();
     const activeIds = planPlayerIds(existing.squadPlan);
     const matchingLegacyPlans = local.squadPlan.savedPlans.filter((plan) => {
@@ -50,11 +50,11 @@ export async function migrateAndLoadState(user) {
       state = { ...existing, squadPlan: { ...existing.squadPlan, savedPlans: [...(existing.squadPlan.savedPlans || []), ...matchingLegacyPlans.filter((plan) => !(existing.squadPlan.savedPlans || []).some((saved) => String(saved.id) === String(plan.id)))] } };
       const { error } = await supabase.from("user_app_state").upsert(state, { onConflict: "user_id" });
       if (error) throw error;
+      localStorage.removeItem("squadPlans");
     }
   }
-  // Squad plan draft/list data used to be shared by every account on this device.
-  // Remove those browser-wide keys so another account cannot inherit them.
-  legacySquadKeys.forEach((key) => localStorage.removeItem(key));
+  // Do not erase unresolved legacy squad data. It has no owner metadata, so
+  // deleting it before an account-scoped migration succeeds can lose a user's plan.
   return {
     assignments: state.assignments || [],
     shortlists: state.shortlists || [],

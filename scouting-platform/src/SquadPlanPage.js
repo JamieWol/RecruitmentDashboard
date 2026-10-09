@@ -161,7 +161,7 @@ export default function SquadPlanPage() {
         .then(({ error }) => { if (error) console.error("Could not update the shared squad plan", error); });
       return;
     }
-    updateAppState({ ...appState, squadPlan: { ...(appState?.squadPlan || {}), club, formation, players: next, tags, removedIds, positionLabels, ...extra } });
+    return updateAppState({ ...appState, squadPlan: { ...(appState?.squadPlan || {}), club, formation, players: next, tags, removedIds, positionLabels, ...extra } });
   };
   const toggleTag = (id, tagId) => {
     const next = squad.map((p) => p.planKey === planKey && String(p.id) === String(id) ? { ...p, tags: p.tags?.includes(tagId) ? [] : [tagId] } : p);
@@ -196,14 +196,22 @@ export default function SquadPlanPage() {
     setRemovedIds(nextRemoved);
     persist(squad.filter((p) => !(p.planKey === planKey && String(p.id) === key)), { removedIds: nextRemoved });
   };
-  const savePlan = () => {
+  const savePlan = async () => {
     if (readOnly || sharedId) return;
     const enteredName = window.prompt("Name this squad plan", squadName || `${club || "New"} Squad Plan`);
     if (!enteredName?.trim()) return;
     const id = planId || `squad-${Date.now()}`;
     const record = { id, name: enteredName.trim(), club, formation, players: currentPlayers, positionLabels, tags, removedIds, updatedAt: new Date().toISOString() };
     const savedPlans = [...(appState?.squadPlan?.savedPlans || []).filter((item) => String(item.id) !== String(id)), record];
-    setSquadName(record.name); persist(squad, { savedPlans }); setSavedMessage("Squad plan saved"); window.setTimeout(() => setSavedMessage(""), 2200); navigate(`/squad-plan?plan=${encodeURIComponent(id)}`, { replace: true });
+    try {
+      await persist(squad, { savedPlans });
+      setSquadName(record.name);
+      setSavedMessage("Squad plan saved");
+      window.setTimeout(() => setSavedMessage(""), 3000);
+      navigate(`/squad-plan?plan=${encodeURIComponent(id)}`, { replace: true });
+    } catch (error) {
+      setSavedMessage("Could not save the squad plan. Check your connection and try again.");
+    }
   };
   const place = (source, slot) => {
     if (readOnly) return;
