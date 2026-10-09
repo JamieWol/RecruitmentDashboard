@@ -34,21 +34,40 @@
 .sr-squad-club-options button {
   display: flex;
   align-items: center;
+  gap: 10px;
   width: 100%;
-  min-height: 48px;
-  padding: 9px 12px;
+  min-height: 46px;
+  padding: 8px 12px;
   border: 0;
   border-radius: 7px;
   background: #fff;
-  color: #173e67;
+  color: #173e67 !important;
   text-align: left;
   font: inherit;
   cursor: pointer;
 }
 
+.sr-squad-club-options .sr-squad-club-name {
+  display: block;
+  min-width: 0;
+  color: #173e67 !important;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
 .sr-squad-club-options button:hover,
 .sr-squad-club-options button.active {
   background: #eaf6fc;
+}
+
+.sr-squad-plan .sr-zone-list .sr-pitch-player-card[draggable="true"] {
+  cursor: grab;
+}
+
+.sr-squad-plan .sr-zone-list .sr-pitch-player-card[draggable="true"]:active {
+  cursor: grabbing;
 }
 
 .sr-squad-club-no-results {
