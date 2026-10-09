@@ -268,9 +268,9 @@ export default function SquadPlanPage() {
       navigate(`/squad-plan?plan=${encodeURIComponent(id)}`, { replace: true });
     } catch (error) {
       const reason = String(error?.message || error || "Unknown save error");
-      const missingSquadPlanColumn = /PGRST204|column[^\n]*squadPlan|squadPlan[^\n]*column/i.test(reason);
-      setSavedMessage(missingSquadPlanColumn
-        ? "Supabase is missing the squad plan storage field. Apply the included database migration, then try again."
+      const missingAppStateColumn = /PGRST204|Could not find the '[^']+' column of 'user_app_state'/i.test(reason);
+      setSavedMessage(missingAppStateColumn
+        ? "Supabase is missing an account data field. Apply the included database migration, then try again."
         : `Could not save the squad plan: ${reason}`);
     }
   };
