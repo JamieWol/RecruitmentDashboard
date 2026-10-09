@@ -33,23 +33,36 @@ function LoginGate() {
   useEffect(() => {
     if (!signup) return;
     let active = true;
-    setClubsLoading(true);
-    supabase.from("players").select("Team,team,club,Club").limit(10000).then(({ data, error: loadError }) => {
-      if (!active) return;
-      if (loadError) {
+    const loadClubs = async () => {
+      setClubsLoading(true);
+      const players = [];
+      let offset = 0;
+      try {
+        while (active) {
+          // Select complete rows because the player table's club column name
+          // varies between imported datasets (Team, Club, or club).
+          const { data, error: loadError } = await supabase.from("players").select("*").range(offset, offset + 999);
+          if (loadError) throw loadError;
+          players.push(...(data || []));
+          if (!data || data.length < 1000) break;
+          offset += 1000;
+        }
+        if (!active) return;
+        const clubFields = ["Team", "team", "club", "Club", "team_name", "Team Name", "club_name", "Club Name"];
+        const names = [...new Set(players.map((player) => {
+          const field = clubFields.find((key) => player[key]);
+          return String(field ? player[field] : "").trim();
+        }).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+        setClubs(names);
+      } catch (loadError) {
+        if (!active) return;
         console.error("Could not load club options", loadError);
         setClubs([]);
-      } else {
-        const names = [...new Set((data || []).map((item) => String(item.Team || item.team || item.club || item.Club || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-        setClubs(names);
+      } finally {
+        if (active) setClubsLoading(false);
       }
-      setClubsLoading(false);
-    }).catch((loadError) => {
-      if (!active) return;
-      console.error("Could not load club options", loadError);
-      setClubs([]);
-      setClubsLoading(false);
-    });
+    };
+    loadClubs();
     return () => { active = false; };
   }, [signup]);
   if (loading) return <div className="sr-auth-screen">Loading…</div>;
@@ -73,7 +86,7 @@ function LoginGate() {
     const result = signup ? await supabase.auth.signUp({ email, password, options: { data: { full_name: name, club } } }) : await supabase.auth.signInWithPassword({ email, password });
     if (result.error) setError(result.error.message);
   };
-  return <main className="sr-auth-screen"><section className="sr-auth-landing"><div className="sr-auth-copy"><div className="sr-auth-brand">⚽ ScoutPro</div><h1>Football Recruitment<br />Organised Properly.</h1><p>Manage assignments, reports and shortlists securely with your scouting team.</p></div><form className="sr-form sr-auth-form" onSubmit={submit}><h2>{signup ? "Request access" : "Welcome back"}</h2>{signup && <><input placeholder="Full name" value={name} onChange={e => setName(e.target.value)} required /><div className="sr-club-picker"><input role="combobox" aria-autocomplete="list" aria-expanded={clubMenuOpen && matchingClubs.length > 0} aria-controls="signup-clubs" aria-activedescendant={clubActiveIndex >= 0 ? `signup-club-${clubActiveIndex}` : undefined} autoComplete="off" placeholder="Start typing your club" value={club} onFocus={() => setClubMenuOpen(true)} onBlur={() => window.setTimeout(() => setClubMenuOpen(false), 120)} onChange={e => { setClub(e.target.value); setClubMenuOpen(true); setClubActiveIndex(-1); }} onKeyDown={handleClubKeyDown} required />{clubMenuOpen && club.trim() && <div className="sr-club-options" id="signup-clubs" role="listbox">{matchingClubs.length ? matchingClubs.map((clubName, index) => <button id={`signup-club-${index}`} className={`sr-club-option${index === clubActiveIndex ? " active" : ""}`} type="button" role="option" aria-selected={index === clubActiveIndex} key={clubName} onMouseDown={(event) => event.preventDefault()} onClick={() => selectClub(clubName)}><ClubBadge club={clubName} size={30} /><span>{clubName}</span></button>) : <div className="sr-club-no-results">{clubsLoading ? "Loading clubs…" : clubs.length ? "No matching clubs found" : "Club list is unavailable right now"}</div>}</div>}</div><small className="sr-auth-note">Your club admin will review your request.</small></>}<input type="email" placeholder="Email address" value={email} onChange={e => setEmail(e.target.value)} required /><input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />{error && <p className="sr-auth-error">{error}</p>}<button className="sr-cyan">{signup ? "Request account" : "Sign in"}</button><button type="button" className="sr-outline" onClick={() => { setSignup(!signup); setClubMenuOpen(false); setError(""); }}>{signup ? "Already have an account? Sign in" : "Create an account"}</button></form></section></main>;
+  return <main className="sr-auth-screen"><section className="sr-auth-landing"><div className="sr-auth-copy"><div className="sr-auth-brand">⚽ ScoutPro</div><h1>Football Recruitment<br />Organised Properly.</h1><p>Manage assignments, reports and shortlists securely with your scouting team.</p></div><form className="sr-form sr-auth-form" onSubmit={submit}><h2>{signup ? "Request access" : "Welcome back"}</h2>{signup && <><input placeholder="Full name" value={name} onChange={e => setName(e.target.value)} required /><div className="sr-club-picker"><input role="combobox" aria-autocomplete="list" aria-expanded={clubMenuOpen && Boolean(club.trim())} aria-controls="signup-clubs" aria-activedescendant={clubActiveIndex >= 0 ? `signup-club-${clubActiveIndex}` : undefined} autoComplete="off" placeholder="Start typing your club" value={club} onFocus={() => setClubMenuOpen(true)} onBlur={() => window.setTimeout(() => setClubMenuOpen(false), 180)} onChange={e => { setClub(e.target.value); setClubMenuOpen(true); setClubActiveIndex(-1); }} onKeyDown={handleClubKeyDown} required />{clubMenuOpen && club.trim() && <div className="sr-club-options" id="signup-clubs" role="listbox">{matchingClubs.length ? matchingClubs.map((clubName, index) => <button id={`signup-club-${index}`} className={`sr-club-option${index === clubActiveIndex ? " active" : ""}`} type="button" role="option" aria-selected={clubName === club} key={clubName} onPointerDown={(event) => event.preventDefault()} onMouseDown={(event) => event.preventDefault()} onClick={() => selectClub(clubName)}><ClubBadge club={clubName} size={30} /><span>{clubName}</span></button>) : <div className="sr-club-no-results">{clubsLoading ? "Loading clubs…" : clubs.length ? "No matching clubs found" : "Could not load the club list"}</div>}</div>}</div><small className="sr-auth-note">Your club admin will review your request.</small></>}<input type="email" placeholder="Email address" value={email} onChange={e => setEmail(e.target.value)} required /><input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />{error && <p className="sr-auth-error">{error}</p>}<button className="sr-cyan">{signup ? "Request account" : "Sign in"}</button><button type="button" className="sr-outline" onClick={() => { setSignup(!signup); setClubMenuOpen(false); setError(""); }}>{signup ? "Already have an account? Sign in" : "Create an account"}</button></form></section></main>;
 }
 
 function AppRoutes() {
