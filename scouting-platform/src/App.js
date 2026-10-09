@@ -161,7 +161,7 @@ function Header() {
         <span style={{ fontSize: 24, fontWeight: 700 }}>&#9917; ScoutPro</span>
       </div>
 
-      <nav className="desktop-nav">
+      <nav className="desktop-nav" style={{ display: "flex", flexDirection: "row", flexWrap: "nowrap", alignItems: "center", justifyContent: "flex-end", gap: 18, whiteSpace: "nowrap", minWidth: 0 }}>
         {links.map((link) => (
           <span
             key={link.label}
@@ -179,8 +179,8 @@ function Header() {
         >
           Recruitment Dashboard
         </a>
-        {user && canReviewAccess && <div className="sr-settings-menu"><button type="button" className="sr-settings-trigger" aria-label="Settings" title="Settings" aria-expanded={settingsOpen} onClick={() => setSettingsOpen((open) => !open)}>⚙</button>{settingsOpen && <div className="sr-settings-dropdown"><button type="button" onClick={() => { goTo("/approval-requests"); setSettingsOpen(false); }}>Access approvals</button></div>}</div>}
-        {user && <button className="header-signout" onClick={() => supabase.auth.signOut()}>Sign out</button>}
+        {user && canReviewAccess && <div className="sr-settings-menu" style={{ marginLeft: 0, flex: "0 0 auto" }}><button type="button" className="sr-settings-trigger" aria-label="Settings" title="Settings" aria-expanded={settingsOpen} onClick={() => setSettingsOpen((open) => !open)}>⚙</button>{settingsOpen && <div className="sr-settings-dropdown"><button type="button" onClick={() => { goTo("/approval-requests"); setSettingsOpen(false); }}>Access approvals</button></div>}</div>}
+        {user && <button className="header-signout" style={{ marginLeft: 0, flex: "0 0 auto" }} onClick={() => supabase.auth.signOut()}>Sign out</button>}
       </nav>
 
       <button type="button" className={`hamburger ${menuOpen ? "open" : ""}`} aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"} aria-expanded={menuOpen} aria-controls="mobile-navigation" onClick={() => setMenuOpen(!menuOpen)}>
@@ -218,10 +218,12 @@ function Header() {
       </nav>
 
       <style>{`
-        .nav-link { color: #fff; cursor: pointer; margin-left: 25px; font-weight: 600; position: relative; }
+        .nav-link { color: #fff; cursor: pointer; margin-left: 0; font-weight: 600; position: relative; }
         .nav-link::after { content: ""; position: absolute; left: 0; bottom: -3px; width: 0%; height: 2px; background-color: #ffb74d; transition: width 0.3s ease; }
         .nav-link:hover::after { width: 100%; }
         .nav-link:hover { color: #ffb74d; }
+
+        .desktop-nav { display: flex; align-items: center; gap: 18px; white-space: nowrap; }
 
         .sr-settings-menu { position: relative; margin-left: 20px; }
         .sr-settings-trigger { min-height: 40px; padding: 7px 11px; border: 1px solid #ffffff66; border-radius: 8px; background: transparent; color: #fff; font-size: 20px; cursor: pointer; }
@@ -244,7 +246,7 @@ function Header() {
         .mobile-menu .nav-link { opacity: 0; animation: fadeIn 0.4s forwards; }
         @keyframes fadeIn { to { opacity: 1; } }
 
-        @media (max-width: 768px) { .desktop-nav { display: none; } .hamburger { display: flex; } }
+        @media (max-width: 1100px) { .desktop-nav { display: none !important; } .hamburger { display: flex; } }
       `}</style>
     </header>
   );
