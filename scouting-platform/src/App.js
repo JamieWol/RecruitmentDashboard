@@ -11,12 +11,13 @@ import SquadPlanPage from "./SquadPlanPage";
 import SquadPlansPage from "./SquadPlansPage";
 import CreateAssignmentPage from "./CreateAssignmentPage";
 import TeamAnalysisPage from "./TeamAnalysisPage";
+import ApprovalRequestsPage from "./ApprovalRequestsPage";
 import { ClubBadge } from "./ClubBadge";
 import "./App.css";
 import "./mobile.css";
 
 function LoginGate() {
-  const { user, profile, profileError, loading } = useAuth();
+  const { user, profile, profileError, loading, refreshProfile } = useAuth();
   const [signup, setSignup] = useState(false), [email, setEmail] = useState(""), [password, setPassword] = useState(""), [name, setName] = useState(""), [club, setClub] = useState(""), [clubs, setClubs] = useState([]), [clubsLoading, setClubsLoading] = useState(false), [clubMenuOpen, setClubMenuOpen] = useState(false), [clubActiveIndex, setClubActiveIndex] = useState(-1), [error, setError] = useState("");
   const matchingClubs = useMemo(() => {
     const query = club.trim().toLocaleLowerCase();
@@ -35,25 +36,38 @@ function LoginGate() {
     let active = true;
     const loadClubs = async () => {
       setClubsLoading(true);
-      const players = [];
-      let offset = 0;
       try {
-        while (active) {
-          // Select complete rows because the player table's club column name
-          // varies between imported datasets (Team, Club, or club).
-          const { data, error: loadError } = await supabase.from("players").select("*").range(offset, offset + 999);
-          if (loadError) throw loadError;
-          players.push(...(data || []));
-          if (!data || data.length < 1000) break;
-          offset += 1000;
+        // Imported player datasets use different names for the team column.
+        // Probe one candidate at a time so one missing column cannot break the
+        // whole signup club list, and only download the club field.
+        const clubFields = ["Team", "team", "club", "Club", "team_name", "club_name"];
+        let names = [];
+        let lastError = null;
+        for (const field of clubFields) {
+          const values = [];
+          let offset = 0;
+          let fieldFailed = false;
+          while (active) {
+            const { data, error: loadError } = await supabase.from("players").select(field).range(offset, offset + 999);
+            if (loadError) {
+              lastError = loadError;
+              fieldFailed = true;
+              break;
+            }
+            values.push(...(data || []).map((item) => item[field]));
+            if (!data || data.length < 1000) break;
+            offset += 1000;
+          }
+          if (!active) return;
+          if (!fieldFailed) {
+            names = [...new Set(values.map((value) => String(value || "").trim()).filter(Boolean))];
+            if (names.length) break;
+          }
         }
         if (!active) return;
-        const clubFields = ["Team", "team", "club", "Club", "team_name", "Team Name", "club_name", "Club Name"];
-        const names = [...new Set(players.map((player) => {
-          const field = clubFields.find((key) => player[key]);
-          return String(field ? player[field] : "").trim();
-        }).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+        names.sort((a, b) => a.localeCompare(b));
         setClubs(names);
+        if (!names.length && lastError) console.error("Could not load club options", lastError);
       } catch (loadError) {
         if (!active) return;
         console.error("Could not load club options", loadError);
@@ -67,7 +81,7 @@ function LoginGate() {
   }, [signup]);
   if (loading) return <div className="sr-auth-screen">Loading…</div>;
   if (user && profile?.approved) return <AppRoutes />;
-  if (user) return <div className="sr-auth-screen"><div className="sr-pending-card"><h1>Awaiting admin approval</h1><p>{profileError || "Your account has been created. An administrator must assign your club before you can access the platform."}</p><small>Signed-in user ID: {user.id}</small><button className="sr-cyan" onClick={() => supabase.auth.signOut()}>Sign out</button></div></div>;
+  if (user) return <div className="sr-auth-screen"><div className="sr-pending-card"><h1>{profile?.approval_status === "rejected" ? "Access request declined" : "Awaiting admin approval"}</h1><p>{profileError || (profile?.approval_status === "rejected" ? "Your club has declined this account request. Contact your club administrator if you think this is a mistake." : "Your account has been created. An administrator must assign your club before you can access the platform.")}</p><button className="sr-cyan" onClick={refreshProfile}>Check approval status</button><button className="sr-outline" onClick={() => supabase.auth.signOut()}>Sign out</button></div></div>;
   const selectClub = (clubName) => { setClub(clubName); setClubMenuOpen(false); setClubActiveIndex(-1); };
   const handleClubKeyDown = (event) => {
     if (event.key === "ArrowDown" && matchingClubs.length) {
@@ -91,14 +105,16 @@ function LoginGate() {
 
 function AppRoutes() {
   const [shadowSquad, setShadowSquad] = useState([]);
-  return <><Header /><div className="sr-app-shell" style={{ paddingTop: 80 }}><Routes><Route path="/" element={<LandingPage />} /><Route path="/scout-report" element={<ScoutReportPage shadowSquad={shadowSquad} setShadowSquad={setShadowSquad} />} /><Route path="/scouting-reports" element={<ScoutingReportsPage />} /><Route path="/shortlists" element={<ShortlistsPage />} /><Route path="/squad-plans" element={<SquadPlansPage />} /><Route path="/squad-plan" element={<SquadPlanPage />} /><Route path="/create-assignment" element={<CreateAssignmentPage />} /><Route path="/team-analysis" element={<TeamAnalysisPage />} /><Route path="/recruitment-dashboard" element={<RecruitmentDashboardPage />} /></Routes></div></>;
+  return <><Header /><div className="sr-app-shell" style={{ paddingTop: 80 }}><Routes><Route path="/" element={<LandingPage />} /><Route path="/scout-report" element={<ScoutReportPage shadowSquad={shadowSquad} setShadowSquad={setShadowSquad} />} /><Route path="/scouting-reports" element={<ScoutingReportsPage />} /><Route path="/shortlists" element={<ShortlistsPage />} /><Route path="/squad-plans" element={<SquadPlansPage />} /><Route path="/squad-plan" element={<SquadPlanPage />} /><Route path="/create-assignment" element={<CreateAssignmentPage />} /><Route path="/team-analysis" element={<TeamAnalysisPage />} /><Route path="/approval-requests" element={<ApprovalRequestsPage />} /><Route path="/recruitment-dashboard" element={<RecruitmentDashboardPage />} /></Routes></div></>;
 }
 
 // ------------------- HEADER COMPONENT -------------------
 function Header() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const canReviewAccess = profile?.role === "platform_admin" || profile?.role === "club_admin";
 
   const goTo = (path) => {
     if (path === "/scouting-reports") {
@@ -163,6 +179,7 @@ function Header() {
         >
           Recruitment Dashboard
         </a>
+        {user && canReviewAccess && <div className="sr-settings-menu"><button type="button" className="sr-settings-trigger" aria-label="Settings" title="Settings" aria-expanded={settingsOpen} onClick={() => setSettingsOpen((open) => !open)}>⚙</button>{settingsOpen && <div className="sr-settings-dropdown"><button type="button" onClick={() => { goTo("/approval-requests"); setSettingsOpen(false); }}>Access approvals</button></div>}</div>}
         {user && <button className="header-signout" onClick={() => supabase.auth.signOut()}>Sign out</button>}
       </nav>
 
@@ -196,7 +213,8 @@ function Header() {
         >
           Recruitment Dashboard
         </a>
-        {user && <button className="header-signout" onClick={() => supabase.auth.signOut()}>Sign out</button>}
+        {user && canReviewAccess && <div className="sr-mobile-account-actions"><button type="button" className="sr-settings-trigger" onClick={() => setSettingsOpen((open) => !open)} aria-expanded={settingsOpen}>⚙ Settings</button>{settingsOpen && <button type="button" className="sr-settings-mobile-link" onClick={() => { goTo("/approval-requests"); setSettingsOpen(false); setMenuOpen(false); }}>Access approvals</button>}<button className="header-signout" onClick={() => supabase.auth.signOut()}>Sign out</button></div>}
+        {user && !canReviewAccess && <button className="header-signout" onClick={() => supabase.auth.signOut()}>Sign out</button>}
       </nav>
 
       <style>{`
@@ -204,6 +222,16 @@ function Header() {
         .nav-link::after { content: ""; position: absolute; left: 0; bottom: -3px; width: 0%; height: 2px; background-color: #ffb74d; transition: width 0.3s ease; }
         .nav-link:hover::after { width: 100%; }
         .nav-link:hover { color: #ffb74d; }
+
+        .sr-settings-menu { position: relative; margin-left: 20px; }
+        .sr-settings-trigger { min-height: 40px; padding: 7px 11px; border: 1px solid #ffffff66; border-radius: 8px; background: transparent; color: #fff; font-size: 20px; cursor: pointer; }
+        .sr-settings-dropdown { position: absolute; top: calc(100% + 8px); right: 0; min-width: 190px; padding: 6px; border: 1px solid #78b4d8; border-radius: 9px; background: #173f70; box-shadow: 0 12px 28px #00152e66; }
+        .sr-settings-dropdown button,.sr-settings-mobile-link { width: 100%; padding: 11px 12px; border: 0; border-radius: 6px; background: transparent; color: white; font: inherit; font-weight: 700; text-align: left; cursor: pointer; }
+        .sr-settings-dropdown button:hover,.sr-settings-mobile-link:hover { background: #285b8d; }
+        .sr-mobile-account-actions { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding-top: 10px; }
+        .sr-mobile-account-actions .sr-settings-trigger { width: 100%; font-size: 15px; }
+        .sr-mobile-account-actions .header-signout { margin: 0; }
+        .sr-settings-mobile-link { grid-column: 1 / -1; border: 1px solid #ffffff30; }
 
         .hamburger { display: none; flex-direction: column; justify-content: space-between; width: 25px; height: 20px; cursor: pointer; z-index: 4; }
         .hamburger span { height: 3px; background: #fff; border-radius: 2px; transition: all 0.3s ease; }
