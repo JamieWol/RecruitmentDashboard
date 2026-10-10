@@ -84,8 +84,14 @@
   }
 
   header.sr-app-header .sr-mobile-account-actions {
-    grid-template-columns: 1fr 1fr;
     align-items: stretch;
+  }
+
+  header.sr-app-header .sr-mobile-account-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    width: 100%;
   }
 
   header.sr-app-header .sr-mobile-account-actions .sr-settings-trigger,

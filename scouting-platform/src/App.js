@@ -131,6 +131,12 @@ function Header() {
       setExporting("");
     }
   };
+  const settingsMenuItems = () => <>
+    {canReviewAccess && <button type="button" onClick={() => { goTo("/approval-requests"); setSettingsOpen(false); }}>Access approvals</button>}
+    <button type="button" disabled={Boolean(exporting)} onClick={() => exportReports("xlsx")}>{exporting === "xlsx" ? "Exporting…" : "Export my reports to Excel"}</button>
+    <button type="button" disabled={Boolean(exporting)} onClick={() => exportReports("csv")}>{exporting === "csv" ? "Exporting…" : "Export my reports to CSV"}</button>
+    {settingsMessage && <p className="sr-settings-message" role="status">{settingsMessage}</p>}
+  </>;
 
   const goTo = (path) => {
     if (path === "/scouting-reports") {
@@ -195,7 +201,7 @@ function Header() {
         >
           Recruitment Dashboard
         </a>
-        {user && <div className="sr-settings-menu" style={{ marginLeft: 0, flex: "0 0 auto" }}><button type="button" className="sr-settings-trigger" aria-label="Settings" title="Settings" aria-expanded={settingsOpen} onClick={() => { setSettingsOpen((open) => !open); setSettingsMessage(""); }}>⚙</button>{settingsOpen && <div className="sr-settings-dropdown">{canReviewAccess && <button type="button" onClick={() => { goTo("/approval-requests"); setSettingsOpen(false); }}>Access approvals</button>}<button type="button" disabled={Boolean(exporting)} onClick={() => exportReports("xlsx")}>{exporting === "xlsx" ? "Exporting…" : "Export my reports to Excel"}</button><button type="button" disabled={Boolean(exporting)} onClick={() => exportReports("csv")}>{exporting === "csv" ? "Exporting…" : "Export my reports to CSV"}</button>{settingsMessage && <p className="sr-settings-message" role="status">{settingsMessage}</p>}</div>}</div>}
+        {user && <div className="sr-settings-menu" style={{ position: "relative", marginLeft: 0, flex: "0 0 auto" }}><button type="button" className="sr-settings-trigger" aria-label="Settings" title="Settings" aria-expanded={settingsOpen} onClick={() => { setSettingsOpen((open) => !open); setSettingsMessage(""); }}>⚙</button>{settingsOpen && <div className="sr-settings-dropdown">{settingsMenuItems()}</div>}</div>}
         {user && <button className="header-signout" style={{ marginLeft: 0, flex: "0 0 auto" }} onClick={() => supabase.auth.signOut()}>Sign out</button>}
       </nav>
 
@@ -229,7 +235,7 @@ function Header() {
         >
           Recruitment Dashboard
         </a>
-        {user && <div className="sr-mobile-account-actions"><button type="button" className="sr-settings-trigger" onClick={() => { setSettingsOpen((open) => !open); setSettingsMessage(""); }} aria-expanded={settingsOpen}>⚙ Settings</button><button className="header-signout" onClick={() => supabase.auth.signOut()}>Sign out</button>{settingsOpen && <>{canReviewAccess && <button type="button" className="sr-settings-mobile-link" onClick={() => { goTo("/approval-requests"); setSettingsOpen(false); setMenuOpen(false); }}>Access approvals</button>}<button type="button" className="sr-settings-mobile-link" disabled={Boolean(exporting)} onClick={() => exportReports("xlsx")}>{exporting === "xlsx" ? "Exporting…" : "Export my reports to Excel"}</button><button type="button" className="sr-settings-mobile-link" disabled={Boolean(exporting)} onClick={() => exportReports("csv")}>{exporting === "csv" ? "Exporting…" : "Export my reports to CSV"}</button>{settingsMessage && <span className="sr-settings-message" role="status">{settingsMessage}</span>}</>}</div>}
+        {user && <div className="sr-mobile-account-actions"><div className="sr-mobile-account-buttons"><button type="button" className="sr-settings-trigger" onClick={() => { setSettingsOpen((open) => !open); setSettingsMessage(""); }} aria-expanded={settingsOpen}>⚙ Settings</button><button className="header-signout" onClick={() => supabase.auth.signOut()}>Sign out</button></div>{settingsOpen && <div className="sr-settings-dropdown sr-settings-dropdown-mobile">{settingsMenuItems()}</div>}</div>}
       </nav>
 
       <style>{`
@@ -240,17 +246,18 @@ function Header() {
 
         .desktop-nav { display: flex; align-items: center; gap: 18px; white-space: nowrap; }
 
-        .sr-settings-menu { position: relative; margin-left: 20px; }
+        .sr-settings-menu { position: relative; margin-left: 0; }
         .sr-settings-trigger { min-height: 40px; padding: 7px 11px; border: 1px solid #ffffff66; border-radius: 8px; background: transparent; color: #fff; font-size: 20px; cursor: pointer; }
-        .sr-settings-dropdown { position: absolute; top: calc(100% + 8px); right: 0; min-width: 190px; padding: 6px; border: 1px solid #78b4d8; border-radius: 9px; background: #173f70; box-shadow: 0 12px 28px #00152e66; }
-        .sr-settings-dropdown button,.sr-settings-mobile-link { width: 100%; padding: 11px 12px; border: 0; border-radius: 6px; background: transparent; color: white; font: inherit; font-weight: 700; text-align: left; cursor: pointer; }
-        .sr-settings-dropdown button:hover,.sr-settings-mobile-link:hover { background: #285b8d; }
-        .sr-settings-dropdown button:disabled,.sr-settings-mobile-link:disabled { opacity: .6; cursor: wait; }
+        .sr-settings-dropdown { position: absolute; top: calc(100% + 8px); right: 0; z-index: 120; display: flex; flex-direction: column; gap: 3px; width: 280px; max-width: calc(100vw - 24px); min-width: 0; box-sizing: border-box; padding: 8px; border: 1px solid #78b4d8; border-radius: 9px; background: #173f70; box-shadow: 0 12px 28px #00152e66; white-space: normal; }
+        .sr-settings-dropdown button { display: block; width: 100%; box-sizing: border-box; padding: 11px 12px; border: 0; border-radius: 6px; background: transparent; color: white; font: inherit; font-weight: 700; line-height: 1.35; text-align: left; white-space: normal; cursor: pointer; }
+        .sr-settings-dropdown button:hover { background: #285b8d; }
+        .sr-settings-dropdown button:disabled { opacity: .6; cursor: wait; }
         .sr-settings-message { display: block; margin: 6px 8px; color: #c9efff; font-size: 12px; line-height: 1.4; white-space: normal; }
-        .sr-mobile-account-actions { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding-top: 10px; }
+        .sr-mobile-account-actions { width: 100%; display: flex; flex-direction: column; gap: 8px; padding-top: 10px; }
+        .sr-mobile-account-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
         .sr-mobile-account-actions .sr-settings-trigger { width: 100%; font-size: 15px; }
         .sr-mobile-account-actions .header-signout { margin: 0; }
-        .sr-settings-mobile-link { grid-column: 1 / -1; border: 1px solid #ffffff30; }
+        .sr-settings-dropdown-mobile { position: static; width: 100%; max-width: none; box-shadow: none; }
 
         .hamburger { display: none; flex-direction: column; justify-content: space-between; width: 25px; height: 20px; cursor: pointer; z-index: 4; }
         .hamburger span { height: 3px; background: #fff; border-radius: 2px; transition: all 0.3s ease; }
