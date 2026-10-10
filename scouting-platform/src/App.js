@@ -12,6 +12,7 @@ import SquadPlansPage from "./SquadPlansPage";
 import CreateAssignmentPage from "./CreateAssignmentPage";
 import TeamAnalysisPage from "./TeamAnalysisPage";
 import ApprovalRequestsPage from "./ApprovalRequestsPage";
+import { exportMyReports } from "./reportExport";
 import { ClubBadge } from "./ClubBadge";
 import "./App.css";
 import "./mobile.css";
@@ -111,10 +112,25 @@ function AppRoutes() {
 // ------------------- HEADER COMPONENT -------------------
 function Header() {
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+  const { user, profile, appState } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [exporting, setExporting] = useState("");
+  const [settingsMessage, setSettingsMessage] = useState("");
   const canReviewAccess = profile?.role === "platform_admin" || profile?.role === "club_admin";
+
+  const exportReports = async (format) => {
+    setExporting(format);
+    setSettingsMessage("");
+    try {
+      const count = await exportMyReports({ appState, user, profile, format });
+      setSettingsMessage(`${count} report${count === 1 ? "" : "s"} exported.`);
+    } catch (error) {
+      setSettingsMessage(error?.message || "Could not export your reports.");
+    } finally {
+      setExporting("");
+    }
+  };
 
   const goTo = (path) => {
     if (path === "/scouting-reports") {
@@ -179,7 +195,7 @@ function Header() {
         >
           Recruitment Dashboard
         </a>
-        {user && canReviewAccess && <div className="sr-settings-menu" style={{ marginLeft: 0, flex: "0 0 auto" }}><button type="button" className="sr-settings-trigger" aria-label="Settings" title="Settings" aria-expanded={settingsOpen} onClick={() => setSettingsOpen((open) => !open)}>⚙</button>{settingsOpen && <div className="sr-settings-dropdown"><button type="button" onClick={() => { goTo("/approval-requests"); setSettingsOpen(false); }}>Access approvals</button></div>}</div>}
+        {user && <div className="sr-settings-menu" style={{ marginLeft: 0, flex: "0 0 auto" }}><button type="button" className="sr-settings-trigger" aria-label="Settings" title="Settings" aria-expanded={settingsOpen} onClick={() => { setSettingsOpen((open) => !open); setSettingsMessage(""); }}>⚙</button>{settingsOpen && <div className="sr-settings-dropdown">{canReviewAccess && <button type="button" onClick={() => { goTo("/approval-requests"); setSettingsOpen(false); }}>Access approvals</button>}<button type="button" disabled={Boolean(exporting)} onClick={() => exportReports("xlsx")}>{exporting === "xlsx" ? "Exporting…" : "Export my reports to Excel"}</button><button type="button" disabled={Boolean(exporting)} onClick={() => exportReports("csv")}>{exporting === "csv" ? "Exporting…" : "Export my reports to CSV"}</button>{settingsMessage && <p className="sr-settings-message" role="status">{settingsMessage}</p>}</div>}</div>}
         {user && <button className="header-signout" style={{ marginLeft: 0, flex: "0 0 auto" }} onClick={() => supabase.auth.signOut()}>Sign out</button>}
       </nav>
 
@@ -213,8 +229,7 @@ function Header() {
         >
           Recruitment Dashboard
         </a>
-        {user && canReviewAccess && <div className="sr-mobile-account-actions"><button type="button" className="sr-settings-trigger" onClick={() => setSettingsOpen((open) => !open)} aria-expanded={settingsOpen}>⚙ Settings</button>{settingsOpen && <button type="button" className="sr-settings-mobile-link" onClick={() => { goTo("/approval-requests"); setSettingsOpen(false); setMenuOpen(false); }}>Access approvals</button>}<button className="header-signout" onClick={() => supabase.auth.signOut()}>Sign out</button></div>}
-        {user && !canReviewAccess && <button className="header-signout" onClick={() => supabase.auth.signOut()}>Sign out</button>}
+        {user && <div className="sr-mobile-account-actions"><button type="button" className="sr-settings-trigger" onClick={() => { setSettingsOpen((open) => !open); setSettingsMessage(""); }} aria-expanded={settingsOpen}>⚙ Settings</button><button className="header-signout" onClick={() => supabase.auth.signOut()}>Sign out</button>{settingsOpen && <>{canReviewAccess && <button type="button" className="sr-settings-mobile-link" onClick={() => { goTo("/approval-requests"); setSettingsOpen(false); setMenuOpen(false); }}>Access approvals</button>}<button type="button" className="sr-settings-mobile-link" disabled={Boolean(exporting)} onClick={() => exportReports("xlsx")}>{exporting === "xlsx" ? "Exporting…" : "Export my reports to Excel"}</button><button type="button" className="sr-settings-mobile-link" disabled={Boolean(exporting)} onClick={() => exportReports("csv")}>{exporting === "csv" ? "Exporting…" : "Export my reports to CSV"}</button>{settingsMessage && <span className="sr-settings-message" role="status">{settingsMessage}</span>}</>}</div>}
       </nav>
 
       <style>{`
@@ -230,6 +245,8 @@ function Header() {
         .sr-settings-dropdown { position: absolute; top: calc(100% + 8px); right: 0; min-width: 190px; padding: 6px; border: 1px solid #78b4d8; border-radius: 9px; background: #173f70; box-shadow: 0 12px 28px #00152e66; }
         .sr-settings-dropdown button,.sr-settings-mobile-link { width: 100%; padding: 11px 12px; border: 0; border-radius: 6px; background: transparent; color: white; font: inherit; font-weight: 700; text-align: left; cursor: pointer; }
         .sr-settings-dropdown button:hover,.sr-settings-mobile-link:hover { background: #285b8d; }
+        .sr-settings-dropdown button:disabled,.sr-settings-mobile-link:disabled { opacity: .6; cursor: wait; }
+        .sr-settings-message { display: block; margin: 6px 8px; color: #c9efff; font-size: 12px; line-height: 1.4; white-space: normal; }
         .sr-mobile-account-actions { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding-top: 10px; }
         .sr-mobile-account-actions .sr-settings-trigger { width: 100%; font-size: 15px; }
         .sr-mobile-account-actions .header-signout { margin: 0; }

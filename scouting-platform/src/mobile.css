@@ -359,7 +359,7 @@
     overflow-x: auto;
     overflow-y: visible;
     overscroll-behavior-x: contain;
-    touch-action: pan-x pan-y;
+    touch-action: pan-x pan-y pinch-zoom;
     -webkit-overflow-scrolling: touch;
   }
 
@@ -476,7 +476,7 @@
     overflow-x: auto;
     overflow-y: visible;
     overscroll-behavior-x: contain;
-    touch-action: pan-x pan-y;
+    touch-action: pan-x pan-y pinch-zoom;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
   }
@@ -503,6 +503,10 @@
 
   .sr-shortlists-page.sr-shortlist-view .sr-zone-list {
     overflow-x: hidden;
+  }
+
+  .sr-mobile-account-actions .sr-settings-message {
+    grid-column: 1 / -1;
   }
 
   .sr-shortlists-page.sr-shortlist-view .sr-pitch-player-card {
