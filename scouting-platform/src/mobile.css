@@ -1,5 +1,9 @@
 /* Phone layout and installed iOS Home Screen safe areas. */
 @media (max-width: 768px) {
+  .sr-report .sr-field textarea {
+    max-height: 40vh;
+  }
+
   html,
   body,
   #root {
