@@ -323,6 +323,7 @@ export default function ScoutingReportsPageFinal() {
       return saved?.active ? { ...saved.active, report: saved.report || saved.active.report || null } : null;
     } catch { return null; }
   });
+  const [profileReturnReport, setProfileReturnReport] = useState(null);
   const [sharedReports, setSharedReports] = useState([]);
   const [sharedAssignments, setSharedAssignments] = useState([]);
   const [deleteError, setDeleteError] = useState("");
@@ -913,8 +914,10 @@ export default function ScoutingReportsPageFinal() {
   };
   const openReportPlayerProfile = () => {
     if (!active) return;
-    sessionStorage.setItem("scoutingActiveReport", JSON.stringify({ active, report }));
-    localStorage.setItem("scoutingProfileOrigin", "scout-report-detail");
+    const returnState = { active, report };
+    setProfileReturnReport(returnState);
+    try { sessionStorage.setItem("scoutingActiveReport", JSON.stringify(returnState)); } catch {}
+    try { localStorage.setItem("scoutingProfileOrigin", "scout-report-detail"); } catch {}
     setActive(null);
     setProfile(active);
   };
@@ -1119,10 +1122,9 @@ export default function ScoutingReportsPageFinal() {
             <div>
               <div className="sr-kicker">PLAYER REPORT</div>
               <button
+                type="button"
                 className="sr-report-player-link"
-                onClick={() => {
-                  openReportPlayerProfile();
-                }}
+                onClick={openReportPlayerProfile}
               >
                 <span>{active.player}</span>
               </button>
@@ -1307,13 +1309,16 @@ export default function ScoutingReportsPageFinal() {
               localStorage.removeItem("scoutingProfileOrigin");
               localStorage.removeItem("scoutingProfileReturnPath");
               nav(returnPath);
-            } else if (localStorage.getItem("scoutingProfileOrigin") === "scout-report-detail") {
-              let savedReport = null;
-              try { savedReport = JSON.parse(sessionStorage.getItem("scoutingActiveReport") || "null"); } catch {}
+            } else if (profileReturnReport || localStorage.getItem("scoutingProfileOrigin") === "scout-report-detail") {
+              let savedReport = profileReturnReport;
+              if (!savedReport) {
+                try { savedReport = JSON.parse(sessionStorage.getItem("scoutingActiveReport") || "null"); } catch {}
+              }
               localStorage.removeItem("scoutingProfilePlayer");
               localStorage.removeItem("scoutingProfileOrigin");
               localStorage.removeItem("scoutingProfileReturnPath");
               setProfile(null);
+              setProfileReturnReport(null);
               if (savedReport?.active) {
                 setActive(savedReport.active);
                 setReport(savedReport.report || savedReport.active.report || empty);
@@ -1329,7 +1334,7 @@ export default function ScoutingReportsPageFinal() {
           ‹{" "}
           {localStorage.getItem("scoutingProfileOrigin") === "shortlists"
             ? "Back to previous page"
-            : localStorage.getItem("scoutingProfileOrigin") === "scout-report-detail"
+            : profileReturnReport || localStorage.getItem("scoutingProfileOrigin") === "scout-report-detail"
               ? "Back to Scout Report"
             : localStorage.getItem("scoutingProfileOrigin") === "squad-plan"
               ? "Back to Squad Analysis"
