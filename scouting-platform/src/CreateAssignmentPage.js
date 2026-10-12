@@ -3,8 +3,10 @@ import React, { useMemo, useState } from "react";
 import { useEffect } from "react";
 import { supabase } from "./supabaseClient";
 import { useAuth } from "./AuthContext";
+import { createMasterPlayer } from "./playerDatabase";
+
 export default function CreateAssignmentPage() {
-  const { appState, updateAppState, profile } = useAuth();
+  const { appState, updateAppState, profile, user } = useAuth();
   const [databasePlayers, setDatabasePlayers] = useState([]);
   const [scouts, setScouts] = useState([]);
   const [mode, setMode] = useState(() => localStorage.getItem("editingAssignment") ? "player" : ""),
@@ -90,9 +92,12 @@ export default function CreateAssignmentPage() {
         { name: editing.game || "", date: editing.fixtureDates?.[0] || "" },
       ],
     );
+    // Keep the scout attached to imported reports when their fixtures are edited.
+    // Legacy assignments without an assignee default to the signed-in editor.
+    setScout(editing.scoutId || user?.id || "");
     setDate(editing.date || "");
     setViewing(editing.viewing || "Live");
-  }, []);
+  }, [user?.id]);
   const matches = players.filter((p) =>
     p.name.toLowerCase().includes(query.toLowerCase()),
   );
@@ -117,7 +122,22 @@ export default function CreateAssignmentPage() {
     if (!player)
       return setError("Select an existing player or create a new player.");
     if (!fixtures.length) return setError("Add at least one fixture / game.");
-    const chosen = players.find((p) => p.name === selected);
+    let chosen = players.find((p) => p.name === selected);
+    if (newPlayer) {
+      try {
+        const savedPlayer = await createMasterPlayer(details);
+        chosen = {
+          ...savedPlayer,
+          name: savedPlayer.Name || savedPlayer.name || player,
+          club: savedPlayer.Team || savedPlayer.team || savedPlayer.Club || savedPlayer.club || details.club,
+          position: savedPlayer.Position || savedPlayer.position || savedPlayer["Primary Position"] || details.position,
+        };
+      } catch (savePlayerError) {
+        console.error("Could not add player to the master player database", savePlayerError);
+        setError(`Could not add this player to the master database: ${savePlayerError.message || "Please check your Supabase permissions and try again."}`);
+        return;
+      }
+    }
     const old = appState?.assignments || JSON.parse(localStorage.getItem("scoutingAssignments") || "[]");
     const editing = JSON.parse(
       localStorage.getItem("editingAssignment") || "null",
@@ -125,10 +145,12 @@ export default function CreateAssignmentPage() {
     const existing = editing
       ? old.find((x) => String(x.id) === String(editing.id))
       : null;
+    const selectedScout = scouts.find((member) => String(member.id) === String(scout));
+    const currentScoutName = profile?.full_name || user?.user_metadata?.full_name || user?.email || "";
     const assignment = {
       id: existing?.id || editing?.id || Date.now(),
       player,
-      playerId: chosen?.id || null,
+      playerId: chosen?.id || chosen?.player_id || chosen?.["Player Id"] || null,
       club: details.club || chosen?.club || "",
       position: details.position || chosen?.position || "",
       games: fixtures,
@@ -136,7 +158,7 @@ export default function CreateAssignmentPage() {
         .map((x) => (typeof x === "string" ? x : x.name))
         .join(" • "),
       fixtureDates: fixtures.map((x) => (typeof x === "string" ? "" : x.date)),
-      scout: scouts.find((member) => member.id === scout)?.full_name || scout,
+      scout: selectedScout?.full_name || (String(scout) === String(user?.id) ? currentScoutName : scout),
       scoutId: scout,
       date,
       viewing,

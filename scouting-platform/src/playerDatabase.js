@@ -1,50 +1,58 @@
-export function parsePlayerCsv(text) {
-  const rows = [];
-  let row = [],
-    cell = "",
-    quoted = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i],
-      n = text[i + 1];
-    if (c === '"' && quoted && n === '"') {
-      cell += '"';
-      i++;
-    } else if (c === '"') {
-      quoted = !quoted;
-    } else if (c === "," && !quoted) {
-      row.push(cell);
-      cell = "";
-    } else if ((c === "\n" || c === "\r") && !quoted) {
-      if (c === "\r" && n === "\n") i++;
-      row.push(cell);
-      if (row.some(Boolean)) rows.push(row);
-      row = [];
-      cell = "";
-    } else cell += c;
+import { supabase } from "./supabaseClient";
+import { normalizePlayerName } from "./playerProfileMatching";
+
+export const createMasterPlayer = async (details) => {
+  const name = String(details.name || "").trim();
+  const { data: existingRows, error: lookupError } = await supabase
+    .from("players")
+    .select("*")
+    .ilike("Name", name)
+    .limit(20);
+  if (lookupError) throw lookupError;
+
+  const existing = (existingRows || []).find((row) =>
+    normalizePlayerName(row.Name || row.name || row.player_name || row.player) === normalizePlayerName(name),
+  );
+  if (existing) return existing;
+
+  const payload = {
+    Name: name,
+    Team: String(details.club || "").trim(),
+    Position: String(details.position || "").trim(),
+    DOB: String(details.dob || "").trim(),
+    Nationality: String(details.nationality || "").trim(),
+    "Dominant Foot": String(details.foot || "").trim(),
+  };
+  Object.keys(payload).forEach((key) => {
+    if (!payload[key]) delete payload[key];
+  });
+
+  // Player sheets vary slightly in their column names. If PostgREST reports a
+  // missing column, retry with its common aliases while retaining other fields.
+  const aliases = {
+    Team: ["team", "club", "Club"],
+    Position: ["Playing Position", "Primary Position", "playing_position", "position"],
+    DOB: ["Date of Birth", "date_of_birth", "dob"],
+    "Dominant Foot": ["Preferred Foot", "preferred_foot"],
+  };
+  const triedAliases = new Set();
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const { data, error } = await supabase.from("players").insert(payload).select("*").single();
+    if (!error) return data;
+    if (!["PGRST204", "42703"].includes(error.code)) throw error;
+
+    const errorMessage = String(error.message || "");
+    const missingColumn = errorMessage.match(/column\s+['"]([^'"]+)['"]/i)?.[1]
+      || errorMessage.match(/['"]([^'"]+)['"]\s+column/i)?.[1];
+    const key = Object.keys(payload).find((candidate) => candidate.toLowerCase() === String(missingColumn || "").toLowerCase());
+    if (!key || key.toLowerCase() === "name") throw error;
+    const canonicalKey = Object.keys(aliases).find((candidate) => candidate.toLowerCase() === key.toLowerCase()) || key;
+    const alias = (aliases[canonicalKey] || []).find((candidate) => !triedAliases.has(candidate.toLowerCase()));
+    if (alias) {
+      triedAliases.add(alias.toLowerCase());
+      payload[alias] = payload[key];
+    }
+    delete payload[key];
   }
-  if (cell || row.length) {
-    row.push(cell);
-    rows.push(row);
-  }
-  const headers = rows.shift() || [],
-    index = Object.fromEntries(headers.map((h, i) => [h.trim(), i]));
-  const get = (r, h) => String(r[index[h]] || "").trim();
-  return rows
-    .map((r) => ({
-      id:
-        get(r, "Player Id") ||
-        get(r, "Player SBData Id") ||
-        `${get(r, "Player Name")}-${get(r, "Team")}`,
-      name: get(r, "Player Name") || get(r, "Name"),
-      club: get(r, "Team"),
-      position: get(r, "Primary Position"),
-      secondaryPosition: get(r, "Secondary Position"),
-      dob: get(r, "Date of Birth") || get(r, "Birth Date"),
-      nationality: get(r, "Nationality") || get(r, "Country"),
-      height: get(r, "Height"),
-      weight: get(r, "Weight"),
-      season: get(r, "Season"),
-      competition: get(r, "Competition"),
-    }))
-    .filter((p) => p.name);
-}
+  throw new Error("Could not add this player using the available player database fields.");
+};

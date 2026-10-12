@@ -7,6 +7,7 @@ import { removeBackground } from "@imgly/background-removal";
 import ReportImportModal from "./ReportImportModal";
 import { normalizeImportedViewing, splitImportedFixtures } from "./reportImport";
 import { choosePlayerRecord, normalizePlayerName, playerNameMatchScore } from "./playerProfileMatching";
+import { createMasterPlayer } from "./playerDatabase";
 const clubFromReport = (...values) => {
   const club = values.find((value) => {
     if (typeof value !== "string") return false;
@@ -46,6 +47,13 @@ const readProfileCheckerFilters = () => {
 };
 const photoBase =
   "https://syjsmvvsvvprxibqoizw.supabase.co/storage/v1/object/public/player-photos/player-photos/";
+const currentPhotoCacheVersion = () => new Date().toISOString().slice(0, 10);
+const withPhotoCacheVersion = (url, version = currentPhotoCacheVersion()) => {
+  const value = String(url || "");
+  if (!value) return value;
+  if (/[?&]v=/.test(value)) return value.replace(/([?&])v=[^&]*/, `$1v=${encodeURIComponent(String(version))}`);
+  return `${value}${value.includes("?") ? "&" : "?"}v=${encodeURIComponent(String(version))}`;
+};
 const photoSlug = (name, lower = false) =>
   String(name || "")
     .trim()
@@ -60,12 +68,13 @@ const photoSlug = (name, lower = false) =>
     )
     .join("_");
 const playerPhoto = (name, lower = true) =>
-  `${photoBase}${photoSlug(name, lower)}.png`;
+  `${photoBase}${photoSlug(name, lower)}.png?v=${currentPhotoCacheVersion()}`;
 const playerPhotoFor = (record) => {
   const direct = ["Photo", "photo", "_photoUrl", "photoUrl", "playerPhoto", "Image", "image", "Photo URL"]
     .map((key) => record?.[key])
     .find((value) => typeof value === "string" && value.trim());
-  return direct || playerPhoto(record?.Name || record?.name || record?.player);
+  const photoVersion = record?.photo_updated_at || record?.photoUpdatedAt || record?.PhotoUpdatedAt || currentPhotoCacheVersion();
+  return direct ? withPhotoCacheVersion(direct, photoVersion) : playerPhoto(record?.Name || record?.name || record?.player);
 };
 const photoCandidates = (name) => {
   const raw = String(name || "").trim();
@@ -79,7 +88,7 @@ const photoCandidates = (name) => {
   // character with an underscore (for example, Rúben Dias -> r_ben_dias).
   const legacyBases = nameVariants.map((value) => value.trim().replace(/[^a-z0-9]/gi, "_").toLowerCase().replace(/^_+|_+$/g, ""));
   const bases = [...new Set([...rawBases, ...normalizedBases, ...legacyBases].filter(Boolean))];
-  return [...new Set(bases.flatMap((base) => [base, base.toLowerCase(), base.toUpperCase(), `_${base}`, `_${base.toLowerCase()}`, `__${base}`]).map((base) => `${photoBase}${base}.png`))];
+  return [...new Set(bases.flatMap((base) => [base, base.toLowerCase(), base.toUpperCase(), `_${base}`, `_${base.toLowerCase()}`, `__${base}`]).map((base) => `${photoBase}${base}.png?v=${currentPhotoCacheVersion()}`))];
 };
 const retryPhoto = (e, name) => {
   const image = e.currentTarget;
@@ -320,6 +329,8 @@ export default function ScoutingReportsPageFinal() {
   const [playerData, setPlayerData] = useState(null);
   const [playerDataLoading, setPlayerDataLoading] = useState(false);
   const [playerDataError, setPlayerDataError] = useState("");
+  const [addingProfilePlayer, setAddingProfilePlayer] = useState(false);
+  const [profilePlayerSaveMessage, setProfilePlayerSaveMessage] = useState("");
   const [ageDate, setAgeDate] = useState(() => new Date());
   const [summaryDraft, setSummaryDraft] = useState("");
   const [summaryEditing, setSummaryEditing] = useState(false);
@@ -466,13 +477,16 @@ export default function ScoutingReportsPageFinal() {
       const { error: uploadError } = await supabase.storage.from("player-photos").upload(path, focusedFile, { upsert: true, contentType: "image/png" });
       if (uploadError) throw uploadError;
       const { data: publicData } = supabase.storage.from("player-photos").getPublicUrl(path);
-      const publicUrl = publicData.publicUrl;
+      const publicUrl = `${publicData.publicUrl}?v=${Date.now()}`;
       const id = playerData?.id || playerData?.player_id;
-      const updateQuery = id ? supabase.from("players").update({ Photo: publicUrl }).eq("id", id) : supabase.from("players").update({ Photo: publicUrl }).ilike("Name", profile.player);
-      const { error: updateError } = await updateQuery;
-      if (updateError) console.warn("Photo uploaded, but player record was not updated", updateError);
-      setPlayerData((current) => ({ ...(current || {}), Photo: publicUrl }));
-      setPhotoStatus("Photo added");
+      const updateQuery = id
+        ? supabase.from("players").update({ Photo: publicUrl }).eq("id", id)
+        : supabase.from("players").update({ Photo: publicUrl }).ilike("Name", profile.player);
+      const { data: updatedPlayers, error: updateError } = await updateQuery.select("id");
+      if (updateError) throw new Error(`The image uploaded, but the player record could not be updated: ${updateError.message}`);
+      if (!updatedPlayers?.length) throw new Error("The image uploaded, but no matching player record was found in the master database.");
+      setPlayerData((current) => ({ ...(current || {}), Photo: publicUrl, photo_updated_at: Date.now() }));
+      setPhotoStatus("Photo updated");
     } catch (error) {
       const message = error?.message || "Please try again";
       setPhotoStatus(message.toLowerCase().includes("row-level security") ? "Upload blocked by Supabase permissions. Run the included player-photo policy SQL, then try again." : `Upload failed: ${message}`);
@@ -1024,6 +1038,26 @@ export default function ScoutingReportsPageFinal() {
   ]
     .reverse()
     .find((x) => x.report?.foot)?.report?.foot;
+  const addProfilePlayerToMaster = async () => {
+    if (!profile?.player || addingProfilePlayer) return;
+    setAddingProfilePlayer(true);
+    setProfilePlayerSaveMessage("");
+    try {
+      const savedPlayer = await createMasterPlayer({
+        name: profile.player,
+        club: clubName === "—" ? "" : clubName,
+        position: dataValue("Playing Position", "Primary Position", "Position", "playing_position", "primary_position", "position"),
+        foot: reportFoot || "",
+      });
+      setPlayerData(savedPlayer);
+      setPlayerDataError("");
+      setProfilePlayerSaveMessage("Player added to the master database.");
+    } catch (error) {
+      setProfilePlayerSaveMessage(`Could not add player: ${error.message || "Check your Supabase permissions and try again."}`);
+    } finally {
+      setAddingProfilePlayer(false);
+    }
+  };
   const grades = (
     <div className="sr-grade-row">
       <label className="sr-field">
@@ -1301,7 +1335,7 @@ export default function ScoutingReportsPageFinal() {
               onError={(e) => retryPhoto(e, playerData?.Name || playerData?.name || profile.player)}
             />
             <span>{profile.player.slice(0, 2).toUpperCase()}</span>
-            {!profileHasDirectPhoto && <label className="sr-add-photo" title="Add player photo"><input type="file" accept="image/*" onChange={uploadProfilePhoto} disabled={photoUploading} />{photoUploading ? "…" : "+"}</label>}
+            <label className="sr-add-photo" title={profileHasDirectPhoto ? "Replace player photo" : "Add player photo"} aria-label={profileHasDirectPhoto ? "Replace player photo" : "Add player photo"}><input type="file" accept="image/*" onChange={uploadProfilePhoto} disabled={photoUploading} />{photoUploading ? "…" : profileHasDirectPhoto ? "↻" : "+"}</label>
           </div>
           <div>
             <h2>{profile.player}</h2>
@@ -1404,7 +1438,7 @@ export default function ScoutingReportsPageFinal() {
             </div>
             {playerDataLoading && <p className="sr-player-data-notice" role="status">Loading player details…</p>}
             {!playerDataLoading && playerDataError && <p className="sr-player-data-notice error" role="alert">Could not load player details: {playerDataError}</p>}
-            {!playerDataLoading && !playerDataError && !playerData && <p className="sr-player-data-notice">The report is available, but no matching player record was found in the master player database. Add the player there to show their date of birth, age and other details.</p>}
+            {!playerDataLoading && !playerDataError && !playerData && <div className="sr-player-data-notice"><p>The report is available, but no matching player record was found in the master player database.</p><button type="button" className="sr-outline" onClick={addProfilePlayerToMaster} disabled={addingProfilePlayer}>{addingProfilePlayer ? "Adding player…" : "Add this player to the database"}</button>{profilePlayerSaveMessage && <p role="status">{profilePlayerSaveMessage}</p>}</div>}
           </section>
           <section className="sr-profile-reports">
             <h2>Reports</h2>
