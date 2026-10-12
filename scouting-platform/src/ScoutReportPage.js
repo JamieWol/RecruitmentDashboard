@@ -4,6 +4,7 @@ import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "./supabaseClient";
 import { useAuth } from "./AuthContext";
 import {
@@ -28,6 +29,7 @@ import {
 } from "recharts";
 
 function ScoutReportPage({ shadowSquad, setShadowSquad }) {
+  const navigate = useNavigate();
   const { profile, appState, updateAppState } = useAuth();
   const [players, setPlayers] = useState([]);
   const [publishedReports, setPublishedReports] = useState([]);
@@ -639,7 +641,37 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     );
     setCompetitions(["All", ...comps]);
 
-    setSelectedPlayer(ranked[0] || null);
+    let savedSelection = null;
+    try { savedSelection = JSON.parse(sessionStorage.getItem("scoutReportSelectedPlayer") || "null"); } catch {}
+    const savedName = String(savedSelection?.["Player Name"] || savedSelection?.["Full Player Name"] || "").trim().toLowerCase();
+    const savedClub = String(savedSelection?.Team || savedSelection?.Club || savedSelection?.club || "").trim().toLowerCase();
+    const restoredPlayer = savedName
+      ? ranked.find((player) => {
+          const name = String(player["Player Name"] || player["Full Player Name"] || "").trim().toLowerCase();
+          const club = String(player.Team || player.Club || player.club || "").trim().toLowerCase();
+          return name === savedName && (!savedClub || !club || club === savedClub);
+        })
+      : null;
+    setSelectedPlayer(restoredPlayer || ranked[0] || null);
+  };
+
+  const openSelectedPlayerProfile = () => {
+    if (!selectedPlayer) return;
+    const name = String(selectedPlayer["Player Name"] || selectedPlayer["Full Player Name"] || "").trim();
+    if (!name) return;
+    const playerProfile = {
+      ...selectedPlayer,
+      player: name,
+      playerId: selectedPlayer["Player Id"] || selectedPlayer.playerId || selectedPlayer.player_id || null,
+      club: selectedPlayer.Team || selectedPlayer.Club || selectedPlayer.club || selectedPlayer.Squad || "",
+    };
+    try {
+      sessionStorage.setItem("scoutReportSelectedPlayer", JSON.stringify(playerProfile));
+      localStorage.setItem("scoutingProfilePlayer", name);
+      localStorage.setItem("scoutingProfileOrigin", "scout-report-page");
+      localStorage.removeItem("scoutingProfileReturnPath");
+    } catch {}
+    navigate("/scouting-reports");
   };
 
   const handleUpload = async (e) => {
@@ -673,6 +705,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
   useEffect(() => {
     const resetAfterInactivity = () => {
       sessionStorage.removeItem("scoutReportUploadedData");
+      sessionStorage.removeItem("scoutReportSelectedPlayer");
       setPlayers([]);
       setFilteredPlayers([]);
       setMetrics([]);
@@ -693,6 +726,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     const isNewBrowserLoad = currentPageLoadId && previousPageLoadId !== currentPageLoadId;
     if (isNewBrowserLoad) {
       sessionStorage.removeItem("scoutReportUploadedData");
+      sessionStorage.removeItem("scoutReportSelectedPlayer");
       sessionStorage.setItem("scoutReportPageLoadId", currentPageLoadId);
     } else {
       try {
@@ -1138,9 +1172,16 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 
             {/* PLAYER NAME + META */}
             <div style={{ lineHeight: 1.25 }}>
-              <div style={{ fontSize: 26, fontWeight: 700 }}>
+              <button
+                type="button"
+                className="scout-report-player-name"
+                onClick={openSelectedPlayerProfile}
+                aria-label={`Open ${selectedPlayer["Player Name"]} player profile`}
+                title="Open player profile"
+                style={{ font: "inherit", fontSize: 26, fontWeight: 700, lineHeight: "inherit", color: "inherit", background: "transparent", border: 0, padding: 0, textAlign: "left", cursor: "pointer" }}
+              >
                 {selectedPlayer["Player Name"]}
-              </div>
+              </button>
 
               <div style={{ fontSize: 14, opacity: 0.9 }}>
                 {selectedPlayer["Primary Position"]}

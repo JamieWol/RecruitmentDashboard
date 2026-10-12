@@ -315,7 +315,16 @@ export default function ScoutingReportsPageFinal() {
   const [playerMatches, setPlayerMatches] = useState([]);
   const [profile, setProfile] = useState(() => {
     const n = JSON.parse(localStorage.getItem("scoutingAssignments") || "[]"), name = localStorage.getItem("scoutingProfilePlayer");
-    return name ? n.find((x) => x.player === name) || { player: name } : null;
+    if (!name) return null;
+    if (localStorage.getItem("scoutingProfileOrigin") === "scout-report-page") {
+      try {
+        const savedPlayer = JSON.parse(sessionStorage.getItem("scoutReportSelectedPlayer") || "null");
+        if (savedPlayer) return { ...savedPlayer, player: name };
+      } catch {}
+    }
+    const assignment = n.find((x) => x.player === name);
+    if (assignment) return assignment;
+    return { player: name };
   });
   const [active, setActive] = useState(() => {
     try {
@@ -928,7 +937,6 @@ export default function ScoutingReportsPageFinal() {
     };
     setActive(null);
     setProfile(selectedPlayer);
-    window.scrollTo(0, 0);
   };
   const searchPlayer = () => {
     const match =
@@ -1320,6 +1328,12 @@ export default function ScoutingReportsPageFinal() {
               localStorage.removeItem("scoutingProfileOrigin");
               localStorage.removeItem("scoutingProfileReturnPath");
               nav(returnPath);
+            } else if (localStorage.getItem("scoutingProfileOrigin") === "scout-report-page") {
+              localStorage.removeItem("scoutingProfilePlayer");
+              localStorage.removeItem("scoutingProfileOrigin");
+              localStorage.removeItem("scoutingProfileReturnPath");
+              setProfile(null);
+              nav("/scout-report");
             } else if (profileReturnReport || localStorage.getItem("scoutingProfileOrigin") === "scout-report-detail") {
               let savedReport = profileReturnReport;
               if (!savedReport) {
@@ -1349,6 +1363,8 @@ export default function ScoutingReportsPageFinal() {
               ? "Back to Scout Report"
             : localStorage.getItem("scoutingProfileOrigin") === "squad-plan"
               ? "Back to Squad Analysis"
+            : localStorage.getItem("scoutingProfileOrigin") === "scout-report-page"
+              ? "Back to Scout Report"
               : "Back to assignments"}
         </button>
         <section className="sr-profile-head">
