@@ -5,7 +5,7 @@ import { supabase } from "./supabaseClient";
 import { useAuth } from "./AuthContext";
 import { removeBackground } from "@imgly/background-removal";
 import ReportImportModal from "./ReportImportModal";
-import { splitImportedFixtures } from "./reportImport";
+import { normalizeImportedViewing, splitImportedFixtures } from "./reportImport";
 import { choosePlayerRecord, normalizePlayerName, playerNameMatchScore } from "./playerProfileMatching";
 const clubFromReport = (...values) => {
   const club = values.find((value) => {
@@ -596,13 +596,13 @@ export default function ScoutingReportsPageFinal() {
         player: String(record.player || "").trim(),
         club: String(record.club || "").trim(),
         position: String(record.position || record.report?.playedPosition || "").trim(),
-        scout: accountProfile?.full_name || user?.email || "Imported report",
+        scout: accountProfile?.full_name || user?.user_metadata?.full_name || user?.email || "Imported report",
         scoutId: user?.id || "",
         game,
         games: fixture,
         fixtureDates,
         date,
-        viewing: record.viewing || "Video",
+        viewing: normalizeImportedViewing(record.viewing),
         status: "Draft",
         importedAt: createdAt,
         importSource: record.sourceFile || "File upload",
@@ -896,8 +896,10 @@ export default function ScoutingReportsPageFinal() {
     const completedAt = new Date().toISOString().slice(0, 10);
     const preservedFixtures = fixtureRecords(active);
     const preservedFixtureDates = active.fixtureDates?.length ? active.fixtureDates : active.report?.__fixtureDates || [];
+    const viewing = normalizeImportedViewing(report.viewing || active.viewing);
     const reportWithFixtures = {
       ...report,
+      viewing,
       __fixtures: preservedFixtures,
       __fixtureDates: preservedFixtureDates,
     };
@@ -917,7 +919,7 @@ export default function ScoutingReportsPageFinal() {
       games: preservedFixtures,
       game: isFixtureName(active.game) ? active.game : preservedFixtures.length > 1 ? "Multiple" : preservedFixtures[0]?.name || "",
       fixtureDates: preservedFixtureDates,
-      viewing: active.viewing || "",
+      viewing,
       date: active.date || completedAt,
     };
     setSharedReports((current) => [
@@ -929,7 +931,7 @@ export default function ScoutingReportsPageFinal() {
       supabase.from("club_reports").upsert({
         id: Number(active.id), assignment_id: Number(active.id), player_id: active.playerId || null,
         player: active.player, club: accountProfile.club, player_club: active.club || "", author_id: user.id, report: reportWithFixtures, status: "Published",
-        updated_at: new Date().toISOString(), completed_at: active.completedAt || active.date || new Date().toISOString().slice(0, 10), scout: active.scout || "", fixture_summary: preservedFixtures.length > 1 ? "Multiple" : (preservedFixtures[0] ? `${preservedFixtures[0].date || ""} · ${preservedFixtures[0].name || preservedFixtures[0]}` : isFixtureName(active.game) ? active.game : ""),
+        updated_at: new Date().toISOString(), completed_at: active.completedAt || active.date || new Date().toISOString().slice(0, 10), scout: active.scout || "", viewing, fixture_summary: preservedFixtures.length > 1 ? "Multiple" : (preservedFixtures[0] ? `${preservedFixtures[0].date || ""} · ${preservedFixtures[0].name || preservedFixtures[0]}` : isFixtureName(active.game) ? active.game : ""),
       }, { onConflict: "id" }).then(async ({ error }) => {
         if (error) {
           console.error("Could not publish shared report", error);
@@ -1083,7 +1085,7 @@ export default function ScoutingReportsPageFinal() {
               </div>
             ))}
           </div>
-          <small>{active.viewing || "Viewing not added"}</small>
+          <small>{normalizeImportedViewing(active.viewing, "Viewing not added")}</small>
           {editing && <button
             className="sr-edit-games"
             onClick={() => {
@@ -1121,7 +1123,7 @@ export default function ScoutingReportsPageFinal() {
           <label className="sr-field">
             <span>Viewing</span>
             <select
-              value={report.viewing || active.viewing || "Video"}
+              value={normalizeImportedViewing(report.viewing || active.viewing)}
               disabled={!editing}
               onChange={(e) =>
                 setReport({ ...report, viewing: e.target.value })
@@ -1538,7 +1540,7 @@ export default function ScoutingReportsPageFinal() {
             <button type="button" className="sr-assignment-player-link" onClick={(e) => { e.stopPropagation(); setProfile(null); openReport(x); }}>{x.player}</button>
             <p><ClubName club={clubFromReport(x.player_club, x.playerClub, x.club, x.Club, x.team, x.Team) || profilePlayerDirectory[normalizePlayerName(x.player)]?.club} /> · {x.position || "Position not added"}</p>
             <div className="sr-fixture">{cardFixtureLabel(x)}</div>
-            <div className="sr-card-meta"><span>{x.date || "Date not added"}</span><span>{x.viewing}</span><span>Scout: {x.scout || "Unassigned"}</span></div>
+            <div className="sr-card-meta"><span>{x.date || "Date not added"}</span><span>{normalizeImportedViewing(x.viewing)}</span><span>Scout: {x.scout || "Unassigned"}</span></div>
           </article>
         ))}
       </section>

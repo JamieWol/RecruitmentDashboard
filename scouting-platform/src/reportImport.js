@@ -137,6 +137,11 @@ const getField = (label) => {
   return aliasToField.get(base);
 };
 const reportFields = ["foot", "playedPosition", "performance", "potential", "conclusion", "reasons", "inPossession", "outPossession", "physical", "behaviour", "strengths", "weaknesses"];
+export const normalizeImportedViewing = (value, fallback = "Video") => {
+  const match = clean(value).match(/\b(live|video)\b/i);
+  if (!match) return fallback;
+  return match[1].toLowerCase() === "live" ? "Live" : "Video";
+};
 
 const emptyRecord = (sourceFile) => ({
   player: "", club: "", position: "", game: "", date: "", viewing: "Video", sourceFile,
@@ -149,7 +154,7 @@ const normalizeRecord = (record, sourceFile) => {
   if (!report.playedPosition && position) report.playedPosition = position;
   const hasLongSections = Boolean(report.inPossession || report.outPossession || report.physical || report.behaviour || report.strengths || report.weaknesses);
   report.type = hasLongSections ? "Long Report" : "Short Report";
-  return { ...emptyRecord(sourceFile), ...record, position, date: toISODate(record.date), report };
+  return { ...emptyRecord(sourceFile), ...record, position, date: toISODate(record.date), viewing: normalizeImportedViewing(record.viewing), report };
 };
 
 const rowToRecord = (row, sourceFile) => {
@@ -290,7 +295,9 @@ const wordBlocksToRecords = (blocks, sourceFile) => {
       }
       if (field === "player") {
         if (!record.player) { record.player = text; sawPlayer = true; }
-      } else if (["club", "position", "game", "date", "viewing"].includes(field)) {
+      } else if (field === "viewing") {
+        record.viewing = normalizeImportedViewing(text, record.viewing || "Video");
+      } else if (["club", "position", "game", "date"].includes(field)) {
         record[field] = [record[field], field === "date" ? toISODate(text) : text].filter(Boolean).join("\n");
       } else {
         const reportKey = field === "position" ? "playedPosition" : field;
