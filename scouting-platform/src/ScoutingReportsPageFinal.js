@@ -912,14 +912,23 @@ export default function ScoutingReportsPageFinal() {
     setEditing(x.status !== "Published" && assignmentBelongsToScout(x, user, accountProfile));
     setPublishError("");
   };
-  const openReportPlayerProfile = () => {
-    if (!active) return;
-    const returnState = { active, report };
+  const openReportPlayerProfile = (event) => {
+    event?.preventDefault();
+    event?.stopPropagation();
+    if (!active?.player) return;
+    const returnState = { active: { ...active }, report: { ...report } };
     setProfileReturnReport(returnState);
     try { sessionStorage.setItem("scoutingActiveReport", JSON.stringify(returnState)); } catch {}
     try { localStorage.setItem("scoutingProfileOrigin", "scout-report-detail"); } catch {}
-    setActive(null);
-    setProfile(active);
+    const selectedPlayer = {
+      ...active,
+      player: String(active.player).trim(),
+      playerId: active.playerId || active.player_id || active["Player Id"] || null,
+      club: active.player_club || active.playerClub || active.club || active.Club || active.team || active.Team || "",
+    };
+    setProfile(null);
+    setProfile(selectedPlayer);
+    window.scrollTo(0, 0);
   };
   const searchPlayer = () => {
     const match =
@@ -1124,6 +1133,8 @@ export default function ScoutingReportsPageFinal() {
               <button
                 type="button"
                 className="sr-report-player-link"
+                aria-label={`Open ${active.player}'s player profile`}
+                title="Open player profile"
                 onClick={openReportPlayerProfile}
               >
                 <span>{active.player}</span>
