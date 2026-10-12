@@ -330,6 +330,10 @@ export default function ScoutingReportsPageFinal() {
   const [playerDataLoading, setPlayerDataLoading] = useState(false);
   const [playerDataError, setPlayerDataError] = useState("");
   const [addingProfilePlayer, setAddingProfilePlayer] = useState(false);
+  const [profilePlayerFormOpen, setProfilePlayerFormOpen] = useState(false);
+  const [missingPlayerDob, setMissingPlayerDob] = useState("");
+  const [missingPlayerNationality, setMissingPlayerNationality] = useState("");
+  const [missingPlayerFoot, setMissingPlayerFoot] = useState("");
   const [profilePlayerSaveMessage, setProfilePlayerSaveMessage] = useState("");
   const [ageDate, setAgeDate] = useState(() => new Date());
   const [summaryDraft, setSummaryDraft] = useState("");
@@ -479,12 +483,13 @@ export default function ScoutingReportsPageFinal() {
       const { data: publicData } = supabase.storage.from("player-photos").getPublicUrl(path);
       const publicUrl = `${publicData.publicUrl}?v=${Date.now()}`;
       const id = playerData?.id || playerData?.player_id;
-      const updateQuery = id
-        ? supabase.from("players").update({ Photo: publicUrl }).eq("id", id)
-        : supabase.from("players").update({ Photo: publicUrl }).ilike("Name", profile.player);
-      const { data: updatedPlayers, error: updateError } = await updateQuery.select("id");
+      if (!id) throw new Error("Add this player to the master database before updating their photo.");
+      const { data: updatedPlayers, error: updateError } = await supabase.rpc("update_player_photo", {
+        p_player_id: String(id),
+        p_photo_url: publicUrl,
+      });
       if (updateError) throw new Error(`The image uploaded, but the player record could not be updated: ${updateError.message}`);
-      if (!updatedPlayers?.length) throw new Error("The image uploaded, but no matching player record was found in the master database.");
+      if (!Number(updatedPlayers)) throw new Error("The image uploaded, but no matching player record was found in the master database.");
       setPlayerData((current) => ({ ...(current || {}), Photo: publicUrl, photo_updated_at: Date.now() }));
       setPhotoStatus("Photo updated");
     } catch (error) {
@@ -1047,10 +1052,13 @@ export default function ScoutingReportsPageFinal() {
         name: profile.player,
         club: clubName === "—" ? "" : clubName,
         position: dataValue("Playing Position", "Primary Position", "Position", "playing_position", "primary_position", "position"),
-        foot: reportFoot || "",
+        dob: missingPlayerDob,
+        nationality: missingPlayerNationality,
+        foot: missingPlayerFoot || reportFoot || "",
       });
       setPlayerData(savedPlayer);
       setPlayerDataError("");
+      setProfilePlayerFormOpen(false);
       setProfilePlayerSaveMessage("Player added to the master database.");
     } catch (error) {
       setProfilePlayerSaveMessage(`Could not add player: ${error.message || "Check your Supabase permissions and try again."}`);
@@ -1438,7 +1446,7 @@ export default function ScoutingReportsPageFinal() {
             </div>
             {playerDataLoading && <p className="sr-player-data-notice" role="status">Loading player details…</p>}
             {!playerDataLoading && playerDataError && <p className="sr-player-data-notice error" role="alert">Could not load player details: {playerDataError}</p>}
-            {!playerDataLoading && !playerDataError && !playerData && <div className="sr-player-data-notice"><p>The report is available, but no matching player record was found in the master player database.</p><button type="button" className="sr-outline" onClick={addProfilePlayerToMaster} disabled={addingProfilePlayer}>{addingProfilePlayer ? "Adding player…" : "Add this player to the database"}</button>{profilePlayerSaveMessage && <p role="status">{profilePlayerSaveMessage}</p>}</div>}
+            {!playerDataLoading && !playerDataError && !playerData && <div className="sr-player-data-notice"><p>The report is available, but no matching player record was found in the master player database. Add their missing details below so their DOB and age can appear on the profile.</p><button type="button" className="sr-outline" onClick={() => setProfilePlayerFormOpen((open) => !open)} disabled={addingProfilePlayer}>{profilePlayerFormOpen ? "Close player details" : "Add this player to the database"}</button>{profilePlayerFormOpen && <><div className="sr-form-grid" style={{ marginTop: 14 }}><label className="sr-field"><span>Date of birth</span><input type="date" value={missingPlayerDob} onChange={(event) => setMissingPlayerDob(event.target.value)} /></label><label className="sr-field"><span>Nationality</span><input value={missingPlayerNationality} onChange={(event) => setMissingPlayerNationality(event.target.value)} /></label><label className="sr-field"><span>Preferred foot</span><select value={missingPlayerFoot} onChange={(event) => setMissingPlayerFoot(event.target.value)}><option value="">Select</option><option>Right</option><option>Left</option><option>Both</option></select></label></div><button type="button" className="sr-cyan" onClick={addProfilePlayerToMaster} disabled={addingProfilePlayer}>{addingProfilePlayer ? "Adding player…" : "Save player to database"}</button></>}{profilePlayerSaveMessage && <p role="status">{profilePlayerSaveMessage}</p>}</div>}
           </section>
           <section className="sr-profile-reports">
             <h2>Reports</h2>

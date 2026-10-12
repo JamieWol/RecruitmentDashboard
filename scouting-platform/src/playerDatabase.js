@@ -32,13 +32,17 @@ export const createMasterPlayer = async (details) => {
   const aliases = {
     Team: ["team", "club", "Club"],
     Position: ["Playing Position", "Primary Position", "playing_position", "position"],
-    DOB: ["Date of Birth", "date_of_birth", "dob"],
+    DOB: ["Date of Birth", "date_of_birth", "dateOfBirth", "dob", "birth_date", "birthDate"],
+    Nationality: ["nationality"],
     "Dominant Foot": ["Preferred Foot", "preferred_foot"],
   };
   const triedAliases = new Set();
   for (let attempt = 0; attempt < 12; attempt += 1) {
     const { data, error } = await supabase.from("players").insert(payload).select("*").single();
     if (!error) return data;
+    if (error.code === "42501" || /row-level security/i.test(error.message || "")) {
+      throw new Error("Supabase is blocking player inserts. Apply the supplied players RLS migration in the Supabase SQL Editor, then try again.");
+    }
     if (!["PGRST204", "42703"].includes(error.code)) throw error;
 
     const errorMessage = String(error.message || "");
