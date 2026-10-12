@@ -926,7 +926,6 @@ export default function ScoutingReportsPageFinal() {
       playerId: active.playerId || active.player_id || active["Player Id"] || null,
       club: active.player_club || active.playerClub || active.club || active.Club || active.team || active.Team || "",
     };
-    setProfile(null);
     setProfile(selectedPlayer);
     window.scrollTo(0, 0);
   };
