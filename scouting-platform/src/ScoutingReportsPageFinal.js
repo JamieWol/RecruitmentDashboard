@@ -648,35 +648,32 @@ export default function ScoutingReportsPageFinal() {
     const sharedAssignmentId = assignment?.sharedAssignmentId || assignment?.id;
     const isPublished = String(assignment?.status || "").toLowerCase() === "published";
 
-    if (user && accountProfile?.club) {
-      const deletes = [];
-      if (isPublished && assignmentId) {
-        deletes.push(
-          supabase
-            .from("club_reports")
-            .delete()
-            .eq("club", accountProfile.club)
-            .eq("id", Number(assignmentId))
-            .select("id"),
-        );
+    if (isPublished) {
+      if (!user?.id || !assignment?.author_id || String(assignment.author_id) !== String(user.id)) {
+        setDeleteError("You can only delete published reports that you authored.");
+        return;
       }
-      if (sharedAssignmentId) {
-        deletes.push(
-          supabase
-            .from("club_assignments")
-            .delete()
-            .eq("club", accountProfile.club)
-            .eq("id", Number(sharedAssignmentId)),
-        );
+      if (!accountProfile?.club || !assignmentId) {
+        setDeleteError("The report could not be deleted because its club or report ID is missing.");
+        return;
       }
-
-      const results = await Promise.all(deletes);
-      const failedDelete = results.find((result) => result.error);
-      const reportDelete = isPublished ? results[0] : null;
-      if (failedDelete || (isPublished && !reportDelete?.data?.length)) {
-        const error = failedDelete?.error;
-        console.error("Could not delete report", error || "No published report row was deleted");
-        setDeleteError(error?.message || "The report was not deleted. Check your access and try again.");
+      const { data, error } = await supabase.rpc("delete_own_published_report", {
+        p_report_id: assignmentId,
+      });
+      if (error || Number(data) !== 1) {
+        console.error("Could not delete published report", error || "No report row was deleted");
+        setDeleteError(error?.message || "The report was not deleted. You can only delete reports you authored.");
+        return;
+      }
+    } else if (user && accountProfile?.club && sharedAssignmentId) {
+      const { error } = await supabase
+        .from("club_assignments")
+        .delete()
+        .eq("club", accountProfile.club)
+        .eq("id", Number(sharedAssignmentId));
+      if (error) {
+        console.error("Could not delete shared assignment", error);
+        setDeleteError(error.message || "This assignment could not be deleted. Please try again.");
         return;
       }
     }
@@ -1614,7 +1611,7 @@ export default function ScoutingReportsPageFinal() {
       <section className="sr-grid">
         {shown.map((x) => (
           <article className="sr-card" key={x.id} onClick={() => { setProfile(null); openReport(x); }}>
-            <div className="sr-card-top"><span className="sr-card-status">{x.status}</span><button className="sr-trash" onClick={(e) => { e.stopPropagation(); deleteAssignment(x); }}>Delete</button></div>
+            <div className="sr-card-top"><span className="sr-card-status">{x.status}</span>{(String(x.status || "").toLowerCase() !== "published" || String(x.author_id || "") === String(user?.id || "")) && <button className="sr-trash" onClick={(e) => { e.stopPropagation(); deleteAssignment(x); }}>Delete</button>}</div>
             <button type="button" className="sr-assignment-player-link" onClick={(e) => { e.stopPropagation(); setProfile(null); openReport(x); }}>{x.player}</button>
             <p><ClubName club={clubFromReport(x.player_club, x.playerClub, x.club, x.Club, x.team, x.Team) || profilePlayerDirectory[normalizePlayerName(x.player)]?.club} /> · {x.position || "Position not added"}</p>
             <div className="sr-fixture">{cardFixtureLabel(x)}</div>
