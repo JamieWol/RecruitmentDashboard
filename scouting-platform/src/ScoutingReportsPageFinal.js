@@ -911,6 +911,13 @@ export default function ScoutingReportsPageFinal() {
     setEditing(x.status !== "Published" && assignmentBelongsToScout(x, user, accountProfile));
     setPublishError("");
   };
+  const openReportPlayerProfile = () => {
+    if (!active) return;
+    sessionStorage.setItem("scoutingActiveReport", JSON.stringify({ active, report }));
+    localStorage.setItem("scoutingProfileOrigin", "scout-report-detail");
+    setActive(null);
+    setProfile(active);
+  };
   const searchPlayer = () => {
     const match =
       items.find(
@@ -1114,8 +1121,7 @@ export default function ScoutingReportsPageFinal() {
               <button
                 className="sr-report-player-link"
                 onClick={() => {
-                  setActive(null);
-                  setProfile(active);
+                  openReportPlayerProfile();
                 }}
               >
                 <span>{active.player}</span>
@@ -1301,6 +1307,17 @@ export default function ScoutingReportsPageFinal() {
               localStorage.removeItem("scoutingProfileOrigin");
               localStorage.removeItem("scoutingProfileReturnPath");
               nav(returnPath);
+            } else if (localStorage.getItem("scoutingProfileOrigin") === "scout-report-detail") {
+              let savedReport = null;
+              try { savedReport = JSON.parse(sessionStorage.getItem("scoutingActiveReport") || "null"); } catch {}
+              localStorage.removeItem("scoutingProfilePlayer");
+              localStorage.removeItem("scoutingProfileOrigin");
+              localStorage.removeItem("scoutingProfileReturnPath");
+              setProfile(null);
+              if (savedReport?.active) {
+                setActive(savedReport.active);
+                setReport(savedReport.report || savedReport.active.report || empty);
+              }
             } else {
               localStorage.removeItem("scoutingProfilePlayer");
               localStorage.removeItem("scoutingProfileOrigin");
@@ -1312,6 +1329,8 @@ export default function ScoutingReportsPageFinal() {
           ‹{" "}
           {localStorage.getItem("scoutingProfileOrigin") === "shortlists"
             ? "Back to previous page"
+            : localStorage.getItem("scoutingProfileOrigin") === "scout-report-detail"
+              ? "Back to Scout Report"
             : localStorage.getItem("scoutingProfileOrigin") === "squad-plan"
               ? "Back to Squad Analysis"
               : "Back to assignments"}

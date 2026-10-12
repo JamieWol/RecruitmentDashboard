@@ -792,6 +792,41 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
     return null;
   };
 
+  const renderScatterPlayerLabel = ({ x, y, width = 0, height = 0, value, parentViewBox }) => {
+    const name = String(value || "");
+    if (!name) return null;
+    const left = Number(parentViewBox?.x) || 0;
+    const right = left + (Number(parentViewBox?.width) || 0);
+    const pointX = Number(x) || 0;
+    const pointY = Number(y) || 0;
+    const labelWidth = name.length * 5.8;
+    let textAnchor = "start";
+    let textX = pointX + width + 5;
+    if (right && textX + labelWidth > right - 4) {
+      textAnchor = "end";
+      textX = pointX - 5;
+    }
+    if (textAnchor === "end" && textX - labelWidth < left + 4) {
+      textAnchor = "start";
+      textX = left + 4;
+    }
+    return (
+      <text
+        x={textX}
+        y={pointY + height / 2 + 3}
+        textAnchor={textAnchor}
+        fill="#222"
+        fontSize={10}
+        paintOrder="stroke"
+        stroke="#fff"
+        strokeWidth={2}
+        strokeLinejoin="round"
+      >
+        {name}
+      </text>
+    );
+  };
+
   const attackingMetrics = metrics.filter(m => /goal|assist|shot|key pass|xg/i.test(m));
   const defendingMetrics = metrics.filter(m => /tackle|intercept|clearance|block|aerial|pressures/i.test(m));
   const ballCarryingMetrics = metrics.filter(m => /dribble|carry|progressive|pass/i.test(m));
@@ -1508,7 +1543,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                     dataKey="scatterY"
                     fill="#555555"
                   >
-                    <LabelList dataKey="Player Name" position="right" fontSize={10} fill="#222" />
+                    <LabelList dataKey="Player Name" content={renderScatterPlayerLabel} fontSize={10} fill="#222" />
                   </Scatter>
                   <Scatter
                     data={selectedScatterPlayer ? [selectedScatterPlayer] : []}
@@ -1516,7 +1551,6 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
                     fill="#ff7f0e"
                     shape="circle"
                   >
-                    <LabelList dataKey="Player Name" position="right" fontSize={10} fill="#222" />
                   </Scatter>
                   <ReferenceArea x1={0} x2={50} y1={50} y2={100} fill="none" label={{ value: `Strong in ${scatterMetrics.y} Only`, position: "insideTop", fill: "#c28d00", fontWeight: 700, fontSize: 11 }} />
                   <ReferenceArea x1={50} x2={100} y1={50} y2={100} fill="none" label={{ value: "Strong In Both", position: "insideTop", fill: "#16852a", fontWeight: 700, fontSize: 11 }} />
