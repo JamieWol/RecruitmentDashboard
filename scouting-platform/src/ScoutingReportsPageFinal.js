@@ -926,6 +926,7 @@ export default function ScoutingReportsPageFinal() {
       playerId: active.playerId || active.player_id || active["Player Id"] || null,
       club: active.player_club || active.playerClub || active.club || active.Club || active.team || active.Team || "",
     };
+    setActive(null);
     setProfile(selectedPlayer);
     window.scrollTo(0, 0);
   };
@@ -1646,7 +1647,12 @@ export default function ScoutingReportsPageFinal() {
         {shown.map((x) => (
           <article className="sr-card" key={x.id} onClick={() => { setProfile(null); openReport(x); }}>
             <div className="sr-card-top"><span className="sr-card-status">{x.status}</span>{(String(x.status || "").toLowerCase() !== "published" || String(x.author_id || "") === String(user?.id || "")) && <button className="sr-trash" onClick={(e) => { e.stopPropagation(); deleteAssignment(x); }}>Delete</button>}</div>
-            <button type="button" className="sr-assignment-player-link" onClick={(e) => { e.stopPropagation(); setProfile(null); openReport(x); }}>{x.player}</button>
+            <button type="button" className="sr-assignment-player-link" onClick={(e) => {
+              e.stopPropagation();
+              setProfileReturnReport(null);
+              try { localStorage.setItem("scoutingProfileOrigin", "assignments"); } catch {}
+              setProfile({ ...x, player: String(x.player || "").trim() });
+            }}>{x.player}</button>
             <p><ClubName club={clubFromReport(x.player_club, x.playerClub, x.club, x.Club, x.team, x.Team) || profilePlayerDirectory[normalizePlayerName(x.player)]?.club} /> · {x.position || "Position not added"}</p>
             <div className="sr-fixture">{cardFixtureLabel(x)}</div>
             <div className="sr-card-meta"><span>{x.date || "Date not added"}</span><span>{normalizeImportedViewing(x.viewing)}</span><span>Scout: {x.scout || "Unassigned"}</span></div>
