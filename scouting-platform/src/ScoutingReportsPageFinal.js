@@ -316,6 +316,7 @@ export default function ScoutingReportsPageFinal() {
   });
   const [sharedReports, setSharedReports] = useState([]);
   const [sharedAssignments, setSharedAssignments] = useState([]);
+  const [deleteError, setDeleteError] = useState("");
   const [playerData, setPlayerData] = useState(null);
   const [playerDataLoading, setPlayerDataLoading] = useState(false);
   const [playerDataError, setPlayerDataError] = useState("");
@@ -623,18 +624,52 @@ export default function ScoutingReportsPageFinal() {
     setReportImportOpen(false);
   };
   const deleteAssignment = async (assignment) => {
-    const assignmentId = String(assignment?.id);
-    const next = items.filter((item) => String(item?.id) !== assignmentId);
-    saveItems(next);
-    setSharedAssignments((current) => current.filter((item) => String(item?.id) !== assignmentId));
+    setDeleteError("");
+    const assignmentId = String(assignment?.assignment_id || assignment?.id || "");
+    const sharedAssignmentId = assignment?.sharedAssignmentId || assignment?.id;
+    const isPublished = String(assignment?.status || "").toLowerCase() === "published";
+
     if (user && accountProfile?.club) {
-      const { error } = await supabase
-        .from("club_assignments")
-        .delete()
-        .eq("club", accountProfile.club)
-        .eq("id", Number(assignment?.sharedAssignmentId || assignment?.id));
-      if (error) console.error("Could not delete shared assignment", error);
+      const deletes = [];
+      if (isPublished && assignmentId) {
+        deletes.push(
+          supabase
+            .from("club_reports")
+            .delete()
+            .eq("club", accountProfile.club)
+            .eq("id", Number(assignmentId))
+            .select("id"),
+        );
+      }
+      if (sharedAssignmentId) {
+        deletes.push(
+          supabase
+            .from("club_assignments")
+            .delete()
+            .eq("club", accountProfile.club)
+            .eq("id", Number(sharedAssignmentId)),
+        );
+      }
+
+      const results = await Promise.all(deletes);
+      const failedDelete = results.find((result) => result.error);
+      const reportDelete = isPublished ? results[0] : null;
+      if (failedDelete || (isPublished && !reportDelete?.data?.length)) {
+        const error = failedDelete?.error;
+        console.error("Could not delete report", error || "No published report row was deleted");
+        setDeleteError(error?.message || "The report was not deleted. Check your access and try again.");
+        return;
+      }
     }
+
+    const idsToRemove = new Set([assignment?.id, assignment?.assignment_id, assignment?.sharedAssignmentId]
+      .filter((id) => id !== undefined && id !== null)
+      .map(String));
+    const matchesAssignment = (item) => [item?.id, item?.assignment_id, item?.sharedAssignmentId]
+      .some((id) => id !== undefined && id !== null && idsToRemove.has(String(id)));
+    saveItems(items.filter((item) => !matchesAssignment(item)));
+    setSharedAssignments((current) => current.filter((item) => !matchesAssignment(item)));
+    setSharedReports((current) => current.filter((item) => !matchesAssignment(item)));
   };
   const shortlistPositions = [
     "GK",
@@ -1518,6 +1553,7 @@ export default function ScoutingReportsPageFinal() {
         </div>
       </section>
       {importNotice && <div className="sr-import-notice" role="status"><span>{importNotice}</span><button type="button" onClick={() => { setDashboardView("reports"); setTab("My Assignments"); setImportNotice(""); }}>Review drafts</button><button type="button" className="sr-import-notice-close" onClick={() => setImportNotice("")} aria-label="Dismiss">×</button></div>}
+      {deleteError && <p className="sr-publish-error" role="alert">{deleteError}</p>}
       {dashboardView === "reports" && <><input
         className="sr-search"
         placeholder="Search scout or player..."
