@@ -21,3 +21,9 @@ describe("Copenhagen badge names", () => {
     expect(clubBadgePathFor(name)).toBe("logos/denmark/copenhagen.png");
   });
 });
+
+describe("Nordsjælland badge names", () => {
+  test.each(["Nordsjælland", "FC Nordsjælland", "Nordsjaelland", "FC Nordsjaelland"])("maps %s to the Nordsjælland badge", (name) => {
+    expect(clubBadgePathFor(name)).toBe("logos/denmark/nordsjaelland.png");
+  });
+});
