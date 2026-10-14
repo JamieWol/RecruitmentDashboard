@@ -4644,6 +4644,7 @@ const clubBadgeAliases = Object.freeze({
   'ac-milano': 'milan',
   'afc-bournemouth': 'bournemouth',
   'brighton-and-hove-albion': 'brighton',
+  'fc-kobenhavn': 'copenhagen',
   'crystal-palace-fc': 'crystal-palace',
   'fc-internazionale-milano': 'inter',
   'inter-milan': 'inter',
@@ -4657,6 +4658,7 @@ const clubBadgeAliases = Object.freeze({
   'manchester-utd': 'manchester-united',
   'newcastle-united': 'newcastle',
   'nottingham-forest-fc': 'nottingham-forest',
+  'kobenhavn': 'copenhagen',
   'sheffield-united-fc': 'sheffield-united',
   'spurs': 'tottenham',
   'tottenham-hotspur': 'tottenham',
@@ -4664,7 +4666,7 @@ const clubBadgeAliases = Object.freeze({
   'wolverhampton-wanderers': 'wolves',
 });
 
-const normalizeClubBadgeKey = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/&/g, " and ").replace(/\bmunich\b/g, "munchen").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+const normalizeClubBadgeKey = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/ø/g, "o").replace(/&/g, " and ").replace(/\bmunich\b/g, "munchen").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 const clubNameDescriptors = new Set([
   "fc", "afc", "cf", "sc", "ac", "fk", "sk", "sv", "tsv", "cd", "ud",
   "kv", "kaa", "krc", "kvc", "rsc", "ksc", "kfc", "kas", "rfc",

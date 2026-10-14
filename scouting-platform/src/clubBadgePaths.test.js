@@ -15,3 +15,9 @@ describe("Bayern Munich badge names", () => {
     expect(clubBadgePathFor(name)).toBe("logos/germany/bayern-munchen.png");
   });
 });
+
+describe("Copenhagen badge names", () => {
+  test.each(["Copenhagen", "FC Copenhagen", "København", "FC København", "FC Kobenhavn"])("maps %s to the Copenhagen badge", (name) => {
+    expect(clubBadgePathFor(name)).toBe("logos/denmark/copenhagen.png");
+  });
+});
