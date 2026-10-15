@@ -90,7 +90,20 @@ const fixtureDateToISO = (value) => {
   return text;
 };
 export const splitImportedFixtures = (value, fallbackDate = "") => {
-  const entries = clean(value).split(/\s*(?:\||\r?\n|;|\u2022)+\s*/).map(clean).filter(Boolean);
+  const rawEntries = clean(value).split(/\s*(?:\||\r?\n|;|\u2022)+\s*/).map(clean).filter(Boolean);
+  // Some Word imports split a single fixture across lines, for example
+  // "ANDERLECHT v" followed by "ZULTE WAREGEM 19/09/2026". Rejoin those
+  // wrapped lines before treating each entry as an individual game.
+  const entries = [];
+  for (let index = 0; index < rawEntries.length; index += 1) {
+    let entry = rawEntries[index];
+    const next = rawEntries[index + 1];
+    if (/\b(?:v|vs|versus)\s*$/i.test(entry) && next && !/^\d{4}[-/.]\d{1,2}[-/.]\d{1,2}$/.test(next) && !/^\d{1,2}[/. -]\d{1,2}[/. -]\d{2,4}$/.test(next) && !/\b(?:v|vs|versus)\b/i.test(next)) {
+      entry = `${entry} ${next}`;
+      index += 1;
+    }
+    entries.push(entry);
+  }
   const fallbackDates = clean(fallbackDate).split(/\s*(?:\||\r?\n|;)+\s*/).map(fixtureDateToISO);
   if (entries.length === 1) {
     const adjacent = splitAdjacentFixtures(entries[0], fallbackDate);

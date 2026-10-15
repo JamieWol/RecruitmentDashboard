@@ -189,6 +189,16 @@ describe("old report import parsing", () => {
     ]);
   });
 
+  test("joins wrapped home and away team lines into three dated fixtures", () => {
+    expect(splitImportedFixtures(
+      "ANDERLECHT v\nZULTE WAREGEM 19/09/2026\nZULTE WAREGEM v\nGENT 10/10/2026\nZULTE WAREGEM v\nSPORTING CHARLEROI 13/09/2026",
+    )).toEqual([
+      { name: "ANDERLECHT v ZULTE WAREGEM", date: "2026-09-19" },
+      { name: "ZULTE WAREGEM v GENT", date: "2026-10-10" },
+      { name: "ZULTE WAREGEM v SPORTING CHARLEROI", date: "2026-09-13" },
+    ]);
+  });
+
   test("recognises the existing player, club, fixture, date and notes layout", () => {
     const [record] = parseWordHtml([
       "<p><strong>D. KOWNACKI</strong></p><p>Werder Bremen</p>",
