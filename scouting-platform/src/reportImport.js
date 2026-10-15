@@ -189,6 +189,7 @@ export const parseExcelSheetRows = (rows, sourceFile = "Workbook.xlsx", sheetNam
 const collectWordBlocks = (html) => {
   const documentNode = new DOMParser().parseFromString(html, "text/html");
   const blocks = [];
+  let nextTableId = 0;
   const blockText = (node) => {
     const parts = [];
     const walk = (current) => {
@@ -209,18 +210,39 @@ const collectWordBlocks = (html) => {
     const strong = heading || Boolean(node.querySelector?.("strong,b")) || (node.tagName === "STRONG" || node.tagName === "B");
     blocks.push({ text, cells: null, strong, heading, tableCell });
   };
+  const directRows = (table) => Array.from(table.children)
+    .flatMap((child) => child.tagName === "TBODY" || child.tagName === "THEAD" || child.tagName === "TFOOT"
+      ? Array.from(child.children).filter((row) => row.tagName === "TR")
+      : child.tagName === "TR" ? [child] : []);
+  const directCells = (row) => Array.from(row.children).filter((cell) => cell.tagName === "TH" || cell.tagName === "TD");
+  const directParagraphs = (cell, table) => Array.from(cell.querySelectorAll("p,h1,h2,h3,h4,h5,h6,li"))
+    .filter((paragraph) => paragraph.closest("table") === table);
+  const walkNestedTable = (table, parentCell) => {
+    directRows(table).forEach((row) => directCells(row).forEach((cell) => {
+      const paragraphs = directParagraphs(cell, table);
+      if (paragraphs.length) {
+        // Word often puts each fixture in a nested table cell with its teams and
+        // date split over separate lines. Keep each cell as one fixture value.
+        paragraphs.forEach((paragraph) => addTextBlock(paragraph, blockText(paragraph).join(" "), parentCell));
+      } else {
+        blockText(cell).forEach((text) => blocks.push({ text, cells: null, strong: false, heading: false, tableCell: parentCell }));
+      }
+      Array.from(cell.children).filter((child) => child.tagName === "TABLE").forEach((nested) => walkNestedTable(nested, parentCell));
+    }));
+  };
   const walk = (node) => {
     if (node.tagName === "TABLE") {
-      const tableId = blocks.filter((block) => block.tableCell).at(-1)?.tableCell.tableId + 1 || 0;
-      Array.from(node.querySelectorAll("tr")).forEach((row, rowIndex) => {
-        Array.from(row.querySelectorAll("th,td")).forEach((cell, columnIndex) => {
+      const tableId = nextTableId++;
+      directRows(node).forEach((row, rowIndex) => {
+        directCells(row).forEach((cell, columnIndex) => {
           const tableCell = { tableId, rowIndex, columnIndex };
-          const paragraphs = Array.from(cell.querySelectorAll("p,h1,h2,h3,h4,h5,h6,li"));
+          const paragraphs = directParagraphs(cell, node);
           if (paragraphs.length) {
             paragraphs.forEach((paragraph) => blockText(paragraph).forEach((text) => addTextBlock(paragraph, text, tableCell)));
-          } else {
+          } else if (!Array.from(cell.children).some((child) => child.tagName === "TABLE")) {
             blockText(cell).forEach((text) => blocks.push({ text, cells: null, strong: cell.children.length === 0 && Boolean(cell.querySelector("strong,b")), heading: false, tableCell }));
           }
+          Array.from(cell.children).filter((child) => child.tagName === "TABLE").forEach((nested) => walkNestedTable(nested, tableCell));
         });
       });
       return;

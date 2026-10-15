@@ -1,4 +1,4 @@
-import { findImportedPlayerMatch, parseExcelSheetRows, parseWordHtml, splitImportedFixtures } from "./reportImport";
+import { findImportedPlayerMatch, normalizeImportedViewing, parseExcelSheetRows, parseWordHtml, splitImportedFixtures } from "./reportImport";
 
 describe("old report import parsing", () => {
   test("splits a multi-game imported report into separately dated fixtures", () => {
@@ -47,6 +47,17 @@ describe("old report import parsing", () => {
     });
   });
 
+  test("normalises repeated viewing text to one published-card label", () => {
+    expect(normalizeImportedViewing("Video Video Watching")).toBe("Video");
+    expect(normalizeImportedViewing("Live Game Live")).toBe("Live");
+
+    const [record] = parseExcelSheetRows([
+      ["Player", "Viewing"],
+      ["Alex Example", "Video Video Watching"],
+    ]);
+    expect(record.viewing).toBe("Video");
+  });
+
   test("splits Word content by player headings and keeps section text", () => {
     const records = parseWordHtml([
       "<p><strong>A. Example</strong></p><p>Example FC</p>",
@@ -82,6 +93,32 @@ describe("old report import parsing", () => {
         behaviour: "Works hard for the team.",
       },
     });
+  });
+
+  test("reads dated fixtures from separate cells in a nested Word table", () => {
+    const [record] = parseWordHtml(`<table>
+      <tr><td colspan="2"><p>Name: E. LOFOLOMO</p></td><td colspan="2"><p>Club: Zulte Waregem</p></td><td><p>Position: CDM</p></td></tr>
+      <tr><td><p>Game(s):</p></td><td colspan="4"><table><tr>
+        <td><p>ANDERLECHT v<br />ZULTE WAREGEM<br />19/09/2026</p></td>
+        <td><p>ZULTE WAREGEM v<br />GENT<br />10/10/2026</p></td>
+        <td><p>ZULTE WAREGEM v<br />SPORTING CHARLEROI<br />13/09/2026</p></td>
+      </tr></table></td></tr>
+      <tr><td colspan="5"><p>In Possession</p></td></tr>
+      <tr><td colspan="5"><p>Comfortable on the ball.</p></td></tr>
+    </table>`);
+
+    expect(record).toMatchObject({
+      player: "E. LOFOLOMO",
+      club: "Zulte Waregem",
+      position: "CDM",
+      game: "ANDERLECHT v ZULTE WAREGEM 19/09/2026\nZULTE WAREGEM v GENT 10/10/2026\nZULTE WAREGEM v SPORTING CHARLEROI 13/09/2026",
+      report: { inPossession: "Comfortable on the ball." },
+    });
+    expect(splitImportedFixtures(record.game, record.date)).toEqual([
+      { name: "ANDERLECHT v ZULTE WAREGEM", date: "2026-09-19" },
+      { name: "ZULTE WAREGEM v GENT", date: "2026-10-10" },
+      { name: "ZULTE WAREGEM v SPORTING CHARLEROI", date: "2026-09-13" },
+    ]);
   });
 
   test("recognises decorated section titles and keeps each section in its own field", () => {
