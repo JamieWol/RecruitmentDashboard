@@ -12,7 +12,7 @@ const formatDate = (value) => {
 
 export default function SquadPlansPage() {
   const navigate = useNavigate();
-  const { appState, updateAppState, profile, user } = useAuth();
+  const { appState, updateAppState, refreshAppState, profile, user } = useAuth();
   const [scouts, setScouts] = useState([]);
   const [sharedPlans, setSharedPlans] = useState([]);
   const [showShared, setShowShared] = useState(false);
@@ -21,6 +21,21 @@ export default function SquadPlansPage() {
   const [sharePermission, setSharePermission] = useState("view");
   const [shareError, setShareError] = useState("");
   const plans = [...(appState?.squadPlan?.savedPlans || [])].sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+
+  useEffect(() => {
+    if (!user || !refreshAppState) return;
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        if (!cancelled) await refreshAppState();
+      } catch (error) {
+        console.error("Could not refresh saved squad plans", error);
+      }
+    };
+    refresh();
+    window.addEventListener("focus", refresh);
+    return () => { cancelled = true; window.removeEventListener("focus", refresh); };
+  }, [refreshAppState, user, user?.id]);
 
   useEffect(() => {
     if (!profile?.club) { setScouts([]); return; }

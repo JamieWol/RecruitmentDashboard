@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { supabase } from "./supabaseClient";
 import { migrateAndLoadState, saveCloudState, syncPublishedReports } from "./cloudState";
 
@@ -10,6 +10,7 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [appState, setAppState] = useState(null);
   const [profileError, setProfileError] = useState("");
+  const cloudSaveQueue = useRef(Promise.resolve());
   const loadProfile = async (user) => {
     if (!user) { setProfile(null); setAppState(null); setProfileError(""); return; }
     const { data, error } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
@@ -33,11 +34,33 @@ export function AuthProvider({ children }) {
   }, [session]);
   const updateAppState = (next) => {
     setAppState(next);
-    return saveCloudState(session?.user, next).catch((error) => {
+    const saveUser = session?.user;
+    if (!saveUser) return Promise.resolve();
+    // Keep full-row app-state upserts in order. Rapid squad edits can otherwise
+    // finish out of order and let an older snapshot overwrite the saved plan.
+    const save = cloudSaveQueue.current.catch(() => {}).then(() => saveCloudState(saveUser, next));
+    cloudSaveQueue.current = save;
+    return save.catch((error) => {
       console.error("Could not save cloud data", error);
       throw error;
     });
   };
-  return <AuthContext.Provider value={{ session, user: session?.user || null, profile, profileError, appState, updateAppState, loading, refreshProfile: () => loadProfile(session?.user) }}>{children}</AuthContext.Provider>;
+  const refreshAppState = useCallback(async () => {
+    const activeUser = session?.user;
+    if (!activeUser) return null;
+    const { data, error } = await supabase.from("user_app_state").select("*").eq("user_id", activeUser.id).maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    const latest = {
+      assignments: data.assignments || [],
+      shortlists: data.shortlists || [],
+      tags: data.tags || [],
+      squadPlan: data.squadPlan || { savedPlans: [] },
+      playerSummaries: data.playerSummaries || {},
+    };
+    setAppState(latest);
+    return latest;
+  }, [session?.user]);
+  return <AuthContext.Provider value={{ session, user: session?.user || null, profile, profileError, appState, updateAppState, refreshAppState, loading, refreshProfile: () => loadProfile(session?.user) }}>{children}</AuthContext.Provider>;
 }
 export const useAuth = () => useContext(AuthContext);
