@@ -150,6 +150,86 @@ const getField = (label) => {
   return aliasToField.get(base);
 };
 const reportFields = ["foot", "playedPosition", "performance", "potential", "conclusion", "reasons", "inPossession", "outPossession", "physical", "behaviour", "strengths", "weaknesses"];
+const noteImportFields = reportFields;
+export const scoutNotesFieldLabels = {
+  foot: "Preferred Foot", playedPosition: "Position Played", performance: "Performance Grade", potential: "Potential Grade",
+  conclusion: "Conclusion", reasons: "Reasons Why", inPossession: "In Possession",
+  outPossession: "Out of Possession", physical: "Physical", behaviour: "On-Pitch Behaviour",
+  strengths: "Strengths", weaknesses: "Weaknesses",
+};
+const inferNoteSection = (value) => {
+  const text = normalizeLabel(value);
+  if (/\b(physical|pace|speed|acceleration|stamina|strength|powerful|aerial|jump|athletic|mobile|mobility|quick|explosive)\b/.test(text)) return "physical";
+  if (/\b(attitude|work rate|works hard|communication|communicates|leadership|character|disciplined|discipline|competes|competitive|reaction)\b/.test(text)) return "behaviour";
+  if (/\b(out of possession|without the ball|off the ball|press|pressing|track back|tracks back|marking|defend|defending|tackle|intercept|cover|blocks|duel|second ball)\b/.test(text)) return "outPossession";
+  if (/\b(in possession|on the ball|with the ball|passing|pass|first touch|ball control|dribbl|carry|carrying|receive|receiving|scan|scanning|create|cross|shoot|finish|finishing|decision|turn)\b/.test(text)) return "inPossession";
+  if (/\b(needs? to|should|could improve|needs improvement|lacks?|poor|struggles?|inconsistent|too easily|fails? to|not enough|doesn.t|cannot|can.t|weakness)\b/.test(text)) return "weaknesses";
+  return "strengths";
+};
+export const parseScoutNotesText = (sourceText) => {
+  const values = Object.fromEntries(noteImportFields.map((field) => [field, []]));
+  let activeField = "";
+  const append = (field, value) => {
+    const text = clean(value).replace(/^[•●▪◦\-*–—]+\s*/, "").trim();
+    if (noteImportFields.includes(field) && text) values[field].push(text);
+  };
+  const lines = clean(sourceText).split(/\r?\n/).map(clean).filter(Boolean);
+  lines.forEach((rawLine) => {
+    const line = rawLine.replace(/^[•●▪◦\-*–—]+\s*/, "").trim();
+    const divider = line.match(/^([^:|–—-]{2,45})\s*(?::|\||–|—|\s-\s)\s*(.*)$/);
+    if (divider) {
+      const field = getField(divider[1]);
+      if (field) {
+        activeField = noteImportFields.includes(field) ? field : "";
+        append(activeField, divider[2]);
+        return;
+      }
+    }
+    const heading = getField(line.replace(/[:：]$/, ""));
+    if (heading) {
+      activeField = noteImportFields.includes(heading) ? heading : "";
+      return;
+    }
+    append(activeField || inferNoteSection(line), line);
+  });
+  return Object.fromEntries(Object.entries(values).filter(([, entries]) => entries.length).map(([field, entries]) => [field, entries.join("\n")]));
+};
+
+export const parseScoutNotesFile = async (file) => {
+  const extension = String(file?.name || "").split(".").pop().toLowerCase();
+  let text = "";
+  if (extension === "docx") {
+    const { value } = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
+    text = value;
+  } else if (extension === "txt") {
+    text = await file.text();
+  } else if (["csv", "xlsx", "xls"].includes(extension)) {
+    const workbook = extension === "csv"
+      ? XLSX.read(await file.text(), { type: "string", cellDates: true })
+      : XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
+    text = workbook.SheetNames.flatMap((sheetName) => {
+      const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: "", raw: false });
+      const headerIndex = rows.findIndex((row) => row.some((cell) => noteImportFields.includes(getField(cell))));
+      if (headerIndex >= 0) {
+        const headers = rows[headerIndex].map((cell) => getField(cell));
+        return rows.slice(headerIndex + 1).flatMap((row) => headers.flatMap((field, index) => {
+          const value = clean(row[index]);
+          return noteImportFields.includes(field) && value ? [`${scoutNotesFieldLabels[field]}: ${value}`] : [];
+        }));
+      }
+      return rows.map((row) => {
+        const cells = row.map(clean).filter(Boolean);
+        if (cells.length > 1 && getField(cells[0])) return `${cells[0]}: ${cells.slice(1).join(" ")}`;
+        return cells.join(" ");
+      });
+    }).join("\n");
+  } else {
+    throw new Error("Use a Word .docx, text .txt, Excel .xlsx/.xls, or CSV notes file.");
+  }
+  const report = parseScoutNotesText(text);
+  if (!Object.keys(report).length) throw new Error("No report notes were recognised. Add section headings such as Strengths, Weaknesses, Physical, or Conclusion.");
+  return report;
+};
 export const normalizeImportedViewing = (value, fallback = "Video") => {
   const match = clean(value).match(/\b(live|video)\b/i);
   if (!match) return fallback;

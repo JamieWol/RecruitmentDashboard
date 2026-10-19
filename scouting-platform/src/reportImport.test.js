@@ -1,4 +1,4 @@
-import { findImportedPlayerMatch, normalizeImportedViewing, parseExcelSheetRows, parseWordHtml, splitImportedFixtures } from "./reportImport";
+import { findImportedPlayerMatch, normalizeImportedViewing, parseExcelSheetRows, parseScoutNotesText, parseWordHtml, splitImportedFixtures } from "./reportImport";
 
 describe("old report import parsing", () => {
   test("splits a multi-game imported report into separately dated fixtures", () => {
@@ -56,6 +56,33 @@ describe("old report import parsing", () => {
       ["Alex Example", "Video Video Watching"],
     ]);
     expect(record.viewing).toBe("Video");
+  });
+
+  test("maps uploaded scout notes under their matching report headings", () => {
+    expect(parseScoutNotesText(`
+      In Possession:
+      Good range of passing and receives well between the lines.
+      Out of Possession:
+      Tracks back to support the fullback.
+      Physical:
+      Mobile and strong in duels.
+      On-Pitch Behaviour:
+      Works hard for the team.
+      Strengths:
+      Finds space in the final third.
+      Weaknesses:
+      Can be loose in possession.
+      Conclusion:
+      A mobile midfielder with a good range of passing.
+    `)).toEqual({
+      inPossession: "Good range of passing and receives well between the lines.",
+      outPossession: "Tracks back to support the fullback.",
+      physical: "Mobile and strong in duels.",
+      behaviour: "Works hard for the team.",
+      strengths: "Finds space in the final third.",
+      weaknesses: "Can be loose in possession.",
+      conclusion: "A mobile midfielder with a good range of passing.",
+    });
   });
 
   test("splits Word content by player headings and keeps section text", () => {

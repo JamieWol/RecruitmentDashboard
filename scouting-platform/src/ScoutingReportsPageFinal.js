@@ -5,7 +5,7 @@ import { supabase } from "./supabaseClient";
 import { useAuth } from "./AuthContext";
 import { removeBackground } from "@imgly/background-removal";
 import ReportImportModal from "./ReportImportModal";
-import { normalizeImportedViewing, splitImportedFixtures } from "./reportImport";
+import { normalizeImportedViewing, parseScoutNotesFile, scoutNotesFieldLabels, splitImportedFixtures } from "./reportImport";
 import { choosePlayerRecord, normalizePlayerName, playerNameMatchScore } from "./playerProfileMatching";
 import { createMasterPlayer } from "./playerDatabase";
 const clubFromReport = (...values) => {
@@ -350,6 +350,7 @@ export default function ScoutingReportsPageFinal() {
   const [summaryEditing, setSummaryEditing] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoStatus, setPhotoStatus] = useState("");
+  const [noteUploadStatus, setNoteUploadStatus] = useState("");
   const [profileQuery, setProfileQuery] = useState(() => sessionStorage.getItem("profileCheckerQuery") || "");
   const [profileResults, setProfileResults] = useState([]);
   const [profilePlayerDirectory, setProfilePlayerDirectory] = useState({});
@@ -918,8 +919,24 @@ export default function ScoutingReportsPageFinal() {
   const openReport = (x) => {
     setActive(x);
     setReport(x.report || empty);
+    setNoteUploadStatus("");
     setEditing(x.status !== "Published" && assignmentBelongsToScout(x, user, accountProfile));
     setPublishError("");
+  };
+  const uploadScoutNotes = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setNoteUploadStatus("Reading notes…");
+    try {
+      const parsed = await parseScoutNotesFile(file);
+      setReport((current) => ({ ...current, ...parsed }));
+      const labels = Object.keys(parsed).map((key) => scoutNotesFieldLabels[key] || key);
+      setNoteUploadStatus(`Filled ${labels.join(", ")}. Check the report and edit anything needed before publishing.`);
+    } catch (error) {
+      setNoteUploadStatus(error?.message || "Could not read these notes.");
+    } finally {
+      event.target.value = "";
+    }
   };
   const openReportPlayerProfile = (event) => {
     event?.preventDefault();
@@ -1196,6 +1213,14 @@ export default function ScoutingReportsPageFinal() {
             }}
           >Edit Games</button>}
         </div>
+        {editing && <section className="sr-note-upload">
+          <label className="sr-note-upload-picker">
+            <input type="file" accept=".docx,.txt,.xlsx,.xls,.csv" onChange={uploadScoutNotes} />
+            <strong>Upload notes to fill this report</strong>
+            <span>Word, text, Excel or CSV. Notes are placed into the matching report sections and remain editable.</span>
+          </label>
+          {noteUploadStatus && <small role="status">{noteUploadStatus}</small>}
+        </section>}
         <div className="sr-form-grid">
           <label className="sr-field">
             <span>Report type</span>

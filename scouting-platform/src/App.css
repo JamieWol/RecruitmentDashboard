@@ -138,6 +138,14 @@ header{z-index:1000!important}.sr-page{position:relative;z-index:1}.sr-pitch{z-i
 .sr-player-data-notice{margin:14px 0 0;padding:11px 13px;border-radius:7px;background:#173f70;color:#d2e5fa;line-height:1.45}
 .sr-player-data-notice.error{background:#5e2c3a;color:#ffe0e4}
 
+.sr-note-upload{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:0 0 20px;padding:14px 16px;border:1px solid #78b4d8;border-radius:9px;background:#174f83;color:#d2e5fa}
+.sr-note-upload-picker{display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer}
+.sr-note-upload-picker input{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+.sr-note-upload-picker strong{padding:9px 13px;border:1px solid #b9eaff;border-radius:7px;background:#62dcff;color:#063d63}
+.sr-note-upload-picker span{font-size:13px}
+.sr-note-upload>small{flex-basis:100%;line-height:1.45;color:#bfe5ff}
+@media(max-width:720px){.sr-note-upload{align-items:flex-start}.sr-note-upload-picker{align-items:flex-start;flex-direction:column}}
+
 /* Long report fields stay readable in view mode on touch screens and desktop. */
 .sr-report .sr-field textarea{max-height:360px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;scrollbar-gutter:stable;}
 .sr-report .sr-field textarea[readonly]{pointer-events:auto;user-select:text;-webkit-user-select:text;cursor:text;}
