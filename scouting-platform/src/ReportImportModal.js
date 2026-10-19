@@ -129,14 +129,14 @@ export default function ReportImportModal({ onClose, onImport, storageKey = "sco
     <div className="sr-modal sr-import-modal" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <section className="sr-form sr-import-form" role="dialog" aria-modal="true" aria-labelledby="sr-import-title">
         <div className="sr-form-head">
-          <div><div className="sr-kicker">REPORT ARCHIVE</div><h2 id="sr-import-title">Import old reports</h2><p>Upload Word .docx or Excel files. Check the extracted details before saving them as drafts.</p></div>
+          <div><div className="sr-kicker">REPORT ARCHIVE</div><h2 id="sr-import-title">Import old reports</h2><p>Upload old reports or scouting notes. Check the extracted details before saving them as drafts.</p></div>
           <button type="button" className="sr-close" onClick={onClose} aria-label="Close">×</button>
         </div>
         <label className="sr-import-drop">
-          <input type="file" multiple accept=".docx,.xlsx,.xls,.csv" onChange={parseFiles} disabled={loading || saving} />
-          <strong>{loading ? "Reading reports and checking players…" : "Choose Word or Excel files"}</strong>
-          <span>Excel: one report per row, with a Player or Name column. Word: one report per file or reports with Player headings.</span>
-          <small>Supported: .docx, .xlsx, .xls and .csv</small>
+          <input type="file" multiple accept=".docx,.txt,.xlsx,.xls,.csv" onChange={parseFiles} disabled={loading || saving} />
+          <strong>{loading ? "Reading reports and checking players…" : "Choose reports or notes files"}</strong>
+          <span>Excel: one report per row, with a Player or Name column. Word: one report per file or reports with Player headings. Notes: add a Player heading or use the player's name as the filename.</span>
+          <small>Supported: .docx, .txt, .xlsx, .xls and .csv</small>
         </label>
         {message && <p className="sr-import-message" role="status">{message}</p>}
         {!!errors.length && <div className="sr-import-errors" role="alert">{errors.map((error) => <p key={error}>{error}</p>)}</div>}

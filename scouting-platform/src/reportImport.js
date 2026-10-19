@@ -173,7 +173,21 @@ export const parseScoutNotesText = (sourceText) => {
     const text = clean(value).replace(/^[•●▪◦\-*–—]+\s*/, "").trim();
     if (noteImportFields.includes(field) && text) values[field].push(text);
   };
-  const lines = clean(sourceText).split(/\r?\n/).map(clean).filter(Boolean);
+  const sectionLabels = Object.values(scoutNotesFieldLabels)
+    .sort((left, right) => right.length - left.length)
+    .map((label) => label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+"));
+  const inlineSectionPattern = new RegExp(`(?:^|\\s)(${sectionLabels.join("|")})\\s*[:：]`, "gi");
+  const lines = clean(sourceText).split(/\r?\n/).map(clean).filter(Boolean).flatMap((rawLine) => {
+    const matches = [...rawLine.matchAll(inlineSectionPattern)];
+    if (!matches.length) return [rawLine];
+    const chunks = [];
+    if (matches[0].index > 0) chunks.push(rawLine.slice(0, matches[0].index).trim());
+    matches.forEach((match, index) => {
+      const end = matches[index + 1]?.index ?? rawLine.length;
+      chunks.push(rawLine.slice(match.index, end).trim());
+    });
+    return chunks.filter(Boolean);
+  });
   lines.forEach((rawLine) => {
     const line = rawLine.replace(/^[•●▪◦\-*–—]+\s*/, "").trim();
     const divider = line.match(/^([^:|–—-]{2,45})\s*(?::|\||–|—|\s-\s)\s*(.*)$/);
@@ -252,11 +266,13 @@ const normalizeRecord = (record, sourceFile) => {
 
 const rowToRecord = (row, sourceFile) => {
   const fields = {};
+  const noteColumns = Object.entries(row).filter(([key]) => ["notes", "scout notes", "scouting notes", "player notes", "player observations", "observations", "match notes"].includes(normalizeLabel(key)));
+  const noteReport = parseScoutNotesText(noteColumns.map(([, value]) => clean(value)).filter(Boolean).join("\n"));
   Object.entries(row).forEach(([key, value]) => {
     const field = getField(key);
     if (field) fields[field] = field === "date" ? toISODate(value) : clean(value);
   });
-  const report = {};
+  const report = { ...noteReport };
   Object.entries(fields).forEach(([field, value]) => {
     if (reportFields.includes(field)) report[field] = value;
   });
@@ -483,11 +499,45 @@ export const parseWordHtml = (html, sourceFile = "Report.docx") => wordBlocksToR
 
 const parseWordFile = async (file) => {
   const arrayBuffer = await file.arrayBuffer();
-  const { value: html } = await mammoth.convertToHtml({ arrayBuffer });
-  const records = parseWordHtml(html, file.name);
+  const [{ value: html }, { value: rawText }] = await Promise.all([
+    mammoth.convertToHtml({ arrayBuffer }),
+    mammoth.extractRawText({ arrayBuffer }),
+  ]);
+  let records = parseWordHtml(html, file.name);
   const filenamePlayer = clean(file.name.replace(/\.docx$/i, "")).replace(/[_]+/g, " ").trim();
+  const noteReport = parseScoutNotesText(rawText);
+  const hasMappedReport = records.some((record) => reportFields.some((field) => record.report?.[field]));
+  if (!hasMappedReport && Object.keys(noteReport).length) {
+    const metadata = parseNotesMetadata(rawText);
+    const fallbackName = /^[\p{L}\p{M}.'’\-\s]+$/u.test(filenamePlayer) ? filenamePlayer : "";
+    records = [normalizeRecord({ ...metadata, player: metadata.player || fallbackName, report: noteReport }, file.name)].filter((record) => record.player);
+  }
   if (records.length === 1 && !records[0].player && /^[\p{L}\p{M}.'’\-\s]+$/u.test(filenamePlayer)) records[0].player = filenamePlayer;
   return records;
+};
+
+const parseNotesMetadata = (sourceText) => {
+  const metadata = {};
+  clean(sourceText).split(/\r?\n/).map(clean).forEach((line) => {
+    const match = line.match(/^([^:|–—-]{2,45})\s*(?::|\||–|—|\s-\s)\s*(.*)$/);
+    if (!match) return;
+    const field = getField(match[1]);
+    if (["player", "club", "position", "game", "date", "viewing"].includes(field) && clean(match[2])) {
+      metadata[field] = field === "date" ? toISODate(match[2]) : clean(match[2]);
+    }
+  });
+  return metadata;
+};
+
+const parseTextNotesFile = async (file) => {
+  const text = await file.text();
+  const report = parseScoutNotesText(text);
+  if (!Object.keys(report).length) throw new Error("No report notes were recognised. Add section headings such as Strengths, Weaknesses, Physical, or Conclusion.");
+  const metadata = parseNotesMetadata(text);
+  const filenamePlayer = clean(file.name.replace(/\.txt$/i, "")).replace(/[_]+/g, " ").trim();
+  const player = metadata.player || (/^[\p{L}\p{M}.'’\-\s]+$/u.test(filenamePlayer) ? filenamePlayer : "");
+  if (!player) throw new Error("Add a Player or Name heading, or name the file after the player.");
+  return normalizeRecord({ ...metadata, player, report }, file.name);
 };
 
 export async function parseOldReportFiles(files) {
@@ -500,6 +550,8 @@ export async function parseOldReportFiles(files) {
         const parsed = await parseWordFile(file);
         if (!parsed.length) errors.push(`${file.name}: no player report was recognised. Add a Player/Name heading or upload one report per file.`);
         records.push(...parsed);
+      } else if (extension === "txt") {
+        records.push(await parseTextNotesFile(file));
       } else if (["xlsx", "xls", "csv"].includes(extension)) {
         const workbook = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
         const parsed = workbook.SheetNames.flatMap((sheetName) => {

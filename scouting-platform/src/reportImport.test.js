@@ -1,4 +1,4 @@
-import { findImportedPlayerMatch, normalizeImportedViewing, parseExcelSheetRows, parseScoutNotesText, parseWordHtml, splitImportedFixtures } from "./reportImport";
+import { findImportedPlayerMatch, normalizeImportedViewing, parseExcelSheetRows, parseOldReportFiles, parseScoutNotesText, parseWordHtml, splitImportedFixtures } from "./reportImport";
 
 describe("old report import parsing", () => {
   test("splits a multi-game imported report into separately dated fixtures", () => {
@@ -82,6 +82,43 @@ describe("old report import parsing", () => {
       strengths: "Finds space in the final third.",
       weaknesses: "Can be loose in possession.",
       conclusion: "A mobile midfielder with a good range of passing.",
+    });
+  });
+
+  test("imports a text notes file as an editable old report draft", async () => {
+    const { records, errors } = await parseOldReportFiles([{
+      name: "Alex Example.txt",
+      text: async () => "Club: Example FC\nPosition: CM\nStrengths:\nFinds space between the lines.\nPhysical:\nCompetes well in duels.\nConclusion:\nA composed midfielder.",
+    }]);
+
+    expect(errors).toEqual([]);
+    expect(records).toHaveLength(1);
+    expect(records[0]).toMatchObject({
+      player: "Alex Example",
+      club: "Example FC",
+      position: "CM",
+      report: {
+        type: "Long Report",
+        strengths: "Finds space between the lines.",
+        physical: "Competes well in duels.",
+        conclusion: "A composed midfielder.",
+      },
+    });
+  });
+
+  test("maps note columns in old report spreadsheets into report sections", () => {
+    const [record] = parseExcelSheetRows([
+      ["Player", "Club", "Scout Notes"],
+      ["Alex Example", "Example FC", "Strengths: Good first touch. Weaknesses: Needs to scan earlier."],
+    ]);
+
+    expect(record).toMatchObject({
+      player: "Alex Example",
+      club: "Example FC",
+      report: {
+        strengths: "Good first touch.",
+        weaknesses: "Needs to scan earlier.",
+      },
     });
   });
 
