@@ -159,19 +159,33 @@ export const scoutNotesFieldLabels = {
 };
 const inferNoteSection = (value) => {
   const text = normalizeLabel(value);
-  if (/\b(physical|pace|speed|acceleration|stamina|strength|powerful|aerial|jump|athletic|mobile|mobility|quick|explosive)\b/.test(text)) return "physical";
-  if (/\b(attitude|work rate|works hard|communication|communicates|leadership|character|disciplined|discipline|competes|competitive|reaction)\b/.test(text)) return "behaviour";
+  if (/\b(needs? to|should|could improve|needs improvement|lacks?|poor|struggles?|inconsistent|too easily|fails? to|not enough|doesn.t|cannot|can.t|weakness|loose in possession|loses? possession|careless in possession)\b/.test(text)) return "weaknesses";
+  if (/\b(physical|tall|pace|speed|acceleration|stamina|strength|powerful|aerial|jump|athletic|mobile|mobility|quick|explosive|duel strength)\b/.test(text)) return "physical";
+  if (/\b(attitude|work rate|works hard|communication|communicates|leadership|character|disciplined|discipline|competes|competitive|reaction|professionalism)\b/.test(text)) return "behaviour";
   if (/\b(out of possession|without the ball|off the ball|press|pressing|track back|tracks back|marking|defend|defending|tackle|intercept|cover|blocks|duel|second ball)\b/.test(text)) return "outPossession";
-  if (/\b(in possession|on the ball|with the ball|passing|pass|first touch|ball control|dribbl|carry|carrying|receive|receiving|scan|scanning|create|cross|shoot|finish|finishing|decision|turn)\b/.test(text)) return "inPossession";
-  if (/\b(needs? to|should|could improve|needs improvement|lacks?|poor|struggles?|inconsistent|too easily|fails? to|not enough|doesn.t|cannot|can.t|weakness)\b/.test(text)) return "weaknesses";
+  if (/\b(in possession|on the ball|with the ball|hold up|link play|links? play|runs? in behind|movement off the ball|passing|pass|first touch|ball control|dribbl|carry|carrying|receive|receiving|scan|scanning|create|cross|shoot|finish|finishing|decision|turn)\b/.test(text)) return "inPossession";
   return "strengths";
 };
 export const parseScoutNotesText = (sourceText) => {
   const values = Object.fromEntries(noteImportFields.map((field) => [field, []]));
   let activeField = "";
   const append = (field, value) => {
-    const text = clean(value).replace(/^[•●▪◦\-*–—]+\s*/, "").trim();
-    if (noteImportFields.includes(field) && text) values[field].push(text);
+    const fragments = clean(value).split(/\s*[•●▪◦]+\s*|\r?\n+/).map((part) => clean(part).replace(/^[-*–—]+\s*/, "")).filter(Boolean);
+    fragments.forEach((text) => {
+      // Fixture lines belong to the assignment, not a scouting observation.
+      if (/\b(?:v|vs|versus)\b/i.test(text) && /\b\d{1,2}[/. -]\d{1,2}[/. -]\d{2,4}\b/.test(text)) return;
+      if (/^(?:player|name|club|team|position|fixture|fixtures|game|games|match|matches|date|viewing)\s*[:|]/i.test(text)) return;
+      if (!noteImportFields.includes(field)) return;
+      const inferred = inferNoteSection(text);
+      let target = field;
+      // Correct obvious heading/content mismatches while keeping explicit headings for general notes.
+      if (field === "weaknesses" && inferred !== "weaknesses") target = inferred;
+      else if (["physical", "behaviour"].includes(inferred)
+        && inferred !== field
+        && ((field === "behaviour" && inferred === "physical")
+          || (field === "strengths" && ["physical", "behaviour"].includes(inferred)))) target = inferred;
+      values[target].push(text);
+    });
   };
   const sectionLabels = Object.values(scoutNotesFieldLabels)
     .sort((left, right) => right.length - left.length)
@@ -190,7 +204,7 @@ export const parseScoutNotesText = (sourceText) => {
   });
   lines.forEach((rawLine) => {
     const line = rawLine.replace(/^[•●▪◦\-*–—]+\s*/, "").trim();
-    const divider = line.match(/^([^:|–—-]{2,45})\s*(?::|\||–|—|\s-\s)\s*(.*)$/);
+    const divider = line.match(/^(.{2,45}?)\s*(?::|\||–|—|\s-\s)\s*(.*)$/);
     if (divider) {
       const field = getField(divider[1]);
       if (field) {
