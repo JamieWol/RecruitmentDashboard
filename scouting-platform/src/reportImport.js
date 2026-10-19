@@ -173,18 +173,10 @@ export const parseScoutNotesText = (sourceText) => {
     const fragments = clean(value).split(/\s*[•●▪◦]+\s*|\r?\n+/).map((part) => clean(part).replace(/^[-*–—]+\s*/, "")).filter(Boolean);
     fragments.forEach((text) => {
       // Fixture lines belong to the assignment, not a scouting observation.
-      if (/\b(?:v|vs|versus)\b/i.test(text) && /\b\d{1,2}[/. -]\d{1,2}[/. -]\d{2,4}\b/.test(text)) return;
+      if (/\b(?:v|vs|versus)\b/i.test(text)) return;
       if (/^(?:player|name|club|team|position|fixture|fixtures|game|games|match|matches|date|viewing)\s*[:|]/i.test(text)) return;
       if (!noteImportFields.includes(field)) return;
-      const inferred = inferNoteSection(text);
-      let target = field;
-      // Correct obvious heading/content mismatches while keeping explicit headings for general notes.
-      if (field === "weaknesses" && inferred !== "weaknesses") target = inferred;
-      else if (["physical", "behaviour"].includes(inferred)
-        && inferred !== field
-        && ((field === "behaviour" && inferred === "physical")
-          || (field === "strengths" && ["physical", "behaviour"].includes(inferred)))) target = inferred;
-      values[target].push(text);
+      values[field].push(text);
     });
   };
   const sectionLabels = Object.values(scoutNotesFieldLabels)

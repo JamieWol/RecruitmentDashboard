@@ -85,16 +85,14 @@ describe("old report import parsing", () => {
     });
   });
 
-  test("keeps fixtures out of report boxes and rehomes mislabelled positive and physical bullets", () => {
+  test("keeps fixtures out of report boxes and follows explicit report headings", () => {
     expect(parseScoutNotesText(`
-      Fixture: CRACOVIA v RAKÓW CZĘSTOCHOWA 16/08/2026
-      Weaknesses: Strong hold-up and link play • Good runs in behind • Strong aerial ability • Mobile for his size • Works hard out of possession • Can be loose in possession
-      On-Pitch Behaviour: Tall, strong physical profile • Mobile for his size • Good pace • Strong aerial presence • Works hard for the team
+      Game(s): CRACOVIA v RAKÓW CZĘSTOCHOWA 16/08/2026
+      Strengths: Strong hold-up and link play • Good runs in behind
+      In Possession: Receives well between the lines.
     `)).toEqual({
-      inPossession: "Strong hold-up and link play\nGood runs in behind",
-      physical: "Strong aerial ability\nMobile for his size\nTall, strong physical profile\nMobile for his size\nGood pace\nStrong aerial presence",
-      behaviour: "Works hard out of possession\nWorks hard for the team",
-      weaknesses: "Can be loose in possession",
+      strengths: "Strong hold-up and link play\nGood runs in behind",
+      inPossession: "Receives well between the lines.",
     });
   });
 
