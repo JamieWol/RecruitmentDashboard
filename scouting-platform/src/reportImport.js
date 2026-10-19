@@ -173,10 +173,12 @@ export const parseScoutNotesText = (sourceText) => {
     const fragments = clean(value).split(/\s*[•●▪◦]+\s*|\r?\n+/).map((part) => clean(part).replace(/^[-*–—]+\s*/, "")).filter(Boolean);
     fragments.forEach((text) => {
       // Fixture lines belong to the assignment, not a scouting observation.
-      if (/\b(?:v|vs|versus)\b/i.test(text)) return;
+      if (/\s(?:v|vs|versus)\s*[\p{L}]/iu.test(text)) return;
       if (/^(?:player|name|club|team|position|fixture|fixtures|game|games|match|matches|date|viewing)\s*[:|]/i.test(text)) return;
       if (!noteImportFields.includes(field)) return;
-      values[field].push(text);
+      const inferred = inferNoteSection(text);
+      const target = field === "behaviour" && inferred === "physical" ? "physical" : field;
+      values[target].push(text);
     });
   };
   const sectionLabels = Object.values(scoutNotesFieldLabels)
@@ -218,9 +220,22 @@ export const parseScoutNotesText = (sourceText) => {
 export const parseScoutNotesFile = async (file) => {
   const extension = String(file?.name || "").split(".").pop().toLowerCase();
   let text = "";
+  let structuredReport = null;
   if (extension === "docx") {
-    const { value } = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
-    text = value;
+    const arrayBuffer = await file.arrayBuffer();
+    const [{ value: html }, { value: rawText }] = await Promise.all([
+      mammoth.convertToHtml({ arrayBuffer }),
+      mammoth.extractRawText({ arrayBuffer }),
+    ]);
+    const wordRecords = parseWordHtml(html, file.name);
+    const mapped = Object.fromEntries(reportFields.map((field) => [field, wordRecords.map((record) => clean(record.report?.[field])).filter(Boolean).join("\n")]));
+    if (mapped.behaviour) {
+      const correctedBehaviour = parseScoutNotesText(`On-Pitch Behaviour:\n${mapped.behaviour}`);
+      mapped.behaviour = correctedBehaviour.behaviour || "";
+      mapped.physical = [mapped.physical, correctedBehaviour.physical].filter(Boolean).join("\n");
+    }
+    if (Object.values(mapped).some(Boolean)) structuredReport = mapped;
+    text = rawText;
   } else if (extension === "txt") {
     text = await file.text();
   } else if (["csv", "xlsx", "xls"].includes(extension)) {
@@ -246,7 +261,7 @@ export const parseScoutNotesFile = async (file) => {
   } else {
     throw new Error("Use a Word .docx, text .txt, Excel .xlsx/.xls, or CSV notes file.");
   }
-  const report = parseScoutNotesText(text);
+  const report = structuredReport || parseScoutNotesText(text);
   if (!Object.keys(report).length) throw new Error("No report notes were recognised. Add section headings such as Strengths, Weaknesses, Physical, or Conclusion.");
   return report;
 };

@@ -87,12 +87,14 @@ describe("old report import parsing", () => {
 
   test("keeps fixtures out of report boxes and follows explicit report headings", () => {
     expect(parseScoutNotesText(`
-      Game(s): CRACOVIA v RAKÓW CZĘSTOCHOWA 16/08/2026
-      Strengths: Strong hold-up and link play • Good runs in behind
+      Strengths: CRACOVIA vRAKÓW CZĘSTOCHOWA16/08/2026 • Strong hold-up and link play • Good runs in behind
       In Possession: Receives well between the lines.
+      On-Pitch Behaviour: Tall, strong physical profile • Mobile for his size • Good pace • Strong aerial presence • Works hard for the team
     `)).toEqual({
       strengths: "Strong hold-up and link play\nGood runs in behind",
       inPossession: "Receives well between the lines.",
+      physical: "Tall, strong physical profile\nMobile for his size\nGood pace\nStrong aerial presence",
+      behaviour: "Works hard for the team",
     });
   });
 
