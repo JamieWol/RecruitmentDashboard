@@ -43,7 +43,7 @@ st.set_page_config(page_title="Football Recruitment Dashboard", layout="wide")
 # ---------------------------------------------------------------------
 # COLUMN DETECTION
 # ---------------------------------------------------------------------
-NAME_CANDIDATES = ["Player", "Name", "player", "name", "Footballer"]
+NAME_CANDIDATES = ["Player Name", "Player", "Name", "player name", "player", "name", "Footballer"]
 TEAM_CANDIDATES = ["Team", "Club", "Squad", "team", "club", "Current Team"]
 LEAGUE_CANDIDATES = ["League", "Competition", "competition", "league"]
 POSITION_CANDIDATES = ["Position", "Primary Position", "Role", "position"]
@@ -583,7 +583,19 @@ if not columns.name:
 
 work = df.copy()
 work["__row_id__"] = np.arange(len(work))
-work["__player_name__"] = work[columns.name].astype(str)
+name_columns = unique_preserve_order(
+    [
+        col
+        for candidate in NAME_CANDIDATES
+        for col in [find_first_existing(work, [candidate])]
+        if col
+    ]
+)
+player_names = pd.Series("", index=work.index, dtype="object")
+for name_column in name_columns:
+    values = work[name_column].fillna("").astype(str).str.strip()
+    player_names = player_names.mask(player_names.eq(""), values)
+work["__player_name__"] = player_names
 work["__team__"] = work[columns.team].astype(str) if columns.team else ""
 work["__league__"] = work[columns.league].astype(str) if columns.league else ""
 work["__position__"] = work[columns.position].astype(str) if columns.position else ""
@@ -694,6 +706,7 @@ filtered_df = filtered_df.loc[:, ~filtered_df.columns.duplicated()].copy()
 pizza_metrics = metrics
 position_metrics_map = globals().get("position_metrics_map", {})
 rank_view = build_rank_view(work, columns.name, columns.team, columns.league, columns.position)
+rank_view["Display Name"] = work["__player_name__"].values
 rank_view["Player Label"] = work["Player Label"].values
 rank_view["Transfermarkt Link"] = [make_transfermarkt_url(n) for n in rank_view["Display Name"].astype(str)]
 
