@@ -11,7 +11,7 @@ import SquadPlansPage from "./SquadPlansPage";
 import CreateAssignmentPage from "./CreateAssignmentPage";
 import TeamAnalysisPage from "./TeamAnalysisPage";
 import ApprovalRequestsPage from "./ApprovalRequestsPage";
-import { exportMyReports } from "./reportExport";
+import ReportManagementPage from "./ReportManagementPage";
 import { ClubBadge } from "./ClubBadge";
 import "./App.css";
 import "./mobile.css";
@@ -105,36 +105,20 @@ function LoginGate() {
 
 function AppRoutes() {
   const [shadowSquad, setShadowSquad] = useState([]);
-  return <><Header /><div className="sr-app-shell" style={{ paddingTop: 80 }}><Routes><Route path="/" element={<LandingPage />} /><Route path="/scout-report" element={<ScoutReportPage shadowSquad={shadowSquad} setShadowSquad={setShadowSquad} />} /><Route path="/scouting-reports" element={<ScoutingReportsPage />} /><Route path="/shortlists" element={<ShortlistsPage />} /><Route path="/squad-plans" element={<SquadPlansPage />} /><Route path="/squad-plan" element={<SquadPlanPage />} /><Route path="/create-assignment" element={<CreateAssignmentPage />} /><Route path="/team-analysis" element={<TeamAnalysisPage />} /><Route path="/approval-requests" element={<ApprovalRequestsPage />} /></Routes></div></>;
+  return <><Header /><div className="sr-app-shell" style={{ paddingTop: 80 }}><Routes><Route path="/" element={<LandingPage />} /><Route path="/scout-report" element={<ScoutReportPage shadowSquad={shadowSquad} setShadowSquad={setShadowSquad} />} /><Route path="/scouting-reports" element={<ScoutingReportsPage />} /><Route path="/shortlists" element={<ShortlistsPage />} /><Route path="/squad-plans" element={<SquadPlansPage />} /><Route path="/squad-plan" element={<SquadPlanPage />} /><Route path="/create-assignment" element={<CreateAssignmentPage />} /><Route path="/team-analysis" element={<TeamAnalysisPage />} /><Route path="/approval-requests" element={<ApprovalRequestsPage />} /><Route path="/report-management" element={<ReportManagementPage />} /></Routes></div></>;
 }
 
 // ------------------- HEADER COMPONENT -------------------
 function Header() {
   const navigate = useNavigate();
-  const { user, profile, appState } = useAuth();
+  const { user, profile } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [exporting, setExporting] = useState("");
-  const [settingsMessage, setSettingsMessage] = useState("");
   const canReviewAccess = profile?.role === "platform_admin" || profile?.role === "club_admin";
 
-  const exportReports = async (format) => {
-    setExporting(format);
-    setSettingsMessage("");
-    try {
-      const count = await exportMyReports({ appState, user, profile, format });
-      setSettingsMessage(`${count} report${count === 1 ? "" : "s"} exported.`);
-    } catch (error) {
-      setSettingsMessage(error?.message || "Could not export your reports.");
-    } finally {
-      setExporting("");
-    }
-  };
   const settingsMenuItems = () => <>
     {canReviewAccess && <button type="button" onClick={() => { goTo("/approval-requests"); setSettingsOpen(false); }}>Access approvals</button>}
-    <button type="button" disabled={Boolean(exporting)} onClick={() => exportReports("xlsx")}>{exporting === "xlsx" ? "Exporting…" : "Export my reports to Excel"}</button>
-    <button type="button" disabled={Boolean(exporting)} onClick={() => exportReports("csv")}>{exporting === "csv" ? "Exporting…" : "Export my reports to CSV"}</button>
-    {settingsMessage && <p className="sr-settings-message" role="status">{settingsMessage}</p>}
+    <button type="button" onClick={() => { goTo("/report-management"); setSettingsOpen(false); }}>Report Management</button>
   </>;
 
   const goTo = (path) => {
@@ -192,7 +176,7 @@ function Header() {
             {link.label}
           </span>
         ))}
-        {user && <div className="sr-settings-menu" style={{ position: "relative", marginLeft: 0, flex: "0 0 auto" }}><button type="button" className="sr-settings-trigger" aria-label="Settings" title="Settings" aria-expanded={settingsOpen} onClick={() => { setSettingsOpen((open) => !open); setSettingsMessage(""); }}>⚙</button>{settingsOpen && <div className="sr-settings-dropdown">{settingsMenuItems()}</div>}</div>}
+        {user && <div className="sr-settings-menu" style={{ position: "relative", marginLeft: 0, flex: "0 0 auto" }}><button type="button" className="sr-settings-trigger" aria-label="Settings" title="Settings" aria-expanded={settingsOpen} onClick={() => setSettingsOpen((open) => !open)}>⚙</button>{settingsOpen && <div className="sr-settings-dropdown">{settingsMenuItems()}</div>}</div>}
         {user && <button className="header-signout" style={{ marginLeft: 0, flex: "0 0 auto" }} onClick={() => supabase.auth.signOut()}>Sign out</button>}
       </nav>
 
@@ -216,7 +200,7 @@ function Header() {
             {link.label}
           </span>
         ))}
-        {user && <div className="sr-mobile-account-actions"><div className="sr-mobile-account-buttons"><button type="button" className="sr-settings-trigger" onClick={() => { setSettingsOpen((open) => !open); setSettingsMessage(""); }} aria-expanded={settingsOpen}>⚙ Settings</button><button className="header-signout" onClick={() => supabase.auth.signOut()}>Sign out</button></div>{settingsOpen && <div className="sr-settings-dropdown sr-settings-dropdown-mobile">{settingsMenuItems()}</div>}</div>}
+        {user && <div className="sr-mobile-account-actions"><div className="sr-mobile-account-buttons"><button type="button" className="sr-settings-trigger" onClick={() => setSettingsOpen((open) => !open)} aria-expanded={settingsOpen}>⚙ Settings</button><button className="header-signout" onClick={() => supabase.auth.signOut()}>Sign out</button></div>{settingsOpen && <div className="sr-settings-dropdown sr-settings-dropdown-mobile">{settingsMenuItems()}</div>}</div>}
       </nav>
 
       <style>{`

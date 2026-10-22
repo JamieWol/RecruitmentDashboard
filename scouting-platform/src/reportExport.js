@@ -1,7 +1,7 @@
 import * as XLSX from "xlsx";
 import { supabase } from "./supabaseClient";
 
-const EXPORT_COLUMNS = [
+export const EXPORT_COLUMNS = [
   "Player", "Player's Club", "Position Played", "Report Date", "Fixture(s)", "Scout",
   "Report Type", "Viewing", "Footage", "Preferred Foot", "Performance Grade",
   "Potential Grade", "Reasons Why", "In Possession", "Out of Possession", "Physical",
@@ -25,7 +25,7 @@ const belongsToUser = (record, user, profile) => {
   if (assignedId && ids.includes(String(assignedId))) return true;
   const scout = String(record?.scout || "").trim().toLowerCase();
   if (scout && names.includes(scout)) return true;
-  // Legacy rows have no assignment owner metadata; appState itself is account scoped.
+  // Legacy assignments in appState are already scoped to the signed-in account.
   return !assignedId && !scout;
 };
 
@@ -50,13 +50,13 @@ const rowFor = (record, profile) => {
     "Report Date": textValue(record?.completed_at || record?.completedAt || record?.date || report.date),
     "Fixture(s)": fixtureText(record, report),
     "Scout": textValue(record?.scout || profile?.full_name),
-    "Report Type": textValue(report.type),
+    "Report Type": textValue(report.type || record?.reportType),
     "Viewing": textValue(report.viewing || record?.viewing),
     "Footage": textValue(report.footage || record?.footage),
-    "Preferred Foot": textValue(report.foot),
+    "Preferred Foot": textValue(report.foot || record?.foot),
     "Performance Grade": textValue(report.performance || record?.performance),
     "Potential Grade": textValue(report.potential || record?.potential),
-    "Reasons Why": textValue(report.reasons),
+    "Reasons Why": textValue(report.reasons || record?.reasons),
     "In Possession": textValue(report.inPossession),
     "Out of Possession": textValue(report.outPossession),
     "Physical": textValue(report.physical),
@@ -70,8 +70,8 @@ const rowFor = (record, profile) => {
 
 const reportKey = (record) => String(record?.assignment_id ?? record?.id ?? [record?.player, record?.completed_at || record?.date, record?.fixture_summary].join("|"));
 
-export async function exportMyReports({ appState, user, profile, format }) {
-  if (!user?.id) throw new Error("Sign in to export your reports.");
+export async function loadMyReportRows({ appState, user, profile }) {
+  if (!user?.id) throw new Error("Sign in to view your reports.");
 
   const ownAssignments = (appState?.assignments || []).filter((record) => hasReportContent(record) && belongsToUser(record, user, profile));
   const { data, error } = await supabase.from("club_reports").select("*").eq("author_id", user.id).eq("status", "Published");
@@ -85,27 +85,29 @@ export async function exportMyReports({ appState, user, profile, format }) {
     merged.set(key, local ? { ...local, ...record, report: { ...(local.report || {}), ...(record.report || {}) } } : record);
   });
 
-  const rows = [...merged.values()].map((record) => rowFor(record, profile));
-  if (!rows.length) throw new Error("No saved reports were found for your account.");
+  return [...merged.entries()].map(([id, record]) => ({ id, record, data: rowFor(record, profile) }));
+}
 
+export function downloadReportRows(rows, format) {
+  if (!rows.length) throw new Error("No reports match the current filters.");
+  const exportRows = rows.map((item) => item.data || item);
   const dateStamp = new Date().toISOString().slice(0, 10);
-  const worksheet = XLSX.utils.json_to_sheet(rows, { header: EXPORT_COLUMNS });
+  const worksheet = XLSX.utils.json_to_sheet(exportRows, { header: EXPORT_COLUMNS });
   worksheet["!cols"] = EXPORT_COLUMNS.map((column) => ({ wch: Math.min(48, Math.max(16, column.length + 2)) }));
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "My Reports");
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Reports");
   if (format === "csv") {
     const csv = XLSX.utils.sheet_to_csv(worksheet);
     const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `scoutpro-my-reports-${dateStamp}.csv`;
+    link.download = `scoutpro-reports-${dateStamp}.csv`;
     document.body.appendChild(link);
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
   } else {
-    XLSX.writeFile(workbook, `scoutpro-my-reports-${dateStamp}.xlsx`);
+    XLSX.writeFile(workbook, `scoutpro-reports-${dateStamp}.xlsx`);
   }
-  return rows.length;
 }
