@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import { downloadReportRows, loadMyReportRows } from "./reportExport";
 
@@ -11,13 +12,14 @@ const asDate = (dateText) => {
 };
 
 export default function ReportManagementPage() {
+  const navigate = useNavigate();
   const { appState, user, profile } = useAuth();
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState({ status: "", club: "", scout: "", type: "", viewing: "", performance: "", potential: "", from: "", to: "" });
+  const [filters, setFilters] = useState({ status: "", club: "", position: "", scout: "", type: "", viewing: "", performance: "", potential: "", from: "", to: "" });
 
   useEffect(() => {
     let active = true;
@@ -38,6 +40,7 @@ export default function ReportManagementPage() {
       if (query && !Object.values(data).join(" ").toLocaleLowerCase().includes(query)) return false;
       if (filters.status && value(data.Status).toLocaleLowerCase() !== filters.status.toLocaleLowerCase()) return false;
       if (filters.club && data["Player's Club"] !== filters.club) return false;
+      if (filters.position && data["Position Played"] !== filters.position) return false;
       if (filters.scout && data.Scout !== filters.scout) return false;
       if (filters.type && data["Report Type"] !== filters.type) return false;
       if (filters.viewing && data.Viewing !== filters.viewing) return false;
@@ -51,7 +54,7 @@ export default function ReportManagementPage() {
   }, [reports, search, filters]);
 
   const updateFilter = (key, nextValue) => setFilters((current) => ({ ...current, [key]: nextValue }));
-  const clearFilters = () => { setSearch(""); setFilters({ status: "", club: "", scout: "", type: "", viewing: "", performance: "", potential: "", from: "", to: "" }); };
+  const clearFilters = () => { setSearch(""); setFilters({ status: "", club: "", position: "", scout: "", type: "", viewing: "", performance: "", potential: "", from: "", to: "" }); };
   const exportFiltered = (format) => {
     try {
       downloadReportRows(filteredReports, format);
@@ -65,6 +68,7 @@ export default function ReportManagementPage() {
 
   const statusOptions = optionsFor(reports, "Status");
   const clubOptions = optionsFor(reports, "Player's Club");
+  const positionOptions = optionsFor(reports, "Position Played");
   const scoutOptions = optionsFor(reports, "Scout");
   const typeOptions = optionsFor(reports, "Report Type");
   const viewingOptions = optionsFor(reports, "Viewing");
@@ -75,6 +79,7 @@ export default function ReportManagementPage() {
     <main className="sr-page sr-report-management">
       <div className="sr-heading">
         <div>
+          <button type="button" className="sr-outline sr-report-management-back" onClick={() => navigate("/scouting-reports")}>← Back to Reports &amp; Assignments</button>
           <p className="sr-eyebrow">REPORTS</p>
           <h1>Report Management</h1>
           <p>Review your reports, filter the ones you need, then export the matching reports to Excel or CSV.</p>
@@ -100,6 +105,7 @@ export default function ReportManagementPage() {
         <div className="sr-report-management-filters">
           <label><span>Status</span><select value={filters.status} onChange={(event) => updateFilter("status", event.target.value)}><option value="">All statuses</option>{statusOptions.map((item) => <option key={item}>{item}</option>)}</select></label>
           <label><span>Player’s club</span><select value={filters.club} onChange={(event) => updateFilter("club", event.target.value)}><option value="">All clubs</option>{clubOptions.map((item) => <option key={item}>{item}</option>)}</select></label>
+          <label><span>Position</span><select value={filters.position} onChange={(event) => updateFilter("position", event.target.value)}><option value="">All positions</option>{positionOptions.map((item) => <option key={item}>{item}</option>)}</select></label>
           <label><span>Scout</span><select value={filters.scout} onChange={(event) => updateFilter("scout", event.target.value)}><option value="">All scouts</option>{scoutOptions.map((item) => <option key={item}>{item}</option>)}</select></label>
           <label><span>Report type</span><select value={filters.type} onChange={(event) => updateFilter("type", event.target.value)}><option value="">All report types</option>{typeOptions.map((item) => <option key={item}>{item}</option>)}</select></label>
           <label><span>Viewing</span><select value={filters.viewing} onChange={(event) => updateFilter("viewing", event.target.value)}><option value="">All viewing types</option>{viewingOptions.map((item) => <option key={item}>{item}</option>)}</select></label>

@@ -137,6 +137,7 @@ header{z-index:1000!important}.sr-page{position:relative;z-index:1}.sr-pitch{z-i
 
 .sr-report-management .sr-heading,.sr-report-management-panel{max-width:1420px;margin-left:auto;margin-right:auto}
 .sr-report-management .sr-heading{margin-bottom:22px}
+.sr-report-management-back{margin-bottom:14px;padding:9px 13px!important;font-size:14px}
 .sr-report-management .sr-eyebrow{margin:0;color:#62dcff;font-size:13px;font-weight:800;letter-spacing:1.5px}
 .sr-report-management .sr-heading h1{margin:5px 0 9px}
 .sr-report-management .sr-heading p{max-width:760px}
