@@ -106,8 +106,8 @@ export default function TeamAnalysisPage() {
   const [rows, setRows] = useState([]);
   const [selectedTeam, setSelectedTeam] = useState("");
   const [comparisonTeam, setComparisonTeam] = useState("");
-  const [selectedMetrics, setSelectedMetrics] = useState([]);
-  const [comparisonMetrics, setComparisonMetrics] = useState([]);
+  const [selectedMetrics, setSelectedMetrics] = useState(null);
+  const [comparisonMetrics, setComparisonMetrics] = useState(null);
   const [error, setError] = useState("");
   const [storageWarning, setStorageWarning] = useState("");
   const [dataStorageKey, setDataStorageKey] = useState("");
@@ -124,22 +124,27 @@ export default function TeamAnalysisPage() {
         setRows(Array.isArray(parsed.rows) ? parsed.rows : []);
         setSelectedTeam(parsed.selectedTeam || "");
         setComparisonTeam(parsed.comparisonTeam || "");
-        setSelectedMetrics(Array.isArray(parsed.selectedMetrics) ? parsed.selectedMetrics : []);
-        setComparisonMetrics(Array.isArray(parsed.comparisonMetrics) ? parsed.comparisonMetrics : []);
+        const restoreMetrics = (value) => {
+          if (!Array.isArray(value)) return null;
+          if (parsed.filterVersion !== 2 && value.length === 0) return null;
+          return value;
+        };
+        setSelectedMetrics(restoreMetrics(parsed.selectedMetrics));
+        setComparisonMetrics(restoreMetrics(parsed.comparisonMetrics));
       } catch {
         window.localStorage.removeItem(storageKey);
         setRows([]);
         setSelectedTeam("");
         setComparisonTeam("");
-        setSelectedMetrics([]);
-        setComparisonMetrics([]);
+        setSelectedMetrics(null);
+        setComparisonMetrics(null);
       }
     } else {
       setRows([]);
       setSelectedTeam("");
       setComparisonTeam("");
-      setSelectedMetrics([]);
-      setComparisonMetrics([]);
+      setSelectedMetrics(null);
+      setComparisonMetrics(null);
     }
     setDataStorageKey(storageKey);
     hydrated.current = true;
@@ -148,7 +153,7 @@ export default function TeamAnalysisPage() {
   useEffect(() => {
     if (!hydrated.current || dataStorageKey !== storageKey || !rows.length) return;
     try {
-      window.localStorage.setItem(storageKey, JSON.stringify({ rows, selectedTeam, comparisonTeam, selectedMetrics, comparisonMetrics }));
+      window.localStorage.setItem(storageKey, JSON.stringify({ rows, selectedTeam, comparisonTeam, selectedMetrics, comparisonMetrics, filterVersion: 2 }));
       setStorageWarning("");
     } catch {
       setStorageWarning("Your data is loaded, but this browser could not save it for next time. Try a smaller file or clear some browser storage.");
@@ -197,12 +202,12 @@ export default function TeamAnalysisPage() {
     );
   }, [rows, teamKey]);
 
-  const activeMetrics = selectedMetrics.length
+  const activeMetrics = selectedMetrics !== null
     ? metrics.filter((metric) => selectedMetrics.includes(metric))
     : metrics;
-  const comparisonActiveMetrics = comparisonMetrics.length
-    ? activeMetrics.filter((metric) => comparisonMetrics.includes(metric))
-    : activeMetrics;
+  const comparisonActiveMetrics = comparisonMetrics !== null
+    ? metrics.filter((metric) => comparisonMetrics.includes(metric))
+    : metrics;
 
   const selected =
     teamRows.find((row) => normalise(row[teamKey]) === selectedTeam) ||
@@ -401,10 +406,10 @@ export default function TeamAnalysisPage() {
       );
       setSelectedTeam(normalise(uploadedTeams[0]?.[detectedTeamKey]) || "");
       setComparisonTeam(normalise(uploadedTeams[1]?.[detectedTeamKey]) || "");
-      setSelectedMetrics([]);
-      setComparisonMetrics([]);
+      setSelectedMetrics(null);
+      setComparisonMetrics(null);
       try {
-        window.localStorage.setItem(storageKey, JSON.stringify({ rows: clean, selectedTeam: normalise(uploadedTeams[0]?.[detectedTeamKey]) || "", comparisonTeam: normalise(uploadedTeams[1]?.[detectedTeamKey]) || "", selectedMetrics: [], comparisonMetrics: [] }));
+        window.localStorage.setItem(storageKey, JSON.stringify({ rows: clean, selectedTeam: normalise(uploadedTeams[0]?.[detectedTeamKey]) || "", comparisonTeam: normalise(uploadedTeams[1]?.[detectedTeamKey]) || "", selectedMetrics: null, comparisonMetrics: null, filterVersion: 2 }));
         setStorageWarning("");
       } catch {
         setStorageWarning("Your data is loaded, but this browser could not save it for next time. Try a smaller file or clear some browser storage.");
@@ -607,10 +612,10 @@ export default function TeamAnalysisPage() {
                 <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,.28)" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
                     <strong>Comparison chart metrics</strong>
-                    <button type="button" onClick={() => setComparisonMetrics([])} style={{ padding: "5px 9px", borderRadius: 6, border: "1px solid #b9eaff", background: "#62dcff", color: "#063d63", fontWeight: 700 }}>Use all selected metrics</button>
+                    <button type="button" onClick={() => setComparisonMetrics(null)} style={{ padding: "5px 9px", borderRadius: 6, border: "1px solid #b9eaff", background: "#62dcff", color: "#063d63", fontWeight: 700 }}>Use all metrics</button>
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 16px" }}>
-                    {activeMetrics.map((metric) => <label key={metric} style={{ display: "flex", gap: 6, alignItems: "center", color: "#fff", fontSize: 13 }}><input type="checkbox" checked={!comparisonMetrics.length || comparisonMetrics.includes(metric)} onChange={() => setComparisonMetrics((current) => { const base = current.length ? current : [...activeMetrics]; return base.includes(metric) ? base.filter((item) => item !== metric) : [...base, metric]; })} />{metric}</label>)}
+                    {metrics.map((metric) => <label key={metric} style={{ display: "flex", gap: 6, alignItems: "center", color: "#fff", fontSize: 13 }}><input type="checkbox" checked={comparisonMetrics === null || comparisonMetrics.includes(metric)} onChange={() => setComparisonMetrics((current) => { const base = current === null ? [...metrics] : current; return base.includes(metric) ? base.filter((item) => item !== metric) : [...base, metric]; })} />{metric}</label>)}
                   </div>
                 </div>
               </div>
@@ -636,7 +641,7 @@ export default function TeamAnalysisPage() {
                   <div style={{ display: "flex", gap: 8 }}>
                     <button
                       type="button"
-                      onClick={() => setSelectedMetrics([])}
+                      onClick={() => setSelectedMetrics(null)}
                       style={{
                         padding: "6px 10px",
                         borderRadius: 6,
@@ -706,14 +711,12 @@ export default function TeamAnalysisPage() {
                                 <input
                                   type="checkbox"
                                   checked={
-                                    !selectedMetrics.length ||
+                                    selectedMetrics === null ||
                                     selectedMetrics.includes(metric)
                                   }
                                   onChange={() =>
                                     setSelectedMetrics((current) => {
-                                      const base = current.length
-                                        ? current
-                                        : [...metrics];
+                                      const base = current === null ? [...metrics] : current;
                                       return base.includes(metric)
                                         ? base.filter((item) => item !== metric)
                                         : [...base, metric];
