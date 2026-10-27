@@ -17,6 +17,7 @@ const formationRows = {
 const normalise = (value) => String(value || "").trim().toLowerCase();
 const playerName = (p) => p.Name || p.name || p.player || [p.first_name, p.last_name].filter(Boolean).join(" ") || "Unnamed player";
 const playerClub = (p) => p.Team || p.team || p.club || p.Club || "";
+const playerId = (p) => String(p["Player Id"] || p.player_id || p.playerId || p.id || playerName(p));
 const photoBase = "https://syjsmvvsvvprxibqoizw.supabase.co/storage/v1/object/public/player-photos/player-photos/";
 const photoFor = (name) => `${photoBase}${String(name || "").trim().split(/\s+/).filter(Boolean).map((x) => x.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-zA-Z0-9]+/g, "_").toLowerCase()).join("_")}.png`;
 const photoCandidates = (name) => {
@@ -173,9 +174,10 @@ export default function SquadPlanPage() {
   };
 
   const currentPlayers = squad.filter((p) => p.planKey === planKey);
-  const visibleClubPlayers = clubPlayers.filter((p) => !removedIds[planKey]?.includes(String(p["Player Id"] || p.player_id || p.playerId || p.id || playerName(p))));
+  const currentPlayerIds = new Set(currentPlayers.map(playerId));
+  const visibleClubPlayers = clubPlayers.filter((p) => !removedIds[planKey]?.includes(playerId(p)) && !currentPlayerIds.has(playerId(p)));
   const allUniquePlayers = useMemo(() => [...new Map(players.map((p) => [String(p["Player Id"] || p.player_id || p.playerId || p.id || playerName(p)), p])).values()], [players]);
-  const pickerPlayers = allUniquePlayers.filter((p) => normalise(playerName(p)).includes(normalise(pickerSearch)));
+  const pickerPlayers = allUniquePlayers.filter((p) => !currentPlayerIds.has(playerId(p)) && normalise(playerName(p)).includes(normalise(pickerSearch)));
   const [dragging, setDragging] = useState(null);
   const persist = (next, extra = {}) => {
     setSquad(next);
