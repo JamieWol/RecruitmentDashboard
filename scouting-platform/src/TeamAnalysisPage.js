@@ -1,4 +1,5 @@
 import { ClubBadge } from "./ClubBadge";
+import { useAuth } from "./AuthContext";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
@@ -14,7 +15,10 @@ import {
 
 const normalise = (value) => String(value ?? "").trim();
 const displayName = (value) =>
-  normalise(value).replace(/([a-z])([A-Z])/g, "$1 $2");
+  normalise(value)
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/\s+/g, " ");
+const pdfTitle = (value) => String(value ?? "").replace(/\s+/g, "\u00a0");
 const number = (value) => {
   const parsed = Number(
     String(value ?? "")
@@ -98,61 +102,58 @@ class ChartBoundary extends React.Component {
 }
 
 export default function TeamAnalysisPage() {
+  const { user } = useAuth();
   const [rows, setRows] = useState([]);
   const [selectedTeam, setSelectedTeam] = useState("");
   const [comparisonTeam, setComparisonTeam] = useState("");
   const [selectedMetrics, setSelectedMetrics] = useState([]);
   const [comparisonMetrics, setComparisonMetrics] = useState([]);
   const [error, setError] = useState("");
+  const [storageWarning, setStorageWarning] = useState("");
+  const [dataStorageKey, setDataStorageKey] = useState("");
   const dashboardRef = useRef(null);
   const hydrated = useRef(false);
-  const storageKey = "scoutpro-team-analysis-uploaded-data";
-  const inactivityMs = 30 * 60 * 1000;
+  const storageKey = `scoutpro-team-analysis-uploaded-data:${user?.id || "anonymous"}`;
 
   useEffect(() => {
-    const navigation = performance.getEntriesByType?.("navigation")?.[0];
-    const wasRefresh = navigation?.type === "reload";
-    if (wasRefresh) window.localStorage.removeItem(storageKey);
-    const saved = wasRefresh ? null : window.localStorage.getItem(storageKey);
+    hydrated.current = false;
+    const saved = window.localStorage.getItem(storageKey);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Date.now() - Number(parsed.lastActive || 0) < inactivityMs) {
-          setRows(parsed.rows || []);
-          setSelectedTeam(parsed.selectedTeam || "");
-          setComparisonTeam(parsed.comparisonTeam || "");
-          setSelectedMetrics(parsed.selectedMetrics || []);
-          setComparisonMetrics(parsed.comparisonMetrics || []);
-        } else window.localStorage.removeItem(storageKey);
-      } catch { window.localStorage.removeItem(storageKey); }
+        setRows(Array.isArray(parsed.rows) ? parsed.rows : []);
+        setSelectedTeam(parsed.selectedTeam || "");
+        setComparisonTeam(parsed.comparisonTeam || "");
+        setSelectedMetrics(Array.isArray(parsed.selectedMetrics) ? parsed.selectedMetrics : []);
+        setComparisonMetrics(Array.isArray(parsed.comparisonMetrics) ? parsed.comparisonMetrics : []);
+      } catch {
+        window.localStorage.removeItem(storageKey);
+        setRows([]);
+        setSelectedTeam("");
+        setComparisonTeam("");
+        setSelectedMetrics([]);
+        setComparisonMetrics([]);
+      }
+    } else {
+      setRows([]);
+      setSelectedTeam("");
+      setComparisonTeam("");
+      setSelectedMetrics([]);
+      setComparisonMetrics([]);
     }
+    setDataStorageKey(storageKey);
     hydrated.current = true;
-    const markActive = () => {
-      const current = window.localStorage.getItem(storageKey);
-      if (current) {
-        try { window.localStorage.setItem(storageKey, JSON.stringify({ ...JSON.parse(current), lastActive: Date.now() })); } catch { /* ignore invalid session state */ }
-      }
-    };
-    const events = ["mousemove", "keydown", "click", "touchstart"];
-    events.forEach((event) => window.addEventListener(event, markActive));
-    const expiryTimer = window.setInterval(() => {
-      const current = window.localStorage.getItem(storageKey);
-      if (current) {
-        try {
-          if (Date.now() - Number(JSON.parse(current).lastActive || 0) >= inactivityMs) {
-            window.localStorage.removeItem(storageKey);
-            setRows([]); setSelectedTeam(""); setSelectedMetrics([]); setComparisonMetrics([]);
-          }
-        } catch { window.localStorage.removeItem(storageKey); }
-      }
-    }, 60 * 1000);
-    return () => { events.forEach((event) => window.removeEventListener(event, markActive)); window.clearInterval(expiryTimer); };
-  }, [inactivityMs]);
+  }, [storageKey]);
 
   useEffect(() => {
-    if (!hydrated.current || !rows.length) return;
-    window.localStorage.setItem(storageKey, JSON.stringify({ rows, selectedTeam, comparisonTeam, selectedMetrics, comparisonMetrics, lastActive: Date.now() }));
-  }, [rows, selectedTeam, comparisonTeam, selectedMetrics, comparisonMetrics]);
+    if (!hydrated.current || dataStorageKey !== storageKey || !rows.length) return;
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify({ rows, selectedTeam, comparisonTeam, selectedMetrics, comparisonMetrics }));
+      setStorageWarning("");
+    } catch {
+      setStorageWarning("Your data is loaded, but this browser could not save it for next time. Try a smaller file or clear some browser storage.");
+    }
+  }, [rows, selectedTeam, comparisonTeam, selectedMetrics, comparisonMetrics, storageKey, dataStorageKey]);
 
   const teamKey = useMemo(() => {
     const keys = Object.keys(rows[0] || {});
@@ -384,6 +385,7 @@ export default function TeamAnalysisPage() {
         return;
       }
       setRows(clean);
+      setDataStorageKey(storageKey);
       const keys = Object.keys(clean[0] || {});
       const detectedTeamKey =
         keys.find((key) =>
@@ -401,7 +403,12 @@ export default function TeamAnalysisPage() {
       setComparisonTeam(normalise(uploadedTeams[1]?.[detectedTeamKey]) || "");
       setSelectedMetrics([]);
       setComparisonMetrics([]);
-      window.localStorage.setItem(storageKey, JSON.stringify({ rows: clean, selectedTeam: normalise(uploadedTeams[0]?.[detectedTeamKey]) || "", comparisonTeam: normalise(uploadedTeams[1]?.[detectedTeamKey]) || "", selectedMetrics: [], comparisonMetrics: [], lastActive: Date.now() }));
+      try {
+        window.localStorage.setItem(storageKey, JSON.stringify({ rows: clean, selectedTeam: normalise(uploadedTeams[0]?.[detectedTeamKey]) || "", comparisonTeam: normalise(uploadedTeams[1]?.[detectedTeamKey]) || "", selectedMetrics: [], comparisonMetrics: [] }));
+        setStorageWarning("");
+      } catch {
+        setStorageWarning("Your data is loaded, but this browser could not save it for next time. Try a smaller file or clear some browser storage.");
+      }
     };
     if (/\.xlsx?$/.test(file.name.toLowerCase())) {
       file
@@ -533,6 +540,7 @@ export default function TeamAnalysisPage() {
             style={{ color: "#fff" }}
           />
           {error && <p style={{ color: "#ffd0d0" }}>{error}</p>}
+          {storageWarning && <p role="status" style={{ color: "#ffe9a8", marginBottom: 0 }}>{storageWarning}</p>}
         </section>
         {!rows.length ? (
           <div
@@ -744,8 +752,9 @@ export default function TeamAnalysisPage() {
                   textAlign: "center",
                 }}
               >
-                <h2 style={{ margin: "0 0 7px", color: "#fff", fontSize: 26, whiteSpace: "nowrap", wordSpacing: "0.18em" }}>
-                  <><span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}><ClubBadge club={selectedTeamName} size={28} />{selectedTeamName}</span><span style={{ marginLeft: "0.4em", whiteSpace: "nowrap" }}>Team Analysis</span></>
+                <h2 style={{ margin: "0 0 7px", color: "#fff", fontSize: 26, whiteSpace: "nowrap", wordSpacing: "0.18em", display: "flex", justifyContent: "center", alignItems: "center", gap: 10 }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}><ClubBadge club={selectedTeamName} size={28} />{pdfTitle(selectedTeamName)}</span>
+                  <span>{pdfTitle("Team Analysis")}</span>
                 </h2>
                 <div style={{ color: "#d2e5fa", fontSize: 14 }}>
                   {gamesKey
@@ -776,9 +785,8 @@ export default function TeamAnalysisPage() {
                     marginBottom: 22,
                   }}
                 >
-                  <h2 style={{ color: "#62dcff", margin: 0 }}>
-                    <span>Metric</span>
-                    <span style={{ marginLeft: "0.3em" }}>Percentiles</span>
+                  <h2 style={{ color: "#62dcff", margin: 0, wordSpacing: "0.2em" }}>
+                    {pdfTitle("Metric Percentiles")}
                   </h2>
                   <div
                     style={{
@@ -1059,9 +1067,8 @@ export default function TeamAnalysisPage() {
                     marginBottom: 8,
                   }}
                 >
-                  <h2 style={{ color: "#62dcff", margin: 0 }}>
-                    <span>Metric</span>
-                    <span style={{ marginLeft: "0.3em" }}>Percentiles</span>
+                  <h2 style={{ color: "#62dcff", margin: 0, wordSpacing: "0.2em" }}>
+                    {pdfTitle("Metric Percentiles")}
                   </h2>
                   <div
                     style={{
@@ -1166,9 +1173,10 @@ export default function TeamAnalysisPage() {
                       color: "#62dcff",
                       margin: "0 0 4px",
                       textAlign: "center",
+                      wordSpacing: "0.2em",
                     }}
                   >
-                    Team Visual Comparison
+                    {pdfTitle("Team Visual Comparison")}
                   </h2>
                   <p
                     style={{
@@ -1407,8 +1415,8 @@ export default function TeamAnalysisPage() {
                   padding: "20px 28px",
                 }}
               >
-                <h2 style={{ color: "#62dcff", margin: "0 0 16px" }}>
-                  Team Rankings
+                <h2 style={{ color: "#62dcff", margin: "0 0 16px", wordSpacing: "0.2em" }}>
+                  {pdfTitle("Team Rankings")}
                 </h2>
                 <div
                   style={{
@@ -1458,8 +1466,8 @@ export default function TeamAnalysisPage() {
                   padding: "20px 28px",
                 }}
               >
-                <h2 style={{ color: "#62dcff", margin: "0 0 16px" }}>
-                  Team Rankings
+                <h2 style={{ color: "#62dcff", margin: "0 0 16px", wordSpacing: "0.2em" }}>
+                  {pdfTitle("Team Rankings")}
                 </h2>
                 <div
                   style={{
