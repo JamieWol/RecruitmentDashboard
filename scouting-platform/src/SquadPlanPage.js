@@ -10,7 +10,7 @@ const formationRows = {
   "4-2-3-1": [["ST"], ["LW", "AM", "RW"], ["DM", "DM"], ["LB", "LCB", "RCB", "RB"], ["GK"]],
   "4-3-3": [["LW", "CF", "RW"], ["LCM", "CM", "RCM"], ["LB", "LCB", "RCB", "RB"], ["GK"]],
   "4-4-2": [["ST", "ST"], ["LM", "LCM", "RCM", "RM"], ["LB", "LCB", "RCB", "RB"], ["GK"]],
-  "3-5-2": [["ST", "ST"], ["LWB", "CM", "CM", "RWB"], ["LCB", "CB", "RCB"], ["GK"]],
+  "3-5-2": [["ST", "ST"], ["AM"], ["LWB", "CM", "CM", "RWB"], ["LCB", "CB", "RCB"], ["GK"]],
   "3-4-3": [["LW", "CF", "RW"], ["LWB", "LCM", "RCM", "RWB"], ["LCB", "CB", "RCB"], ["GK"]],
   "4-1-4-1": [["ST"], ["LM", "CM", "CM", "RM"], ["DM"], ["LB", "LCB", "RCB", "RB"], ["GK"]],
 };
