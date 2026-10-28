@@ -526,10 +526,22 @@ export default function ShortlistsPage() {
               className="sr-pitch-player-card"
               key={p.id}
               draggable
-              onDragStart={() => setDragging({ id: p.id, pos })}
+              onDragStart={(e) => {
+                e.dataTransfer.effectAllowed = "move";
+                e.dataTransfer.setData("text/plain", String(p.id));
+                setDragging({ id: p.id, pos });
+              }}
               onDragEnd={() => setDragging(null)}
               onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => { e.preventDefault(); e.stopPropagation(); reorder(pos, p.id, e.clientY, e.currentTarget.getBoundingClientRect()); }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (dragging?.pos === pos) {
+                  reorder(pos, p.id, e.clientY, e.currentTarget.getBoundingClientRect());
+                } else {
+                  moveToPosition(pos);
+                }
+              }}
               style={{
                 "--tag-color":
                   tags.find((t) => (p.tags || []).includes(t.id))?.color ||
