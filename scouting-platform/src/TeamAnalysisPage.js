@@ -52,6 +52,33 @@ const rankLabel = (rank) => {
   const suffix = rank % 100 >= 11 && rank % 100 <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" }[rank % 10] || "th");
   return `${rank}${suffix}`;
 };
+const openTeamAnalysisDb = () => new Promise((resolve, reject) => {
+  if (!window.indexedDB) return reject(new Error("Browser storage is unavailable"));
+  const request = window.indexedDB.open("scoutpro-team-analysis", 1);
+  request.onupgradeneeded = () => {
+    if (!request.result.objectStoreNames.contains("uploads")) {
+      request.result.createObjectStore("uploads");
+    }
+  };
+  request.onsuccess = () => resolve(request.result);
+  request.onerror = () => reject(request.error || new Error("Could not open browser storage"));
+});
+const readTeamAnalysisUpload = async (key) => {
+  const db = await openTeamAnalysisDb();
+  return new Promise((resolve, reject) => {
+    const request = db.transaction("uploads", "readonly").objectStore("uploads").get(key);
+    request.onsuccess = () => { db.close(); resolve(request.result || null); };
+    request.onerror = () => { db.close(); reject(request.error || new Error("Could not read saved upload")); };
+  });
+};
+const writeTeamAnalysisUpload = async (key, value) => {
+  const db = await openTeamAnalysisDb();
+  return new Promise((resolve, reject) => {
+    const request = db.transaction("uploads", "readwrite").objectStore("uploads").put(value, key);
+    request.onsuccess = () => { db.close(); resolve(); };
+    request.onerror = () => { db.close(); reject(request.error || new Error("Could not save uploaded data")); };
+  });
+};
 const metricGroup = (metric) => {
   const label = metric.toLowerCase();
   if (/set.?piece|corner|free.?kick|dead.?ball|throw.?in|dfk/.test(label))
@@ -117,11 +144,25 @@ export default function TeamAnalysisPage() {
 
   useEffect(() => {
     hydrated.current = false;
-    const saved = window.localStorage.getItem(storageKey);
-    if (saved) {
+    let cancelled = false;
+    const restore = async () => {
+      let parsed = null;
       try {
-        const parsed = JSON.parse(saved);
-        setRows(Array.isArray(parsed.rows) ? parsed.rows : []);
+        parsed = await readTeamAnalysisUpload(storageKey);
+      } catch {
+        // Use localStorage below if IndexedDB is unavailable in this browser.
+      }
+      if (!parsed) {
+        try {
+          const saved = window.localStorage.getItem(storageKey);
+          parsed = saved ? JSON.parse(saved) : null;
+        } catch {
+          window.localStorage.removeItem(storageKey);
+        }
+      }
+      if (cancelled) return;
+      if (parsed && Array.isArray(parsed.rows)) {
+        setRows(parsed.rows);
         setSelectedTeam(parsed.selectedTeam || "");
         setComparisonTeam(parsed.comparisonTeam || "");
         const restoreMetrics = (value) => {
@@ -131,33 +172,34 @@ export default function TeamAnalysisPage() {
         };
         setSelectedMetrics(restoreMetrics(parsed.selectedMetrics));
         setComparisonMetrics(restoreMetrics(parsed.comparisonMetrics));
-      } catch {
-        window.localStorage.removeItem(storageKey);
+      } else {
         setRows([]);
         setSelectedTeam("");
         setComparisonTeam("");
         setSelectedMetrics(null);
         setComparisonMetrics(null);
       }
-    } else {
-      setRows([]);
-      setSelectedTeam("");
-      setComparisonTeam("");
-      setSelectedMetrics(null);
-      setComparisonMetrics(null);
-    }
-    setDataStorageKey(storageKey);
-    hydrated.current = true;
+      setDataStorageKey(storageKey);
+      hydrated.current = true;
+    };
+    restore();
+    return () => { cancelled = true; };
   }, [storageKey]);
 
   useEffect(() => {
     if (!hydrated.current || dataStorageKey !== storageKey || !rows.length) return;
+    const savedUpload = { rows, selectedTeam, comparisonTeam, selectedMetrics, comparisonMetrics, filterVersion: 2 };
+    let localStorageSaved = true;
     try {
-      window.localStorage.setItem(storageKey, JSON.stringify({ rows, selectedTeam, comparisonTeam, selectedMetrics, comparisonMetrics, filterVersion: 2 }));
-      setStorageWarning("");
+      window.localStorage.setItem(storageKey, JSON.stringify(savedUpload));
     } catch {
-      setStorageWarning("Your data is loaded, but this browser could not save it for next time. Try a smaller file or clear some browser storage.");
+      localStorageSaved = false;
     }
+    writeTeamAnalysisUpload(storageKey, savedUpload).then(() => {
+      setStorageWarning("");
+    }).catch(() => {
+      if (!localStorageSaved) setStorageWarning("Your data is loaded, but this browser could not save it for next time. Try a smaller file or clear some browser storage.");
+    });
   }, [rows, selectedTeam, comparisonTeam, selectedMetrics, comparisonMetrics, storageKey, dataStorageKey]);
 
   const teamKey = useMemo(() => {
