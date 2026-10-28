@@ -195,6 +195,7 @@ header{z-index:1000!important}.sr-page{position:relative;z-index:1}.sr-pitch{z-i
 .sr-shortlist-view .sr-real-pitch{height:auto!important;min-height:1240px;max-height:none;overflow:visible}
 .sr-shortlist-view .sr-real-pitch>.sr-pitch-row{flex:0 0 240px;min-height:240px;align-items:flex-start}
 .sr-shortlist-view .sr-real-pitch .sr-zone{width:clamp(220px,20vw,300px);height:240px!important;min-height:240px;max-height:240px;overflow:hidden;display:flex;flex-direction:column}
+.sr-shortlist-view .sr-real-pitch .sr-zone{overflow:visible}
 .sr-shortlist-view .sr-real-pitch .sr-zone-list{display:flex;flex:1 1 0;flex-direction:column;gap:0;min-height:0;max-height:190px;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#62dcff #174f78}
 .sr-shortlist-view .sr-real-pitch .sr-zone-list>.sr-pitch-player-card{flex:0 0 auto;margin:0}
 .sr-shortlist-view .sr-zone-head .sr-position-label-input{width:104px;min-width:0;padding:2px 3px;border:1px solid transparent;border-radius:4px;background:transparent;color:#fff;text-align:center;font:inherit;font-weight:700;line-height:1.2;outline:none}
