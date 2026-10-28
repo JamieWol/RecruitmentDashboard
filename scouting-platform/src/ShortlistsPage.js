@@ -537,7 +537,7 @@ export default function ShortlistsPage() {
         x.player.toLowerCase().includes(search.toLowerCase()),
       );
     return (
-      <div className="sr-zone" key={pos} onDragOver={(e) => e.preventDefault()} onDrop={() => moveToPosition(pos)}>
+      <div className={`sr-zone sr-zone-position-${pos.split("-")[0].toLowerCase()}`} key={pos} onDragOver={(e) => e.preventDefault()} onDrop={() => moveToPosition(pos)}>
         <div className="sr-zone-head">
           <input
             className="sr-position-label-input"
