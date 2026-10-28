@@ -190,11 +190,10 @@ header{z-index:1000!important}.sr-page{position:relative;z-index:1}.sr-pitch{z-i
 .sr-shortlist-view .sr-shortlist-remove-player{position:relative;z-index:3;display:grid;place-items:center;flex:0 0 34px;width:34px;height:34px;margin-left:4px;padding:0;border:1px solid #7890a8;border-radius:6px;background:#fff;color:#122d49;font-size:24px;line-height:1;cursor:pointer}
 .sr-shortlist-view .sr-shortlist-remove-player:hover,.sr-shortlist-view .sr-shortlist-remove-player:focus-visible{border-color:#b33b3b;background:#fff0f0;color:#9d2424;outline:2px solid #b33b3b;outline-offset:1px}
 
-/* Let shortlist position zones grow with their player stacks, keeping each row
-   in the pitch flow instead of letting cards spill over the next row. */
-.sr-shortlist-view .sr-real-pitch{height:auto!important;min-height:1218px;max-height:none;overflow:visible}
-.sr-shortlist-view .sr-real-pitch>.sr-pitch-row{flex:0 0 230px;min-height:230px;align-items:flex-start}
-.sr-shortlist-view .sr-real-pitch .sr-zone{height:230px!important;min-height:230px;max-height:230px;overflow:hidden;display:flex;flex-direction:column}
+/* Keep shortlist position zones fixed and scroll their player stacks so cards
+   stay within their own positions instead of spilling into the next row. */
+.sr-shortlist-view .sr-real-pitch{height:auto!important;min-height:1030px;max-height:none;overflow:visible}
+.sr-shortlist-view .sr-real-pitch>.sr-pitch-row{flex:0 0 190px;min-height:190px;align-items:flex-start}
+.sr-shortlist-view .sr-real-pitch .sr-zone{width:clamp(190px,17vw,250px);height:190px!important;min-height:190px;max-height:190px;overflow:hidden;display:flex;flex-direction:column}
 .sr-shortlist-view .sr-real-pitch .sr-zone-list{display:flex;flex:1 1 0;flex-direction:column;gap:0;min-height:0;max-height:none;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#62dcff #174f78}
 .sr-shortlist-view .sr-real-pitch .sr-zone-list>.sr-pitch-player-card{flex:0 0 auto;margin:0}
-.sr-shortlist-view .sr-pitch-player-card .sr-shortlist-player-photo{width:36px;height:42px;max-width:36px;max-height:42px;flex:0 0 36px;object-fit:contain;object-position:center center}
