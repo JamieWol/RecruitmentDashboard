@@ -172,7 +172,31 @@ export default function ShortlistsPage() {
     return () => window.removeEventListener("focus", loadSharedLists);
   }, [user]);
   const [lists, setLists] = useState(() => JSON.parse(localStorage.getItem("scoutingShortlists") || "[]"));
-  const [current, setCurrent] = useState(null);
+  const currentStorageKey = `scoutingOpenShortlist:${user?.id || "anonymous"}`;
+  const currentUserKey = user?.id || "anonymous";
+  const readOpenShortlist = (key) => {
+    try {
+      return JSON.parse(sessionStorage.getItem(key) || "null");
+    } catch {
+      return null;
+    }
+  };
+  const [current, setCurrent] = useState(() => readOpenShortlist(currentStorageKey));
+  const [currentOwnerKey, setCurrentOwnerKey] = useState(currentUserKey);
+  useEffect(() => {
+    if (currentOwnerKey === currentUserKey) return;
+    setCurrentOwnerKey(currentUserKey);
+    setCurrent(readOpenShortlist(currentStorageKey));
+  }, [currentOwnerKey, currentStorageKey, currentUserKey]);
+  useEffect(() => {
+    if (currentOwnerKey !== currentUserKey) return;
+    try {
+      if (current) sessionStorage.setItem(currentStorageKey, JSON.stringify(current));
+      else sessionStorage.removeItem(currentStorageKey);
+    } catch {
+      // Keep the shortlist usable if browser session storage is unavailable.
+    }
+  }, [current, currentOwnerKey, currentStorageKey, currentUserKey]);
   useEffect(() => {
     if (!user) return;
     const loadOwnedSharedLists = async () => {
