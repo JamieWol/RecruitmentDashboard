@@ -129,7 +129,7 @@ class ChartBoundary extends React.Component {
 }
 
 export default function TeamAnalysisPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [rows, setRows] = useState([]);
   const [selectedTeam, setSelectedTeam] = useState("");
   const [comparisonTeam, setComparisonTeam] = useState("");
@@ -138,26 +138,29 @@ export default function TeamAnalysisPage() {
   const [error, setError] = useState("");
   const [storageWarning, setStorageWarning] = useState("");
   const [dataStorageKey, setDataStorageKey] = useState("");
+  const [isRestoring, setIsRestoring] = useState(true);
   const dashboardRef = useRef(null);
   const hydrated = useRef(false);
   const storageKey = `scoutpro-team-analysis-uploaded-data:${user?.id || "anonymous"}`;
 
   useEffect(() => {
     hydrated.current = false;
+    setIsRestoring(true);
+    if (authLoading) return undefined;
     let cancelled = false;
     const restore = async () => {
       let parsed = null;
       try {
-        parsed = await readTeamAnalysisUpload(storageKey);
+        const saved = window.localStorage.getItem(storageKey);
+        parsed = saved ? JSON.parse(saved) : null;
       } catch {
-        // Use localStorage below if IndexedDB is unavailable in this browser.
+        // Fall back to IndexedDB if localStorage is full or unavailable.
       }
       if (!parsed) {
         try {
-          const saved = window.localStorage.getItem(storageKey);
-          parsed = saved ? JSON.parse(saved) : null;
+          parsed = await readTeamAnalysisUpload(storageKey);
         } catch {
-          window.localStorage.removeItem(storageKey);
+          // No saved upload is available in this browser.
         }
       }
       if (cancelled) return;
@@ -181,13 +184,14 @@ export default function TeamAnalysisPage() {
       }
       setDataStorageKey(storageKey);
       hydrated.current = true;
+      setIsRestoring(false);
     };
     restore();
     return () => { cancelled = true; };
-  }, [storageKey]);
+  }, [storageKey, authLoading]);
 
   useEffect(() => {
-    if (!hydrated.current || dataStorageKey !== storageKey || !rows.length) return;
+    if (authLoading || !hydrated.current || dataStorageKey !== storageKey || !rows.length) return;
     const savedUpload = { rows, selectedTeam, comparisonTeam, selectedMetrics, comparisonMetrics, filterVersion: 2 };
     let localStorageSaved = true;
     try {
@@ -200,7 +204,7 @@ export default function TeamAnalysisPage() {
     }).catch(() => {
       if (!localStorageSaved) setStorageWarning("Your data is loaded, but this browser could not save it for next time. Try a smaller file or clear some browser storage.");
     });
-  }, [rows, selectedTeam, comparisonTeam, selectedMetrics, comparisonMetrics, storageKey, dataStorageKey]);
+  }, [rows, selectedTeam, comparisonTeam, selectedMetrics, comparisonMetrics, storageKey, dataStorageKey, authLoading]);
 
   const teamKey = useMemo(() => {
     const keys = Object.keys(rows[0] || {});
@@ -584,12 +588,17 @@ export default function TeamAnalysisPage() {
             type="file"
             accept=".csv,.xlsx,.xls"
             onChange={upload}
+            disabled={isRestoring}
             style={{ color: "#fff" }}
           />
           {error && <p style={{ color: "#ffd0d0" }}>{error}</p>}
           {storageWarning && <p role="status" style={{ color: "#ffe9a8", marginBottom: 0 }}>{storageWarning}</p>}
         </section>
-        {!rows.length ? (
+        {isRestoring ? (
+          <div style={{ padding: "90px 20px", textAlign: "center", color: "#d7e8f8", fontSize: 20 }}>
+            Restoring your saved team data…
+          </div>
+        ) : !rows.length ? (
           <div
             style={{
               padding: "90px 20px",
