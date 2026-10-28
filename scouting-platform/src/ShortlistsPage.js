@@ -329,6 +329,12 @@ export default function ShortlistsPage() {
     persist(lists.map((x) => (x.id === current.id ? n : x)), n);
     setCurrent(n);
   };
+  const savePositionLabel = (pos, value) => {
+    const positionLabels = { ...(current.positionLabels || {}), [pos]: value.trim() };
+    const n = { ...current, positionLabels };
+    persist(lists.map((x) => (x.id === current.id ? n : x)), n);
+    setCurrent(n);
+  };
   const toggleTag = (tagId) => {
     const n = {
       ...tagPlayer,
@@ -533,7 +539,18 @@ export default function ShortlistsPage() {
     return (
       <div className="sr-zone" key={pos} onDragOver={(e) => e.preventDefault()} onDrop={() => moveToPosition(pos)}>
         <div className="sr-zone-head">
-          <strong>{pos}</strong>
+          <input
+            className="sr-position-label-input"
+            aria-label="Edit position label"
+            title="Edit position label"
+            value={current.positionLabels?.[pos] ?? pos.split("-")[0]}
+            onChange={(e) => setCurrent({
+              ...current,
+              positionLabels: { ...(current.positionLabels || {}), [pos]: e.target.value },
+            })}
+            onBlur={(e) => savePositionLabel(pos, e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+          />
           <span>{players.length} Players</span>
           <button
             onClick={() => {
