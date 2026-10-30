@@ -308,12 +308,20 @@ export default function ScoutingReportsPageFinal() {
   const { appState, updateAppState, user, profile: accountProfile } = useAuth();
   const reportViewStorageKey = `scoutingReportsView:${user?.id || user?.email || "guest"}`;
   const reportImportStorageKey = `scoutingReportImport:${user?.id || user?.email || "guest"}`;
+  const openPlayerProfileStorageKey = `scoutingOpenPlayerProfile:${user?.id || user?.email || "guest"}`;
   const [items, setItems] = useState(() => JSON.parse(localStorage.getItem("scoutingAssignments") || "[]"));
   const [tab, setTab] = useState(() => localStorage.getItem(`${reportViewStorageKey}:tab`) || sessionStorage.getItem("scoutingReportsTab") || "My Assignments");
   const [query, setQuery] = useState("");
   const [playerSearch, setPlayerSearch] = useState("");
   const [playerMatches, setPlayerMatches] = useState([]);
   const [profile, setProfile] = useState(() => {
+    try {
+      const savedProfile = JSON.parse(sessionStorage.getItem(openPlayerProfileStorageKey) || "null");
+      if (savedProfile?.profile?.player) {
+        if (savedProfile.origin) localStorage.setItem("scoutingProfileOrigin", savedProfile.origin);
+        return savedProfile.profile;
+      }
+    } catch {}
     const n = JSON.parse(localStorage.getItem("scoutingAssignments") || "[]"), name = localStorage.getItem("scoutingProfilePlayer");
     if (!name) return null;
     if (localStorage.getItem("scoutingProfileOrigin") === "scout-report-page") {
@@ -326,6 +334,18 @@ export default function ScoutingReportsPageFinal() {
     if (assignment) return assignment;
     return { player: name };
   });
+  useEffect(() => {
+    try {
+      if (profile?.player) {
+        sessionStorage.setItem(openPlayerProfileStorageKey, JSON.stringify({
+          profile,
+          origin: localStorage.getItem("scoutingProfileOrigin") || "assignments",
+        }));
+      } else {
+        sessionStorage.removeItem(openPlayerProfileStorageKey);
+      }
+    } catch {}
+  }, [profile, openPlayerProfileStorageKey]);
   const [active, setActive] = useState(() => {
     try {
       const saved = JSON.parse(sessionStorage.getItem("scoutingActiveReport") || "null");
