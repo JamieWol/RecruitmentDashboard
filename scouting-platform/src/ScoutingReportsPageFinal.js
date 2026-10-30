@@ -636,7 +636,7 @@ export default function ScoutingReportsPageFinal() {
   }, [active]);
   const saveItems = (n) => {
     setItems(n);
-    updateAppState({ ...appState, assignments: n });
+    return updateAppState({ ...appState, assignments: n });
   };
   const importOldReports = async (records) => {
     const createdAt = new Date().toISOString();
@@ -986,12 +986,34 @@ export default function ScoutingReportsPageFinal() {
     setEditing(x.status !== "Published" && assignmentBelongsToScout(x, user, accountProfile));
     setPublishError("");
   };
-  const openFixtureGroupPlayer = (person) => {
+  const openFixtureGroupPlayer = async (person) => {
     const target = items.find((item) => String(item.id) === String(person.assignmentId)) || (() => {
       const published = sharedReports.find((item) => String(item.assignment_id || item.id) === String(person.assignmentId));
       return published ? { ...published, id: published.assignment_id || published.id, player: person.player, status: "Published" } : null;
     })();
     if (!target) return;
+    if (active && String(target.id) === String(active.id)) return;
+    if (active && editing && active.status !== "Published" && JSON.stringify(report || {}) !== JSON.stringify(active.report || empty)) {
+      const fixtures = fixtureRecords(active);
+      const fixtureDates = active.fixtureDates?.length ? active.fixtureDates : active.report?.__fixtureDates || fixtures.map((fixture) => fixture.date || "");
+      const reportWithFixtures = { ...report, __fixtures: fixtures, __fixtureDates: fixtureDates };
+      const updatedAssignment = { ...active, report: reportWithFixtures, games: fixtures, fixtureDates, status: "In Progress", updatedAt: new Date().toISOString() };
+      const nextItems = items.map((item) => String(item.id) === String(active.id) ? updatedAssignment : item);
+      try {
+        await saveItems(nextItems);
+        if (user && accountProfile?.club) {
+          const { error } = await supabase.from("club_assignments")
+            .update({ assignment: updatedAssignment, status: updatedAssignment.status })
+            .eq("club", accountProfile.club)
+            .eq("id", Number(active.sharedAssignmentId || active.id));
+          if (error) throw error;
+        }
+      } catch (error) {
+        console.error("Could not save the report draft before switching players", error);
+        setPublishError("Your changes could not be saved. Please try again before opening another player.");
+        return;
+      }
+    }
     setActive(target);
     setReport(target.report || empty);
     setNoteUploadStatus("");
