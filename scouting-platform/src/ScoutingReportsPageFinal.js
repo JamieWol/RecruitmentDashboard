@@ -943,6 +943,18 @@ export default function ScoutingReportsPageFinal() {
     setEditing(x.status !== "Published" && assignmentBelongsToScout(x, user, accountProfile));
     setPublishError("");
   };
+  const openFixtureGroupPlayer = (person) => {
+    const target = items.find((item) => String(item.id) === String(person.assignmentId)) || (() => {
+      const published = sharedReports.find((item) => String(item.assignment_id || item.id) === String(person.assignmentId));
+      return published ? { ...published, id: published.assignment_id || published.id, player: person.player, status: "Published" } : null;
+    })();
+    if (!target) return;
+    setActive(target);
+    setReport(target.report || empty);
+    setNoteUploadStatus("");
+    setEditing(target.status !== "Published" && assignmentBelongsToScout(target, user, accountProfile));
+    setPublishError("");
+  };
   const uploadScoutNotes = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -1165,6 +1177,24 @@ export default function ScoutingReportsPageFinal() {
         className={`sr-form sr-report ${!editing ? "readonly" : ""}`}
       >
         <button className="sr-report-back" onClick={() => { setActive(null); setProfile(null); sessionStorage.removeItem("scoutingActiveReport"); }}>‹ Back to Assignments</button>
+        {active.fixtureGroupId && active.fixtureGroupPlayers?.length > 1 && (
+          <section className="sr-fixture-player-switcher" aria-label="Players assigned for this fixture">
+            <div className="sr-fixture-player-switcher-title">{active.fixtureGroupFixture || active.game || "Fixture assignment"}</div>
+            <div className="sr-fixture-player-switcher-list">
+              {active.fixtureGroupPlayers.map((person) => (
+                <button
+                  type="button"
+                  key={person.assignmentId}
+                  className={String(person.assignmentId) === String(active.id) ? "selected" : ""}
+                  onClick={() => openFixtureGroupPlayer(person)}
+                >
+                  {person.player}
+                  {String(person.assignmentId) === String(active.id) && <span>Current report</span>}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
         <div className="sr-form-head sr-report-banner">
           <div className="sr-report-banner-main">
             <img

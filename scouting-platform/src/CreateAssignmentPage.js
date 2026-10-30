@@ -12,6 +12,7 @@ export default function CreateAssignmentPage() {
   const [mode, setMode] = useState(() => localStorage.getItem("editingAssignment") ? "player" : ""),
     [query, setQuery] = useState(""),
     [selected, setSelected] = useState(""),
+    [selectedPlayers, setSelectedPlayers] = useState([]),
     [newPlayer, setNewPlayer] = useState(false);
   useEffect(() => {
     if (!profile?.club) return;
@@ -99,7 +100,8 @@ export default function CreateAssignmentPage() {
     setViewing(editing.viewing || "Live");
   }, [user?.id]);
   const matches = players.filter((p) =>
-    p.name.toLowerCase().includes(query.toLowerCase()),
+    p.name.toLowerCase().includes(query.toLowerCase()) &&
+    (mode !== "fixture" || !selectedPlayers.some((chosen) => String(chosen.id || chosen.name).toLowerCase() === String(p.id || p.name).toLowerCase())),
   );
   const addGame = () => {
     if (!game.trim() || !gameDate) {
@@ -119,7 +121,9 @@ export default function CreateAssignmentPage() {
       : game.trim() && gameDate
         ? [{ name: game.trim(), date: gameDate }]
         : [];
-    if (!player)
+    if (mode === "fixture" && !selectedPlayers.length)
+      return setError("Select at least one player for this fixture.");
+    if (mode !== "fixture" && !player)
       return setError("Select an existing player or create a new player.");
     if (!fixtures.length) return setError("Add at least one fixture / game.");
     let chosen = players.find((p) => p.name === selected);
@@ -165,13 +169,47 @@ export default function CreateAssignmentPage() {
       status: "Not Started",
       report: existing?.report || editing?.report || null,
     };
-    const nextAssignments = editing
-      ? old
-        .map((x) => String(x.id) === String(editing.id) ? { ...x, ...assignment, id: x.id } : x)
-        .filter((x) => String(x.id) === String(editing.id) || String(x.player || "").trim().toLowerCase() !== String(player).trim().toLowerCase())
-      : [...old, assignment];
+    let nextAssignments;
+    if (mode === "fixture") {
+      const groupId = String(Date.now());
+      const groupPlayers = selectedPlayers.map((person, index) => ({
+        assignmentId: Number(groupId) + index,
+        player: person.name,
+        playerId: person.id || person.player_id || person["Player Id"] || null,
+        club: person.club || "",
+        position: person.position || "",
+      }));
+      nextAssignments = [
+        ...old,
+        ...groupPlayers.map((person) => ({
+          ...assignment,
+          id: person.assignmentId,
+          player: person.player,
+          playerId: person.playerId,
+          club: person.club,
+          position: person.position,
+          report: null,
+          fixtureGroupId: groupId,
+          fixtureGroupFixture: fixtures.map((fixture) => typeof fixture === "string" ? fixture : fixture.name).join(" • "),
+          fixtureGroupPlayers: groupPlayers,
+        })),
+      ];
+    } else {
+      nextAssignments = editing
+        ? old
+          .map((x) => String(x.id) === String(editing.id) ? { ...x, ...assignment, id: x.id } : x)
+          .filter((x) => String(x.id) === String(editing.id) || String(x.player || "").trim().toLowerCase() !== String(player).trim().toLowerCase())
+        : [...old, assignment];
+    }
     updateAppState({ ...appState, assignments: nextAssignments });
-    if (profile?.club && scout) await supabase.from("club_assignments").upsert({ id: Number(assignment.id), club: profile.club, assigned_to: scout, created_by: (await supabase.auth.getUser()).data.user.id, assignment: { ...assignment, id: Number(assignment.id) }, status: assignment.status }, { onConflict: "id" });
+    if (profile?.club && scout) {
+      const createdBy = (await supabase.auth.getUser()).data.user.id;
+      const assignmentsToSave = mode === "fixture" ? nextAssignments.slice(old.length) : [assignment];
+      await Promise.all(assignmentsToSave.map((item) => supabase.from("club_assignments").upsert({
+        id: Number(item.id), club: profile.club, assigned_to: scout, created_by: createdBy,
+        assignment: { ...item, id: Number(item.id) }, status: item.status,
+      }, { onConflict: "id" })));
+    }
     localStorage.removeItem("editingAssignment");
     window.history.back();
   };
@@ -209,8 +247,11 @@ export default function CreateAssignmentPage() {
               value={query}
               onChange={(e) => {
                 setQuery(e.target.value);
+              if (mode === "fixture") setNewPlayer(false);
+              else {
                 setSelected("");
                 setNewPlayer(false);
+              }
               }}
               placeholder="Type player name..."
             />
@@ -222,8 +263,13 @@ export default function CreateAssignmentPage() {
                   type="button"
                   key={p.id || p.name}
                   onClick={() => {
-                    setSelected(p.name);
-                    setQuery(p.name);
+                    if (mode === "fixture") {
+                      setSelectedPlayers((current) => current.some((person) => String(person.id || person.name).toLowerCase() === String(p.id || p.name).toLowerCase()) ? current : [...current, p]);
+                      setQuery("");
+                    } else {
+                      setSelected(p.name);
+                      setQuery(p.name);
+                    }
                   }}
                 >
                   <>
@@ -235,7 +281,7 @@ export default function CreateAssignmentPage() {
                   </>
                 </button>
               ))}
-              {!matches.length && (
+              {!matches.length && mode !== "fixture" && (
                 <button
                   type="button"
                   onClick={() => {
@@ -248,7 +294,19 @@ export default function CreateAssignmentPage() {
               )}
             </div>
           )}
-          {selected && (
+          {mode === "fixture" && (
+            <div className="sr-fixture-selected-players">
+              <strong>Players selected for this fixture ({selectedPlayers.length})</strong>
+              {selectedPlayers.length ? selectedPlayers.map((person) => (
+                <div className="sr-selected-player" key={person.id || person.name}>
+                  <strong>{person.name}</strong>
+                  <span><ClubName club={person.club} size={16} /> · {person.position || "Position not added"}</span>
+                  <button type="button" aria-label={`Remove ${person.name}`} onClick={() => setSelectedPlayers((current) => current.filter((chosen) => String(chosen.id || chosen.name) !== String(person.id || person.name)))}>×</button>
+                </div>
+              )) : <p className="sr-muted">Search and select each player you want to report on from this fixture.</p>}
+            </div>
+          )}
+          {mode !== "fixture" && selected && (
             <div className="sr-selected-player">
               <strong>{selected}</strong>
               <span>Existing player selected</span>
