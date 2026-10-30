@@ -1,4 +1,4 @@
-import { ClubName } from "./ClubBadge";
+import { ClubBadge, ClubName } from "./ClubBadge";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "./supabaseClient";
@@ -15,6 +15,10 @@ const clubFromReport = (...values) => {
     return normalized && !["club not added", "—", "-", "n/a", "unknown"].includes(normalized);
   });
   return typeof club === "string" ? club.trim() : "";
+};
+const fixtureTeams = (fixture) => {
+  const parts = String(fixture || "").split(/\s+(?:vs\.?|v)\s+/i).map((team) => team.trim()).filter(Boolean);
+  return parts.length === 2 ? parts : [];
 };
 const empty = {
   type: "Long Report",
@@ -678,6 +682,9 @@ export default function ScoutingReportsPageFinal() {
     const assignmentId = String(assignment?.assignment_id || assignment?.id || "");
     const sharedAssignmentId = assignment?.sharedAssignmentId || assignment?.id;
     const isPublished = String(assignment?.status || "").toLowerCase() === "published";
+    const groupedAssignments = Array.isArray(assignment?.fixtureGroupItems) ? assignment.fixtureGroupItems : [assignment];
+    const groupedIds = [...new Set(groupedAssignments.flatMap((item) => [item?.sharedAssignmentId, item?.id]
+      .filter((id) => id !== undefined && id !== null).map((id) => Number(id))).filter(Number.isFinite))];
 
     if (isPublished) {
       if (!user?.id || !assignment?.author_id || String(assignment.author_id) !== String(user.id)) {
@@ -701,7 +708,7 @@ export default function ScoutingReportsPageFinal() {
         .from("club_assignments")
         .delete()
         .eq("club", accountProfile.club)
-        .eq("id", Number(sharedAssignmentId));
+        .in("id", groupedIds.length ? groupedIds : [Number(sharedAssignmentId)]);
       if (error) {
         console.error("Could not delete shared assignment", error);
         setDeleteError(error.message || "This assignment could not be deleted. Please try again.");
@@ -709,7 +716,7 @@ export default function ScoutingReportsPageFinal() {
       }
     }
 
-    const idsToRemove = new Set([assignment?.id, assignment?.assignment_id, assignment?.sharedAssignmentId]
+    const idsToRemove = new Set([...groupedAssignments.flatMap((item) => [item?.id, item?.assignment_id, item?.sharedAssignmentId]), assignment?.id, assignment?.assignment_id, assignment?.sharedAssignmentId]
       .filter((id) => id !== undefined && id !== null)
       .map(String));
     const matchesAssignment = (item) => [item?.id, item?.assignment_id, item?.sharedAssignmentId]
@@ -805,12 +812,14 @@ export default function ScoutingReportsPageFinal() {
         const assignedId = String(assignment.scoutId);
         return currentIds.includes(assignedId) || currentNames.includes(String(assignment.scout || "").trim().toLowerCase());
       };
-      return [...new Map(source.map((x) => [String(x.id), x])).values()]
+      const deduplicated = [...new Map(source.map((x) => [String(x.id), x])).values()];
+      const filtered = deduplicated
         .filter(belongsToCurrentScout)
         .filter((x) => {
           const club = clubFromReport(x.player_club, x.playerClub, x.club, x.Club, x.team, x.Team) ||
             profilePlayerDirectory[normalizePlayerName(x.player)]?.club || "";
-          return `${x.player} ${club} ${x.scout}`
+          const groupedPlayerNames = (x.fixtureGroupPlayers || []).map((person) => person.player).join(" ");
+          return `${x.player} ${groupedPlayerNames} ${x.fixtureGroupFixture || ""} ${club} ${x.scout}`
             .toLowerCase()
             .includes(query.toLowerCase());
         })
@@ -819,6 +828,40 @@ export default function ScoutingReportsPageFinal() {
             ? x.status === "Published"
             : x.status !== "Published",
         );
+      if (tab === "Published") return filtered;
+      const fixtureGroups = new Map();
+      const displayed = [];
+      filtered.forEach((assignment) => {
+        if (!assignment.fixtureGroupId) {
+          displayed.push(assignment);
+          return;
+        }
+        const key = String(assignment.fixtureGroupId);
+        const group = fixtureGroups.get(key) || [];
+        group.push(assignment);
+        fixtureGroups.set(key, group);
+      });
+      fixtureGroups.forEach((matchedGroup, key) => {
+        const group = deduplicated.filter((item) => String(item.fixtureGroupId || "") === key && belongsToCurrentScout(item) && item.status !== "Published");
+        if (!group.length) group.push(...matchedGroup);
+        const first = group[0];
+        const groupedPlayers = first.fixtureGroupPlayers || group.map((item) => ({
+          assignmentId: item.id,
+          player: item.player,
+          playerId: item.playerId,
+          club: item.club,
+          position: item.position,
+        }));
+        displayed.push({
+          ...first,
+          fixtureAssignmentTitle: first.fixtureGroupFixture || first.game || "Fixture assignment",
+          fixtureGroupPlayers: groupedPlayers,
+          fixtureGroupItems: group,
+          fixtureGroupCount: groupedPlayers.length,
+          status: group.every((item) => item.status === "Published") ? "Published" : first.status,
+        });
+      });
+      return displayed;
     },
     [items, query, tab, sharedReports, sharedAssignments, profilePlayerDirectory, user?.id, user?.email, accountProfile?.id, accountProfile?.full_name],
   );
@@ -1738,14 +1781,27 @@ export default function ScoutingReportsPageFinal() {
         {shown.map((x) => (
           <article className="sr-card" key={x.id} onClick={() => { setProfile(null); openReport(x); }}>
             <div className="sr-card-top"><span className="sr-card-status">{x.status}</span>{(String(x.status || "").toLowerCase() !== "published" || String(x.author_id || "") === String(user?.id || "")) && <button className="sr-trash" onClick={(e) => { e.stopPropagation(); deleteAssignment(x); }}>Delete</button>}</div>
-            <button type="button" className="sr-assignment-player-link" onClick={(e) => {
-              e.stopPropagation();
-              setProfileReturnReport(null);
-              try { localStorage.setItem("scoutingProfileOrigin", "assignments"); } catch {}
-              setProfile({ ...x, player: String(x.player || "").trim() });
-            }}>{x.player}</button>
-            <p><ClubName club={clubFromReport(x.player_club, x.playerClub, x.club, x.Club, x.team, x.Team) || profilePlayerDirectory[normalizePlayerName(x.player)]?.club} /> · {x.position || "Position not added"}</p>
-            <div className="sr-fixture">{cardFixtureLabel(x)}</div>
+            {x.fixtureGroupId ? (() => {
+              const fixtureName = x.fixtureAssignmentTitle || x.fixtureGroupFixture || x.game || "Fixture assignment";
+              const teams = fixtureTeams(fixtureName);
+              const fixtureDate = x.games?.[0]?.date || x.fixtureDates?.[0] || x.date;
+              return <>
+                <div className="sr-assignment-player-link sr-assignment-fixture-heading">
+                  {teams.length === 2 ? <><span><ClubBadge club={teams[0]} size={27} />{teams[0]}</span><b>vs</b><span><ClubBadge club={teams[1]} size={27} />{teams[1]}</span></> : fixtureName}
+                </div>
+                <p className="sr-fixture-assigned-players"><strong>{x.fixtureGroupCount || x.fixtureGroupPlayers?.length || 0} players:</strong> {(x.fixtureGroupPlayers || []).map((person) => person.player).join(", ")}</p>
+                <div className="sr-fixture">{fixtureDate || "Date not added"}</div>
+              </>;
+            })() : <>
+              <button type="button" className="sr-assignment-player-link" onClick={(e) => {
+                e.stopPropagation();
+                setProfileReturnReport(null);
+                try { localStorage.setItem("scoutingProfileOrigin", "assignments"); } catch {}
+                setProfile({ ...x, player: String(x.player || "").trim() });
+              }}>{x.player}</button>
+              <p><ClubName club={clubFromReport(x.player_club, x.playerClub, x.club, x.Club, x.team, x.Team) || profilePlayerDirectory[normalizePlayerName(x.player)]?.club} /> · {x.position || "Position not added"}</p>
+              <div className="sr-fixture">{cardFixtureLabel(x)}</div>
+            </>}
             <div className="sr-card-meta"><span>{x.date || "Date not added"}</span><span>{normalizeImportedViewing(x.viewing)}</span><span>Scout: {x.scout || "Unassigned"}</span></div>
           </article>
         ))}
