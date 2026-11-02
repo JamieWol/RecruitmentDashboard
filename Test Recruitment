@@ -814,4 +814,4 @@ if "Overall Score" not in export_df.columns and "Overall Score" in work.columns:
 csv = export_df.to_csv(index=False).encode("utf-8")
 st.download_button("Download Filtered Data", csv, "recruitment_data.csv", "text/csv")
 
-st.caption("Metric inference, duplicate-column protection, and league filtering are enabled.")
+st.caption("Metric inference, duplicate-column protection, and league filtering are enabled.") 
