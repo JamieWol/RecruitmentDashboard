@@ -237,6 +237,11 @@ header{z-index:1000!important}.sr-page{position:relative;z-index:1}.sr-pitch{z-i
 .sr-tactical-player{cursor:grab;touch-action:none}
 .sr-tactical-player:active{cursor:grabbing}
 .sr-tactical-player.selected .sr-tactical-disc{stroke:#ffe36e;stroke-width:5}
+.sr-tactical-ball{cursor:grab;touch-action:none}
+.sr-tactical-ball:active,.sr-tactical-ball.dragging{cursor:grabbing}
+.sr-tactical-ball-shadow{fill:#05223f70}
+.sr-tactical-ball-shell{fill:#f7f8f3;stroke:#142234;stroke-width:2}
+.sr-tactical-ball-patch{fill:#142234;pointer-events:none}
 .sr-tactical-arrow{stroke:#ffe36e;stroke-width:6;stroke-linecap:round;pointer-events:none}
 .sr-tactical-arrow-preview{stroke-dasharray:12 9;opacity:.8}
 .sr-tactical-pitch-wrap.drawing{cursor:crosshair}
@@ -245,6 +250,7 @@ header{z-index:1000!important}.sr-page{position:relative;z-index:1}.sr-pitch{z-i
 .sr-tactical-legend i{width:15px;height:15px;border:2px solid white;border-radius:50%}
 .sr-tactical-legend i.home{background:#1485dd}
 .sr-tactical-legend i.away{background:#e64b50}
+.sr-tactical-legend i.ball{background:#f7f8f3;border-color:#142234}
 .sr-tactical-legend small{color:#b9d8f1}
 @media(max-width:700px){.sr-team-analysis-header{align-items:flex-start}.sr-team-analysis-header h1{font-size:38px!important}.sr-team-analysis-header p{font-size:15px!important}.sr-team-analysis-more-trigger{padding:9px 13px}.sr-tactical-pad{padding:12px}.sr-tactical-title-fields{grid-template-columns:1fr}.sr-tactical-tools button{flex:1 1 auto}.sr-tactical-legend{align-items:flex-start}.sr-tactical-legend small{flex-basis:100%}}
 .sr-assignment-fixture-heading{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:28px;cursor:pointer;text-transform:none;line-height:1.2}

@@ -141,6 +141,7 @@ const freshTacticalBoard = (homeName = "Home Team", awayName = "Opposition") => 
   homeName: homeName || "Home Team",
   awayName: awayName || "Opposition",
   players: [...DEFAULT_TACTICAL_HOME, ...DEFAULT_TACTICAL_AWAY],
+  ball: { x: 500, y: 320 },
   arrows: [],
 });
 
@@ -189,6 +190,11 @@ const drawTacticalVideoFrame = (canvas, board) => {
     context.fillStyle = "#fff"; context.font = "bold 17px Arial, sans-serif"; context.textAlign = "center"; context.textBaseline = "middle";
     context.fillText(String(player.number), player.x, player.y + 1);
   });
+  const ball = board.ball || { x: 500, y: 320 };
+  context.beginPath(); context.arc(ball.x, ball.y + 2, 11, 0, Math.PI * 2); context.fillStyle = "#05223f70"; context.fill();
+  context.beginPath(); context.arc(ball.x, ball.y, 10, 0, Math.PI * 2); context.fillStyle = "#f7f8f3"; context.fill();
+  context.strokeStyle = "#142234"; context.lineWidth = 2; context.stroke();
+  context.fillStyle = "#142234"; context.beginPath(); context.moveTo(ball.x, ball.y - 5); context.lineTo(ball.x + 4, ball.y - 2); context.lineTo(ball.x + 3, ball.y + 3); context.lineTo(ball.x - 3, ball.y + 3); context.lineTo(ball.x - 4, ball.y - 2); context.closePath(); context.fill();
   context.restore();
 };
 
@@ -200,10 +206,12 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     } catch { return freshTacticalBoard(homeTeamName, oppositionName); }
   });
   const [mode, setMode] = useState("move");
-  const [draggingId, setDraggingId] = useState(null);
+  const [draggingIds, setDraggingIds] = useState([]);
+  const [draggingBall, setDraggingBall] = useState(false);
+  const [multiSelectMode, setMultiSelectMode] = useState(false);
   const [arrowStart, setArrowStart] = useState(null);
   const [arrowPreview, setArrowPreview] = useState(null);
-  const [selectedToken, setSelectedToken] = useState(null);
+  const [selectedTokens, setSelectedTokens] = useState([]);
   const [videoRecording, setVideoRecording] = useState(false);
   const [videoStatus, setVideoStatus] = useState("");
   const pitchRef = useRef(null);
@@ -211,7 +219,9 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const boardRef = useRef(board);
   const videoBoardRef = useRef(board);
   const videoTransitionsRef = useRef(new Map());
-  const dragTargetRef = useRef(null);
+  const dragStartRef = useRef(null);
+  const dragTargetsRef = useRef({});
+  const ballDragTargetRef = useRef(null);
   const videoRecorderRef = useRef(null);
   const videoChunksRef = useRef([]);
   const videoFrameRef = useRef(null);
@@ -226,6 +236,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       homeName: board.homeName,
       awayName: board.awayName,
       arrows: board.arrows,
+      ball: current.ball || board.ball || { x: 500, y: 320 },
       players: board.players.map((player) => {
         const existing = current.players.find((item) => item.id === player.id);
         return existing ? { ...existing, number: player.number, side: player.side } : { ...player };
@@ -235,22 +246,24 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
 
   const getVideoFrameBoard = (now = performance.now()) => {
     const transitions = videoTransitionsRef.current;
-    const players = videoBoardRef.current.players.map((player) => {
-      const transition = transitions.get(player.id);
-      if (!transition) return { ...player, moving: false };
+    const positionAt = (id, position) => {
+      const transition = transitions.get(id);
+      if (!transition) return { ...position, moving: false };
       const progress = Math.min(1, Math.max(0, (now - transition.startedAt) / transition.duration));
       const eased = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
-      const position = {
+      const interpolated = {
         x: transition.from.x + (transition.to.x - transition.from.x) * eased,
         y: transition.from.y + (transition.to.y - transition.from.y) * eased,
       };
       if (progress >= 1) {
-        transitions.delete(player.id);
-        return { ...player, ...transition.to, moving: false };
+        transitions.delete(id);
+        return { ...position, ...transition.to, moving: false };
       }
-      return { ...player, ...position, moving: true };
-    });
-    const frameBoard = { ...videoBoardRef.current, players };
+      return { ...position, ...interpolated, moving: true };
+    };
+    const players = videoBoardRef.current.players.map((player) => ({ ...player, ...positionAt(player.id, player) }));
+    const ball = positionAt("tactical-ball", videoBoardRef.current.ball || { x: 500, y: 320 });
+    const frameBoard = { ...videoBoardRef.current, players, ball };
     videoBoardRef.current = frameBoard;
     return frameBoard;
   };
@@ -278,10 +291,26 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const beginPlayerDrag = (event, player) => {
     if (mode !== "move") return;
     event.stopPropagation();
+    if (multiSelectMode) {
+      setSelectedTokens((current) => current.includes(player.id) ? current.filter((id) => id !== player.id) : [...current, player.id]);
+      return;
+    }
     event.currentTarget.setPointerCapture?.(event.pointerId);
-    dragTargetRef.current = { x: player.x, y: player.y };
-    setDraggingId(player.id);
-    setSelectedToken(player.id);
+    const moving = selectedTokens.includes(player.id) && selectedTokens.length > 1 ? selectedTokens : [player.id];
+    setSelectedTokens(moving);
+    setDraggingIds(moving);
+    const point = pointFromEvent(event);
+    const positions = Object.fromEntries(boardRef.current.players.filter((item) => moving.includes(item.id)).map((item) => [item.id, { x: item.x, y: item.y }]));
+    dragStartRef.current = { pointer: point, positions };
+  };
+  const beginBallDrag = (event) => {
+    if (mode !== "move" || multiSelectMode) return;
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    const point = pointFromEvent(event);
+    const ball = boardRef.current.ball || { x: 500, y: 320 };
+    dragStartRef.current = { pointer: point, positions: { "tactical-ball": { x: ball.x, y: ball.y } } };
+    setDraggingBall(true);
   };
   const handlePitchPointerDown = (event) => {
     if (mode !== "arrow") return;
@@ -292,17 +321,40 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   };
   const handlePitchPointerMove = (event) => {
     const point = pointFromEvent(event);
-    if (draggingId) {
-      dragTargetRef.current = point;
-      setBoard((current) => ({ ...current, players: current.players.map((player) => player.id === draggingId ? { ...player, ...point } : player) }));
+    if (draggingIds.length && dragStartRef.current) {
+      const delta = { x: point.x - dragStartRef.current.pointer.x, y: point.y - dragStartRef.current.pointer.y };
+      const targets = Object.fromEntries(draggingIds.map((id) => [id, {
+        x: Math.max(24, Math.min(976, dragStartRef.current.positions[id].x + delta.x)),
+        y: Math.max(24, Math.min(616, dragStartRef.current.positions[id].y + delta.y)),
+      }]));
+      dragTargetsRef.current = targets;
+      setBoard((current) => ({ ...current, players: current.players.map((player) => targets[player.id] ? { ...player, ...targets[player.id] } : player) }));
+    }
+    if (draggingBall && dragStartRef.current) {
+      const origin = dragStartRef.current.positions["tactical-ball"];
+      const delta = { x: point.x - dragStartRef.current.pointer.x, y: point.y - dragStartRef.current.pointer.y };
+      const target = { x: Math.max(24, Math.min(976, origin.x + delta.x)), y: Math.max(24, Math.min(616, origin.y + delta.y)) };
+      ballDragTargetRef.current = target;
+      setBoard((current) => ({ ...current, ball: target }));
     }
     if (arrowStart) setArrowPreview(point);
   };
   const handlePitchPointerUp = (event) => {
-    if (draggingId) {
+    if (draggingIds.length && dragStartRef.current) {
       const finalPoint = pointFromEvent(event);
-      dragTargetRef.current = finalPoint;
-      setBoard((current) => ({ ...current, players: current.players.map((player) => player.id === draggingId ? { ...player, ...finalPoint } : player) }));
+      const delta = { x: finalPoint.x - dragStartRef.current.pointer.x, y: finalPoint.y - dragStartRef.current.pointer.y };
+      dragTargetsRef.current = Object.fromEntries(draggingIds.map((id) => [id, {
+        x: Math.max(24, Math.min(976, dragStartRef.current.positions[id].x + delta.x)),
+        y: Math.max(24, Math.min(616, dragStartRef.current.positions[id].y + delta.y)),
+      }]));
+      setBoard((current) => ({ ...current, players: current.players.map((player) => dragTargetsRef.current[player.id] ? { ...player, ...dragTargetsRef.current[player.id] } : player) }));
+    }
+    if (draggingBall && dragStartRef.current) {
+      const finalPoint = pointFromEvent(event);
+      const origin = dragStartRef.current.positions["tactical-ball"];
+      const delta = { x: finalPoint.x - dragStartRef.current.pointer.x, y: finalPoint.y - dragStartRef.current.pointer.y };
+      ballDragTargetRef.current = { x: Math.max(24, Math.min(976, origin.x + delta.x)), y: Math.max(24, Math.min(616, origin.y + delta.y)) };
+      setBoard((current) => ({ ...current, ball: ballDragTargetRef.current }));
     }
     if (arrowStart) {
       const end = pointFromEvent(event);
@@ -311,18 +363,23 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       setArrowStart(null);
       setArrowPreview(null);
     }
-    if (draggingId && videoRecording && dragTargetRef.current) {
+    if ((draggingIds.length || draggingBall) && videoRecording) {
       const frameBoard = getVideoFrameBoard();
-      const player = frameBoard.players.find((item) => item.id === draggingId);
-      if (player) videoTransitionsRef.current.set(draggingId, {
-        from: { x: player.x, y: player.y },
-        to: { ...dragTargetRef.current },
-        startedAt: performance.now(),
-        duration: 900,
+      const startedAt = performance.now();
+      draggingIds.forEach((id) => {
+        const player = frameBoard.players.find((item) => item.id === id);
+        const target = dragTargetsRef.current[id];
+        if (player && target) videoTransitionsRef.current.set(id, { from: { x: player.x, y: player.y }, to: { ...target }, startedAt, duration: 900 });
       });
+      if (draggingBall && ballDragTargetRef.current) {
+        videoTransitionsRef.current.set("tactical-ball", { from: { x: frameBoard.ball.x, y: frameBoard.ball.y }, to: { ...ballDragTargetRef.current }, startedAt, duration: 900 });
+      }
     }
-    dragTargetRef.current = null;
-    setDraggingId(null);
+    dragStartRef.current = null;
+    dragTargetsRef.current = {};
+    ballDragTargetRef.current = null;
+    setDraggingIds([]);
+    setDraggingBall(false);
   };
   const addPlayer = (side) => {
     setBoard((current) => {
@@ -334,9 +391,9 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     });
   };
   const removeSelectedPlayer = () => {
-    if (!selectedToken) return;
-    setBoard((current) => ({ ...current, players: current.players.filter((player) => player.id !== selectedToken) }));
-    setSelectedToken(null);
+    if (!selectedTokens.length) return;
+    setBoard((current) => ({ ...current, players: current.players.filter((player) => !selectedTokens.includes(player.id)) }));
+    setSelectedTokens([]);
   };
   const startVideoRecording = () => {
     const canvas = videoCanvasRef.current;
@@ -378,7 +435,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     videoRecorderRef.current = recorder;
     recorder.start(250);
     setVideoRecording(true);
-    setVideoStatus("Recording. Drag and release each disc; it will glide to its new position in the video.");
+    setVideoStatus("Recording. Drag and release a disc or group; it will glide to its new position in the video.");
     const drawFrame = () => {
       drawTacticalVideoFrame(videoCanvasRef.current, getVideoFrameBoard());
       videoFrameRef.current = window.requestAnimationFrame(drawFrame);
@@ -402,13 +459,14 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
           <label><span>Opposition</span><input value={board.awayName} onChange={(event) => setBoard((current) => ({ ...current, awayName: event.target.value }))} /></label>
         </div>
         <div className="sr-tactical-tools" role="toolbar" aria-label="Tactical pad tools">
-          <button type="button" className={mode === "move" ? "selected" : ""} onClick={() => setMode("move")}>Move players</button>
+          <button type="button" className={mode === "move" && !multiSelectMode ? "selected" : ""} onClick={() => { setMode("move"); setMultiSelectMode(false); }}>Move players</button>
+          <button type="button" className={multiSelectMode ? "selected" : ""} onClick={() => { setMode("move"); setMultiSelectMode((value) => !value); }}>Select multiple</button>
           <button type="button" className={mode === "arrow" ? "selected" : ""} onClick={() => setMode("arrow")}>Draw arrows</button>
           <button type="button" onClick={() => addPlayer("home")}>+ Home disc</button>
           <button type="button" onClick={() => addPlayer("away")}>+ Opponent disc</button>
-          <button type="button" onClick={removeSelectedPlayer} disabled={!selectedToken}>Remove selected</button>
+          <button type="button" onClick={removeSelectedPlayer} disabled={!selectedTokens.length}>Remove selected</button>
           <button type="button" onClick={() => setBoard((current) => ({ ...current, arrows: [] }))} disabled={!board.arrows.length}>Clear arrows</button>
-          <button type="button" onClick={() => { setBoard(freshTacticalBoard(homeTeamName, oppositionName)); setSelectedToken(null); }}>Reset pitch</button>
+          <button type="button" onClick={() => { setBoard(freshTacticalBoard(homeTeamName, oppositionName)); setSelectedTokens([]); }}>Reset pitch</button>
           <button type="button" className={videoRecording ? "sr-tactical-recording" : "sr-tactical-video"} onClick={videoRecording ? stopVideoRecording : startVideoRecording}>{videoRecording ? "Stop & download video" : "Record video"}</button>
         </div>
       </div>
@@ -433,14 +491,18 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
           <path d="M35 55 A20 20 0 0 0 55 35 M945 35 A20 20 0 0 0 965 55 M35 585 A20 20 0 0 1 55 605 M945 605 A20 20 0 0 1 965 585" className="sr-tactical-line" />
           {board.arrows.map((arrow) => <line key={arrow.id} x1={arrow.from.x} y1={arrow.from.y} x2={arrow.to.x} y2={arrow.to.y} className="sr-tactical-arrow" markerEnd="url(#sr-tactical-arrowhead)" />)}
           {arrowPreview && arrowStart && <line x1={arrowStart.x} y1={arrowStart.y} x2={arrowPreview.x} y2={arrowPreview.y} className="sr-tactical-arrow sr-tactical-arrow-preview" markerEnd="url(#sr-tactical-arrowhead)" />}
-          {board.players.map((player) => <g key={player.id} className={`sr-tactical-player ${player.side} ${selectedToken === player.id ? "selected" : ""}`} transform={`translate(${player.x} ${player.y})`} onPointerDown={(event) => beginPlayerDrag(event, player)} onClick={() => setSelectedToken(player.id)}>
+          <g className={`sr-tactical-ball ${draggingBall ? "dragging" : ""}`} transform={`translate(${board.ball?.x ?? 500} ${board.ball?.y ?? 320})`} onPointerDown={beginBallDrag}>
+            <circle r="13" className="sr-tactical-ball-shadow" /><circle r="10" className="sr-tactical-ball-shell" />
+            <path d="M0 -5 L4 -2 L3 3 L-3 3 L-4 -2 Z" className="sr-tactical-ball-patch" />
+          </g>
+          {board.players.map((player) => <g key={player.id} className={`sr-tactical-player ${player.side} ${selectedTokens.includes(player.id) ? "selected" : ""} ${draggingIds.includes(player.id) ? "dragging" : ""}`} transform={`translate(${player.x} ${player.y})`} onPointerDown={(event) => beginPlayerDrag(event, player)}>
             <circle r="27" className="sr-tactical-disc-shadow" />
             <circle r="24" className="sr-tactical-disc" />
             <text y="1">{player.number}</text>
           </g>)}
         </svg>
       </div>
-      <div className="sr-tactical-legend"><span><i className="home" />{board.homeName}</span><span><i className="away" />{board.awayName}</span><small>Drag discs to position players. While recording, release each disc to show a smooth, glowing transition. Draw arrows for runs or passes. The board saves automatically on this device.</small></div>
+      <div className="sr-tactical-legend"><span><i className="home" />{board.homeName}</span><span><i className="away" />{board.awayName}</span><span><i className="ball" />Ball</span><small>Drag discs or the ball to position them. Use Select multiple, choose several discs, then drag one selected disc to move them together. During recording, they glide together with a smooth transition. The board saves automatically on this device.</small></div>
     </section>
   );
 }
