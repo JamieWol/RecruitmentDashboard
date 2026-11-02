@@ -213,6 +213,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const [arrowPreview, setArrowPreview] = useState(null);
   const [selectedTokens, setSelectedTokens] = useState([]);
   const [videoRecording, setVideoRecording] = useState(false);
+  const [finishingVideo, setFinishingVideo] = useState(false);
   const [videoStatus, setVideoStatus] = useState("");
   const pitchRef = useRef(null);
   const videoCanvasRef = useRef(null);
@@ -225,6 +226,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const videoRecorderRef = useRef(null);
   const videoChunksRef = useRef([]);
   const videoFrameRef = useRef(null);
+  const videoFinishTimerRef = useRef(null);
 
   useEffect(() => { boardRef.current = board; }, [board]);
   useEffect(() => {
@@ -276,6 +278,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   }, [board, storageKey]);
   useEffect(() => () => {
     if (videoFrameRef.current) window.cancelAnimationFrame(videoFrameRef.current);
+    if (videoFinishTimerRef.current) window.clearTimeout(videoFinishTimerRef.current);
     const recorder = videoRecorderRef.current;
     if (recorder && recorder.state !== "inactive") recorder.stop();
   }, []);
@@ -289,13 +292,13 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     };
   };
   const beginPlayerDrag = (event, player) => {
-    if (mode !== "move") return;
+    if (mode !== "move" || finishingVideo) return;
     event.stopPropagation();
     if (multiSelectMode) {
       setSelectedTokens((current) => current.includes(player.id) ? current.filter((id) => id !== player.id) : [...current, player.id]);
       return;
     }
-    event.currentTarget.setPointerCapture?.(event.pointerId);
+    pitchRef.current?.setPointerCapture?.(event.pointerId);
     const moving = selectedTokens.includes(player.id) && selectedTokens.length > 1 ? selectedTokens : [player.id];
     setSelectedTokens(moving);
     setDraggingIds(moving);
@@ -304,16 +307,16 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     dragStartRef.current = { pointer: point, positions };
   };
   const beginBallDrag = (event) => {
-    if (mode !== "move" || multiSelectMode) return;
+    if (mode !== "move" || multiSelectMode || finishingVideo) return;
     event.stopPropagation();
-    event.currentTarget.setPointerCapture?.(event.pointerId);
+    pitchRef.current?.setPointerCapture?.(event.pointerId);
     const point = pointFromEvent(event);
     const ball = boardRef.current.ball || { x: 500, y: 320 };
     dragStartRef.current = { pointer: point, positions: { "tactical-ball": { x: ball.x, y: ball.y } } };
     setDraggingBall(true);
   };
   const handlePitchPointerDown = (event) => {
-    if (mode !== "arrow") return;
+    if (mode !== "arrow" || finishingVideo) return;
     pitchRef.current?.setPointerCapture?.(event.pointerId);
     const point = pointFromEvent(event);
     setArrowStart(point);
@@ -362,18 +365,6 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       if (distance > 12) setBoard((current) => ({ ...current, arrows: [...current.arrows, { id: `${Date.now()}-${current.arrows.length}`, from: arrowStart, to: end }] }));
       setArrowStart(null);
       setArrowPreview(null);
-    }
-    if ((draggingIds.length || draggingBall) && videoRecording) {
-      const frameBoard = getVideoFrameBoard();
-      const startedAt = performance.now();
-      draggingIds.forEach((id) => {
-        const player = frameBoard.players.find((item) => item.id === id);
-        const target = dragTargetsRef.current[id];
-        if (player && target) videoTransitionsRef.current.set(id, { from: { x: player.x, y: player.y }, to: { ...target }, startedAt, duration: 900 });
-      });
-      if (draggingBall && ballDragTargetRef.current) {
-        videoTransitionsRef.current.set("tactical-ball", { from: { x: frameBoard.ball.x, y: frameBoard.ball.y }, to: { ...ballDragTargetRef.current }, startedAt, duration: 900 });
-      }
     }
     dragStartRef.current = null;
     dragTargetsRef.current = {};
@@ -426,7 +417,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
         const filename = (boardRef.current.name || "tactical-movement").trim().replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "tactical-movement";
         link.href = url; link.download = `${filename}.${extension}`; link.click();
         window.setTimeout(() => URL.revokeObjectURL(url), 1500);
-        setVideoStatus("Video downloaded. Move the discs while recording to show the play.");
+        setVideoStatus("Video downloaded with the disc and ball movements animated together.");
       } else setVideoStatus("No video frames were recorded. Please try again.");
       stream.getTracks().forEach((track) => track.stop());
       videoRecorderRef.current = null;
@@ -435,7 +426,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     videoRecorderRef.current = recorder;
     recorder.start(250);
     setVideoRecording(true);
-    setVideoStatus("Recording. Drag and release a disc or group; it will glide to its new position in the video.");
+    setVideoStatus("Recording your starting positions. Arrange the final positions, then choose Animate & download to move everything together.");
     const drawFrame = () => {
       drawTacticalVideoFrame(videoCanvasRef.current, getVideoFrameBoard());
       videoFrameRef.current = window.requestAnimationFrame(drawFrame);
@@ -444,10 +435,36 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   };
   const stopVideoRecording = () => {
     const recorder = videoRecorderRef.current;
-    if (videoFrameRef.current) window.cancelAnimationFrame(videoFrameRef.current);
-    videoFrameRef.current = null;
-    setVideoRecording(false);
-    if (recorder && recorder.state !== "inactive") recorder.stop();
+    if (!recorder || recorder.state === "inactive" || finishingVideo) return;
+    const initial = videoBoardRef.current;
+    const final = boardRef.current;
+    const startedAt = performance.now() + 350;
+    const duration = 1300;
+    let movements = 0;
+    videoTransitionsRef.current.clear();
+    final.players.forEach((player) => {
+      const from = initial.players.find((item) => item.id === player.id);
+      if (!from) return;
+      if (Math.hypot(player.x - from.x, player.y - from.y) > 2) {
+        videoTransitionsRef.current.set(player.id, { from: { x: from.x, y: from.y }, to: { x: player.x, y: player.y }, startedAt, duration });
+        movements += 1;
+      }
+    });
+    const initialBall = initial.ball || { x: 500, y: 320 };
+    const finalBall = final.ball || { x: 500, y: 320 };
+    if (Math.hypot(finalBall.x - initialBall.x, finalBall.y - initialBall.y) > 2) {
+      videoTransitionsRef.current.set("tactical-ball", { from: { ...initialBall }, to: { ...finalBall }, startedAt, duration });
+      movements += 1;
+    }
+    setFinishingVideo(true);
+    setVideoStatus(movements ? "Animating all player and ball movements together…" : "No positions changed. Preparing your video…");
+    videoFinishTimerRef.current = window.setTimeout(() => {
+      if (videoFrameRef.current) window.cancelAnimationFrame(videoFrameRef.current);
+      videoFrameRef.current = null;
+      setVideoRecording(false);
+      setFinishingVideo(false);
+      if (recorder.state !== "inactive") recorder.stop();
+    }, movements ? 2350 : 700);
   };
 
   return (
@@ -467,7 +484,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
           <button type="button" onClick={removeSelectedPlayer} disabled={!selectedTokens.length}>Remove selected</button>
           <button type="button" onClick={() => setBoard((current) => ({ ...current, arrows: [] }))} disabled={!board.arrows.length}>Clear arrows</button>
           <button type="button" onClick={() => { setBoard(freshTacticalBoard(homeTeamName, oppositionName)); setSelectedTokens([]); }}>Reset pitch</button>
-          <button type="button" className={videoRecording ? "sr-tactical-recording" : "sr-tactical-video"} onClick={videoRecording ? stopVideoRecording : startVideoRecording}>{videoRecording ? "Stop & download video" : "Record video"}</button>
+          <button type="button" className={videoRecording ? "sr-tactical-recording" : "sr-tactical-video"} onClick={videoRecording ? stopVideoRecording : startVideoRecording} disabled={finishingVideo}>{finishingVideo ? "Animating…" : videoRecording ? "Animate & download" : "Record video"}</button>
         </div>
       </div>
       {videoStatus && <p className="sr-tactical-video-status" role="status">{videoStatus}</p>}
@@ -502,7 +519,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
           </g>)}
         </svg>
       </div>
-      <div className="sr-tactical-legend"><span><i className="home" />{board.homeName}</span><span><i className="away" />{board.awayName}</span><span><i className="ball" />Ball</span><small>Drag discs or the ball to position them. Use Select multiple, choose several discs, then drag one selected disc to move them together. During recording, they glide together with a smooth transition. The board saves automatically on this device.</small></div>
+      <div className="sr-tactical-legend"><span><i className="home" />{board.homeName}</span><span><i className="away" />{board.awayName}</span><span><i className="ball" />Ball</span><small>Drag discs or the ball to set the final positions. Record video, make all your changes, then choose Animate & download to see every changed player and the ball move together. The board saves automatically on this device.</small></div>
     </section>
   );
 }
