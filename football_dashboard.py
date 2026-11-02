@@ -905,6 +905,6 @@ with tabs[3]:
             st.write(f"Average metrics for {selected_position_role}:")
             st.dataframe(role_avg.to_frame("Average").sort_values("Average", ascending=False))
         else:
-            st.warning(f"No metrics defined for {selected_position_role}.") 
+            st.warning(f"No metrics defined for {selected_position_role}.")
 
 
