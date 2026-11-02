@@ -128,6 +128,143 @@ class ChartBoundary extends React.Component {
   }
 }
 
+const DEFAULT_TACTICAL_HOME = [
+  [90, 320], [245, 90], [245, 245], [245, 395], [245, 550],
+  [420, 170], [420, 320], [420, 470], [610, 145], [610, 320], [610, 495],
+].map(([x, y], index) => ({ id: `home-${index + 1}`, side: "home", number: index + 1, x, y }));
+const DEFAULT_TACTICAL_AWAY = [
+  [910, 320], [755, 90], [755, 245], [755, 395], [755, 550],
+  [580, 170], [580, 320], [580, 470], [390, 145], [390, 320], [390, 495],
+].map(([x, y], index) => ({ id: `away-${index + 1}`, side: "away", number: index + 1, x, y }));
+const freshTacticalBoard = (homeName = "Home Team", awayName = "Opposition") => ({
+  name: "New Tactic",
+  homeName: homeName || "Home Team",
+  awayName: awayName || "Opposition",
+  players: [...DEFAULT_TACTICAL_HOME, ...DEFAULT_TACTICAL_AWAY],
+  arrows: [],
+});
+
+function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
+  const [board, setBoard] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(storageKey) || "null");
+      return saved?.players?.length ? { ...freshTacticalBoard(homeTeamName, oppositionName), ...saved } : freshTacticalBoard(homeTeamName, oppositionName);
+    } catch { return freshTacticalBoard(homeTeamName, oppositionName); }
+  });
+  const [mode, setMode] = useState("move");
+  const [draggingId, setDraggingId] = useState(null);
+  const [arrowStart, setArrowStart] = useState(null);
+  const [arrowPreview, setArrowPreview] = useState(null);
+  const [selectedToken, setSelectedToken] = useState(null);
+  const pitchRef = useRef(null);
+
+  useEffect(() => {
+    try { localStorage.setItem(storageKey, JSON.stringify(board)); } catch {}
+  }, [board, storageKey]);
+
+  const pointFromEvent = (event) => {
+    const rect = pitchRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 500, y: 320 };
+    return {
+      x: Math.max(24, Math.min(976, ((event.clientX - rect.left) / rect.width) * 1000)),
+      y: Math.max(24, Math.min(616, ((event.clientY - rect.top) / rect.height) * 640)),
+    };
+  };
+  const beginPlayerDrag = (event, player) => {
+    if (mode !== "move") return;
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    setDraggingId(player.id);
+    setSelectedToken(player.id);
+  };
+  const handlePitchPointerDown = (event) => {
+    if (mode !== "arrow") return;
+    pitchRef.current?.setPointerCapture?.(event.pointerId);
+    const point = pointFromEvent(event);
+    setArrowStart(point);
+    setArrowPreview(point);
+  };
+  const handlePitchPointerMove = (event) => {
+    const point = pointFromEvent(event);
+    if (draggingId) {
+      setBoard((current) => ({ ...current, players: current.players.map((player) => player.id === draggingId ? { ...player, ...point } : player) }));
+    }
+    if (arrowStart) setArrowPreview(point);
+  };
+  const handlePitchPointerUp = (event) => {
+    if (arrowStart) {
+      const end = pointFromEvent(event);
+      const distance = Math.hypot(end.x - arrowStart.x, end.y - arrowStart.y);
+      if (distance > 12) setBoard((current) => ({ ...current, arrows: [...current.arrows, { id: `${Date.now()}-${current.arrows.length}`, from: arrowStart, to: end }] }));
+      setArrowStart(null);
+      setArrowPreview(null);
+    }
+    setDraggingId(null);
+  };
+  const addPlayer = (side) => {
+    setBoard((current) => {
+      const sidePlayers = current.players.filter((player) => player.side === side);
+      if (sidePlayers.length >= 16) return current;
+      const number = sidePlayers.reduce((max, player) => Math.max(max, Number(player.number) || 0), 0) + 1;
+      const player = { id: `${side}-${Date.now()}`, side, number, x: side === "home" ? 350 : 650, y: 320 + (sidePlayers.length % 5) * 18 };
+      return { ...current, players: [...current.players, player] };
+    });
+  };
+  const removeSelectedPlayer = () => {
+    if (!selectedToken) return;
+    setBoard((current) => ({ ...current, players: current.players.filter((player) => player.id !== selectedToken) }));
+    setSelectedToken(null);
+  };
+
+  return (
+    <section className="sr-tactical-pad">
+      <div className="sr-tactical-toolbar">
+        <div className="sr-tactical-title-fields">
+          <label><span>Tactic name</span><input value={board.name} onChange={(event) => setBoard((current) => ({ ...current, name: event.target.value }))} /></label>
+          <label><span>Home team</span><input value={board.homeName} onChange={(event) => setBoard((current) => ({ ...current, homeName: event.target.value }))} /></label>
+          <label><span>Opposition</span><input value={board.awayName} onChange={(event) => setBoard((current) => ({ ...current, awayName: event.target.value }))} /></label>
+        </div>
+        <div className="sr-tactical-tools" role="toolbar" aria-label="Tactical pad tools">
+          <button type="button" className={mode === "move" ? "selected" : ""} onClick={() => setMode("move")}>Move players</button>
+          <button type="button" className={mode === "arrow" ? "selected" : ""} onClick={() => setMode("arrow")}>Draw arrows</button>
+          <button type="button" onClick={() => addPlayer("home")}>+ Home disc</button>
+          <button type="button" onClick={() => addPlayer("away")}>+ Opponent disc</button>
+          <button type="button" onClick={removeSelectedPlayer} disabled={!selectedToken}>Remove selected</button>
+          <button type="button" onClick={() => setBoard((current) => ({ ...current, arrows: [] }))} disabled={!board.arrows.length}>Clear arrows</button>
+          <button type="button" onClick={() => { setBoard(freshTacticalBoard(homeTeamName, oppositionName)); setSelectedToken(null); }}>Reset pitch</button>
+        </div>
+      </div>
+
+      <div className={`sr-tactical-pitch-wrap ${mode === "arrow" ? "drawing" : "moving"}`}>
+        <svg ref={pitchRef} className="sr-tactical-pitch" viewBox="0 0 1000 640" role="img" aria-label="Tactical football pitch. Drag the discs to position players." onPointerDown={handlePitchPointerDown} onPointerMove={handlePitchPointerMove} onPointerUp={handlePitchPointerUp} onPointerCancel={handlePitchPointerUp}>
+          <defs><marker id="sr-tactical-arrowhead" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#ffe36e" /></marker></defs>
+          <rect x="12" y="12" width="976" height="616" rx="7" className="sr-tactical-grass" />
+          <rect x="35" y="35" width="930" height="570" className="sr-tactical-line" />
+          <line x1="500" y1="35" x2="500" y2="605" className="sr-tactical-line" />
+          <circle cx="500" cy="320" r="83" className="sr-tactical-line" />
+          <circle cx="500" cy="320" r="4" className="sr-tactical-mark" />
+          <rect x="35" y="180" width="150" height="280" className="sr-tactical-line" />
+          <rect x="35" y="245" width="58" height="150" className="sr-tactical-line" />
+          <rect x="815" y="180" width="150" height="280" className="sr-tactical-line" />
+          <rect x="907" y="245" width="58" height="150" className="sr-tactical-line" />
+          <path d="M185 250 A82 82 0 0 1 185 390 M815 250 A82 82 0 0 0 815 390" className="sr-tactical-line" />
+          <circle cx="145" cy="320" r="4" className="sr-tactical-mark" />
+          <circle cx="855" cy="320" r="4" className="sr-tactical-mark" />
+          <path d="M35 55 A20 20 0 0 0 55 35 M945 35 A20 20 0 0 0 965 55 M35 585 A20 20 0 0 1 55 605 M945 605 A20 20 0 0 1 965 585" className="sr-tactical-line" />
+          {board.arrows.map((arrow) => <line key={arrow.id} x1={arrow.from.x} y1={arrow.from.y} x2={arrow.to.x} y2={arrow.to.y} className="sr-tactical-arrow" markerEnd="url(#sr-tactical-arrowhead)" />)}
+          {arrowPreview && arrowStart && <line x1={arrowStart.x} y1={arrowStart.y} x2={arrowPreview.x} y2={arrowPreview.y} className="sr-tactical-arrow sr-tactical-arrow-preview" markerEnd="url(#sr-tactical-arrowhead)" />}
+          {board.players.map((player) => <g key={player.id} className={`sr-tactical-player ${player.side} ${selectedToken === player.id ? "selected" : ""}`} transform={`translate(${player.x} ${player.y})`} onPointerDown={(event) => beginPlayerDrag(event, player)} onClick={() => setSelectedToken(player.id)}>
+            <circle r="27" className="sr-tactical-disc-shadow" />
+            <circle r="24" className="sr-tactical-disc" />
+            <text y="1">{player.number}</text>
+          </g>)}
+        </svg>
+      </div>
+      <div className="sr-tactical-legend"><span><i className="home" />{board.homeName}</span><span><i className="away" />{board.awayName}</span><small>Drag discs to move players. Select a disc, then remove it if needed. Draw arrows to show runs or passes. This board saves automatically on this device.</small></div>
+    </section>
+  );
+}
+
 export default function TeamAnalysisPage() {
   const { user, loading: authLoading } = useAuth();
   const [rows, setRows] = useState([]);
@@ -139,6 +276,8 @@ export default function TeamAnalysisPage() {
   const [storageWarning, setStorageWarning] = useState("");
   const [dataStorageKey, setDataStorageKey] = useState("");
   const [isRestoring, setIsRestoring] = useState(true);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [tacticalPadOpen, setTacticalPadOpen] = useState(false);
   const dashboardRef = useRef(null);
   const hydrated = useRef(false);
   const storageKey = `scoutpro-team-analysis-uploaded-data:${user?.id || "anonymous"}`;
@@ -517,37 +656,47 @@ export default function TeamAnalysisPage() {
     pdf.save(`${normalise(selected?.[teamKey]) || "team"}-analysis-report.pdf`);
   };
 
+  const moreMenu = (
+    <div className="sr-team-analysis-more">
+      <button type="button" className="sr-team-analysis-more-trigger" aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen((open) => !open)}>More <span aria-hidden="true">▾</span></button>
+      {moreOpen && <div className="sr-team-analysis-more-menu" role="menu">
+        <button type="button" role="menuitem" onClick={() => { setTacticalPadOpen((open) => !open); setMoreOpen(false); }}>{tacticalPadOpen ? "Team Analysis" : "Tactical Pad"}</button>
+      </div>}
+    </div>
+  );
+  const pageHeader = (title, description, showBack = false) => (
+    <header className="sr-team-analysis-header">
+      <div>
+        <div style={{ color: "#6bd7fa", fontSize: 14, letterSpacing: 1 }}>SCOUTPRO PLATFORM</div>
+        <h1 style={{ margin: "10px 0", fontSize: 48, fontWeight: 800, color: "#62dcff", textTransform: "uppercase", fontFamily: 'Impact,"Arial Narrow",sans-serif' }}>{title}</h1>
+        <p style={{ color: "#d7e8f8", fontSize: 18, margin: 0 }}>{description}</p>
+        {showBack && <button type="button" className="sr-team-analysis-back" onClick={() => setTacticalPadOpen(false)}>‹ Back to Team Analysis</button>}
+      </div>
+      {moreMenu}
+    </header>
+  );
+  const pageStyle = {
+    minHeight: "calc(100vh - 80px)",
+    background: "linear-gradient(135deg,#062c63 0%,#063d74 100%)",
+    color: "#fff",
+    padding: "42px clamp(22px,5vw,72px) 70px",
+    boxSizing: "border-box",
+  };
+
+  if (tacticalPadOpen) {
+    return <main style={pageStyle}>
+      <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+        {pageHeader("Tactical Pad", "Set up a shape, move players and draw runs or passes.", true)}
+        <TacticalPad storageKey={`scoutpro-tactical-board:${user?.id || "anonymous"}`} homeTeamName={selectedTeamName} oppositionName={comparisonTeamName} />
+      </div>
+    </main>;
+  }
+
   return (
-    <main
-      style={{
-        minHeight: "calc(100vh - 80px)",
-        background: "linear-gradient(135deg,#062c63 0%,#063d74 100%)",
-        color: "#fff",
-        padding: "42px clamp(22px,5vw,72px) 70px",
-        boxSizing: "border-box",
-      }}
-    >
+    <main style={pageStyle}>
       <style>{`[data-old-metric-section]{display:none!important}[data-grouped-metrics]{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;order:3!important}[data-grouped-metrics] span{color:#fff!important}section[style*="order: 3"]{order:2!important}section[style*="order: 4"]{display:none!important}@media(max-width:800px){[data-grouped-metrics]{grid-template-columns:1fr}}`}</style>
       <div style={{ maxWidth: 1400, margin: "0 auto" }}>
-        <div style={{ color: "#6bd7fa", fontSize: 14, letterSpacing: 1 }}>
-          SCOUTPRO PLATFORM
-        </div>
-        <h1
-          style={{
-            margin: "10px 0",
-            fontSize: 48,
-            fontWeight: 800,
-            color: "#62dcff",
-            textTransform: "uppercase",
-            fontFamily: 'Impact,"Arial Narrow",sans-serif',
-          }}
-        >
-          Team Analysis
-        </h1>
-        <p style={{ color: "#d7e8f8", fontSize: 18 }}>
-          Upload league team data to compare performance across every available
-          playing metric.
-        </p>
+        {pageHeader("Team Analysis", "Upload league team data to compare performance across every available playing metric.")}
         <section
           style={{
             marginTop: 28,
