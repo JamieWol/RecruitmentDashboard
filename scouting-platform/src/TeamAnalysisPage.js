@@ -144,6 +144,53 @@ const freshTacticalBoard = (homeName = "Home Team", awayName = "Opposition") => 
   arrows: [],
 });
 
+const drawTacticalVideoFrame = (canvas, board) => {
+  if (!canvas) return;
+  const width = canvas.width;
+  const height = canvas.height;
+  const context = canvas.getContext("2d");
+  if (!context) return;
+  context.clearRect(0, 0, width, height);
+  context.save();
+  context.scale(width / 1000, height / 640);
+  context.fillStyle = "#24734e";
+  context.fillRect(12, 12, 976, 616);
+  context.strokeStyle = "#e8f4e9";
+  context.lineWidth = 3;
+  context.strokeRect(35, 35, 930, 570);
+  context.beginPath(); context.moveTo(500, 35); context.lineTo(500, 605); context.stroke();
+  context.beginPath(); context.arc(500, 320, 83, 0, Math.PI * 2); context.stroke();
+  context.fillStyle = "#e8f4e9";
+  [[500, 320], [145, 320], [855, 320]].forEach(([x, y]) => { context.beginPath(); context.arc(x, y, 4, 0, Math.PI * 2); context.fill(); });
+  context.strokeRect(35, 180, 150, 280); context.strokeRect(35, 245, 58, 150);
+  context.strokeRect(815, 180, 150, 280); context.strokeRect(907, 245, 58, 150);
+  context.beginPath(); context.arc(145, 320, 82, -0.83, 0.83); context.stroke();
+  context.beginPath(); context.arc(855, 320, 82, Math.PI - 0.83, Math.PI + 0.83); context.stroke();
+  context.fillStyle = "#fff";
+  context.font = "bold 24px Arial, sans-serif";
+  context.textAlign = "left";
+  context.fillText(board.homeName || "Home Team", 42, 76);
+  context.textAlign = "right";
+  context.fillText(board.awayName || "Opposition", 958, 76);
+  board.arrows.forEach((arrow) => {
+    const angle = Math.atan2(arrow.to.y - arrow.from.y, arrow.to.x - arrow.from.x);
+    context.strokeStyle = "#ffe36e"; context.fillStyle = "#ffe36e"; context.lineWidth = 6; context.lineCap = "round";
+    context.beginPath(); context.moveTo(arrow.from.x, arrow.from.y); context.lineTo(arrow.to.x, arrow.to.y); context.stroke();
+    context.beginPath(); context.moveTo(arrow.to.x, arrow.to.y);
+    context.lineTo(arrow.to.x - 20 * Math.cos(angle - Math.PI / 6), arrow.to.y - 20 * Math.sin(angle - Math.PI / 6));
+    context.lineTo(arrow.to.x - 20 * Math.cos(angle + Math.PI / 6), arrow.to.y - 20 * Math.sin(angle + Math.PI / 6));
+    context.closePath(); context.fill();
+  });
+  board.players.forEach((player) => {
+    context.beginPath(); context.arc(player.x, player.y + 3, 27, 0, Math.PI * 2); context.fillStyle = "#05223f70"; context.fill();
+    context.beginPath(); context.arc(player.x, player.y, 24, 0, Math.PI * 2); context.fillStyle = player.side === "home" ? "#1485dd" : "#e64b50"; context.fill();
+    context.strokeStyle = "#f3f8ff"; context.lineWidth = 3; context.stroke();
+    context.fillStyle = "#fff"; context.font = "bold 17px Arial, sans-serif"; context.textAlign = "center"; context.textBaseline = "middle";
+    context.fillText(String(player.number), player.x, player.y + 1);
+  });
+  context.restore();
+};
+
 function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const [board, setBoard] = useState(() => {
     try {
@@ -156,11 +203,28 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const [arrowStart, setArrowStart] = useState(null);
   const [arrowPreview, setArrowPreview] = useState(null);
   const [selectedToken, setSelectedToken] = useState(null);
+  const [videoRecording, setVideoRecording] = useState(false);
+  const [videoStatus, setVideoStatus] = useState("");
   const pitchRef = useRef(null);
+  const videoCanvasRef = useRef(null);
+  const boardRef = useRef(board);
+  const videoRecorderRef = useRef(null);
+  const videoChunksRef = useRef([]);
+  const videoFrameRef = useRef(null);
+
+  useEffect(() => { boardRef.current = board; }, [board]);
 
   useEffect(() => {
-    try { localStorage.setItem(storageKey, JSON.stringify(board)); } catch {}
+    const saveTimer = window.setTimeout(() => {
+      try { localStorage.setItem(storageKey, JSON.stringify(board)); } catch {}
+    }, 250);
+    return () => window.clearTimeout(saveTimer);
   }, [board, storageKey]);
+  useEffect(() => () => {
+    if (videoFrameRef.current) window.cancelAnimationFrame(videoFrameRef.current);
+    const recorder = videoRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") recorder.stop();
+  }, []);
 
   const pointFromEvent = (event) => {
     const rect = pitchRef.current?.getBoundingClientRect();
@@ -215,6 +279,58 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     setBoard((current) => ({ ...current, players: current.players.filter((player) => player.id !== selectedToken) }));
     setSelectedToken(null);
   };
+  const startVideoRecording = () => {
+    const canvas = videoCanvasRef.current;
+    if (!canvas?.captureStream || typeof MediaRecorder === "undefined") {
+      setVideoStatus("Video recording is not supported by this browser. Try Chrome, Edge, or Safari.");
+      return;
+    }
+    drawTacticalVideoFrame(canvas, boardRef.current);
+    const stream = canvas.captureStream(30);
+    const formats = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm", "video/mp4"];
+    const mimeType = formats.find((format) => MediaRecorder.isTypeSupported?.(format));
+    let recorder;
+    try {
+      recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+    } catch (recordError) {
+      stream.getTracks().forEach((track) => track.stop());
+      setVideoStatus(recordError?.message || "Could not start video recording in this browser.");
+      return;
+    }
+    videoChunksRef.current = [];
+    recorder.ondataavailable = (event) => { if (event.data?.size) videoChunksRef.current.push(event.data); };
+    recorder.onstop = () => {
+      const blob = new Blob(videoChunksRef.current, { type: recorder.mimeType || mimeType || "video/webm" });
+      if (blob.size) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        const extension = blob.type.includes("mp4") ? "mp4" : "webm";
+        const filename = (boardRef.current.name || "tactical-movement").trim().replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "tactical-movement";
+        link.href = url; link.download = `${filename}.${extension}`; link.click();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+        setVideoStatus("Video downloaded. Move the discs while recording to show the play.");
+      } else setVideoStatus("No video frames were recorded. Please try again.");
+      stream.getTracks().forEach((track) => track.stop());
+      videoRecorderRef.current = null;
+    };
+    recorder.onerror = () => setVideoStatus("Video recording stopped because of a browser error.");
+    videoRecorderRef.current = recorder;
+    recorder.start(250);
+    setVideoRecording(true);
+    setVideoStatus("Recording. Move the discs to show the play, then stop and download.");
+    const drawFrame = () => {
+      drawTacticalVideoFrame(videoCanvasRef.current, boardRef.current);
+      videoFrameRef.current = window.requestAnimationFrame(drawFrame);
+    };
+    videoFrameRef.current = window.requestAnimationFrame(drawFrame);
+  };
+  const stopVideoRecording = () => {
+    const recorder = videoRecorderRef.current;
+    if (videoFrameRef.current) window.cancelAnimationFrame(videoFrameRef.current);
+    videoFrameRef.current = null;
+    setVideoRecording(false);
+    if (recorder && recorder.state !== "inactive") recorder.stop();
+  };
 
   return (
     <section className="sr-tactical-pad">
@@ -232,8 +348,11 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
           <button type="button" onClick={removeSelectedPlayer} disabled={!selectedToken}>Remove selected</button>
           <button type="button" onClick={() => setBoard((current) => ({ ...current, arrows: [] }))} disabled={!board.arrows.length}>Clear arrows</button>
           <button type="button" onClick={() => { setBoard(freshTacticalBoard(homeTeamName, oppositionName)); setSelectedToken(null); }}>Reset pitch</button>
+          <button type="button" className={videoRecording ? "sr-tactical-recording" : "sr-tactical-video"} onClick={videoRecording ? stopVideoRecording : startVideoRecording}>{videoRecording ? "Stop & download video" : "Record video"}</button>
         </div>
       </div>
+      {videoStatus && <p className="sr-tactical-video-status" role="status">{videoStatus}</p>}
+      <canvas ref={videoCanvasRef} width="1280" height="819" className="sr-tactical-video-canvas" aria-hidden="true" />
 
       <div className={`sr-tactical-pitch-wrap ${mode === "arrow" ? "drawing" : "moving"}`}>
         <svg ref={pitchRef} className="sr-tactical-pitch" viewBox="0 0 1000 640" role="img" aria-label="Tactical football pitch. Drag the discs to position players." onPointerDown={handlePitchPointerDown} onPointerMove={handlePitchPointerMove} onPointerUp={handlePitchPointerUp} onPointerCancel={handlePitchPointerUp}>
