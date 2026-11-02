@@ -183,8 +183,9 @@ const drawTacticalVideoFrame = (canvas, board) => {
   });
   board.players.forEach((player) => {
     context.beginPath(); context.arc(player.x, player.y + 3, 27, 0, Math.PI * 2); context.fillStyle = "#05223f70"; context.fill();
-    context.beginPath(); context.arc(player.x, player.y, 24, 0, Math.PI * 2); context.fillStyle = player.side === "home" ? "#1485dd" : "#e64b50"; context.fill();
-    context.strokeStyle = "#f3f8ff"; context.lineWidth = 3; context.stroke();
+    context.beginPath(); context.arc(player.x, player.y, 24, 0, Math.PI * 2); context.fillStyle = player.side === "home" ? "#1485dd" : "#e64b50";
+    context.shadowColor = player.moving ? "#ffe36e" : "transparent"; context.shadowBlur = player.moving ? 22 : 0; context.fill(); context.shadowBlur = 0;
+    context.strokeStyle = player.moving ? "#ffe36e" : "#f3f8ff"; context.lineWidth = player.moving ? 5 : 3; context.stroke();
     context.fillStyle = "#fff"; context.font = "bold 17px Arial, sans-serif"; context.textAlign = "center"; context.textBaseline = "middle";
     context.fillText(String(player.number), player.x, player.y + 1);
   });
@@ -208,11 +209,51 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const pitchRef = useRef(null);
   const videoCanvasRef = useRef(null);
   const boardRef = useRef(board);
+  const videoBoardRef = useRef(board);
+  const videoTransitionsRef = useRef(new Map());
+  const dragTargetRef = useRef(null);
   const videoRecorderRef = useRef(null);
   const videoChunksRef = useRef([]);
   const videoFrameRef = useRef(null);
 
   useEffect(() => { boardRef.current = board; }, [board]);
+  useEffect(() => {
+    if (!videoRecording) return;
+    const current = videoBoardRef.current;
+    videoBoardRef.current = {
+      ...current,
+      name: board.name,
+      homeName: board.homeName,
+      awayName: board.awayName,
+      arrows: board.arrows,
+      players: board.players.map((player) => {
+        const existing = current.players.find((item) => item.id === player.id);
+        return existing ? { ...existing, number: player.number, side: player.side } : { ...player };
+      }),
+    };
+  }, [board, videoRecording]);
+
+  const getVideoFrameBoard = (now = performance.now()) => {
+    const transitions = videoTransitionsRef.current;
+    const players = videoBoardRef.current.players.map((player) => {
+      const transition = transitions.get(player.id);
+      if (!transition) return { ...player, moving: false };
+      const progress = Math.min(1, Math.max(0, (now - transition.startedAt) / transition.duration));
+      const eased = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+      const position = {
+        x: transition.from.x + (transition.to.x - transition.from.x) * eased,
+        y: transition.from.y + (transition.to.y - transition.from.y) * eased,
+      };
+      if (progress >= 1) {
+        transitions.delete(player.id);
+        return { ...player, ...transition.to, moving: false };
+      }
+      return { ...player, ...position, moving: true };
+    });
+    const frameBoard = { ...videoBoardRef.current, players };
+    videoBoardRef.current = frameBoard;
+    return frameBoard;
+  };
 
   useEffect(() => {
     const saveTimer = window.setTimeout(() => {
@@ -238,6 +279,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     if (mode !== "move") return;
     event.stopPropagation();
     event.currentTarget.setPointerCapture?.(event.pointerId);
+    dragTargetRef.current = { x: player.x, y: player.y };
     setDraggingId(player.id);
     setSelectedToken(player.id);
   };
@@ -251,11 +293,17 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const handlePitchPointerMove = (event) => {
     const point = pointFromEvent(event);
     if (draggingId) {
+      dragTargetRef.current = point;
       setBoard((current) => ({ ...current, players: current.players.map((player) => player.id === draggingId ? { ...player, ...point } : player) }));
     }
     if (arrowStart) setArrowPreview(point);
   };
   const handlePitchPointerUp = (event) => {
+    if (draggingId) {
+      const finalPoint = pointFromEvent(event);
+      dragTargetRef.current = finalPoint;
+      setBoard((current) => ({ ...current, players: current.players.map((player) => player.id === draggingId ? { ...player, ...finalPoint } : player) }));
+    }
     if (arrowStart) {
       const end = pointFromEvent(event);
       const distance = Math.hypot(end.x - arrowStart.x, end.y - arrowStart.y);
@@ -263,6 +311,17 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       setArrowStart(null);
       setArrowPreview(null);
     }
+    if (draggingId && videoRecording && dragTargetRef.current) {
+      const frameBoard = getVideoFrameBoard();
+      const player = frameBoard.players.find((item) => item.id === draggingId);
+      if (player) videoTransitionsRef.current.set(draggingId, {
+        from: { x: player.x, y: player.y },
+        to: { ...dragTargetRef.current },
+        startedAt: performance.now(),
+        duration: 900,
+      });
+    }
+    dragTargetRef.current = null;
     setDraggingId(null);
   };
   const addPlayer = (side) => {
@@ -286,6 +345,8 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       return;
     }
     drawTacticalVideoFrame(canvas, boardRef.current);
+    videoBoardRef.current = JSON.parse(JSON.stringify(boardRef.current));
+    videoTransitionsRef.current.clear();
     const stream = canvas.captureStream(30);
     const formats = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm", "video/mp4"];
     const mimeType = formats.find((format) => MediaRecorder.isTypeSupported?.(format));
@@ -317,9 +378,9 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     videoRecorderRef.current = recorder;
     recorder.start(250);
     setVideoRecording(true);
-    setVideoStatus("Recording. Move the discs to show the play, then stop and download.");
+    setVideoStatus("Recording. Drag and release each disc; it will glide to its new position in the video.");
     const drawFrame = () => {
-      drawTacticalVideoFrame(videoCanvasRef.current, boardRef.current);
+      drawTacticalVideoFrame(videoCanvasRef.current, getVideoFrameBoard());
       videoFrameRef.current = window.requestAnimationFrame(drawFrame);
     };
     videoFrameRef.current = window.requestAnimationFrame(drawFrame);
@@ -379,13 +440,14 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
           </g>)}
         </svg>
       </div>
-      <div className="sr-tactical-legend"><span><i className="home" />{board.homeName}</span><span><i className="away" />{board.awayName}</span><small>Drag discs to move players. Select a disc, then remove it if needed. Draw arrows to show runs or passes. This board saves automatically on this device.</small></div>
+      <div className="sr-tactical-legend"><span><i className="home" />{board.homeName}</span><span><i className="away" />{board.awayName}</span><small>Drag discs to position players. While recording, release each disc to show a smooth, glowing transition. Draw arrows for runs or passes. The board saves automatically on this device.</small></div>
     </section>
   );
 }
 
 export default function TeamAnalysisPage() {
   const { user, loading: authLoading } = useAuth();
+  const tacticalViewStorageKey = `scoutpro-team-analysis-view:${user?.id || "anonymous"}`;
   const [rows, setRows] = useState([]);
   const [selectedTeam, setSelectedTeam] = useState("");
   const [comparisonTeam, setComparisonTeam] = useState("");
@@ -396,10 +458,22 @@ export default function TeamAnalysisPage() {
   const [dataStorageKey, setDataStorageKey] = useState("");
   const [isRestoring, setIsRestoring] = useState(true);
   const [moreOpen, setMoreOpen] = useState(false);
-  const [tacticalPadOpen, setTacticalPadOpen] = useState(false);
+  const [tacticalPadOpen, setTacticalPadOpen] = useState(() => {
+    try { return localStorage.getItem(tacticalViewStorageKey) === "tactical-pad"; } catch { return false; }
+  });
+  const tacticalViewOwner = useRef(tacticalViewStorageKey);
   const dashboardRef = useRef(null);
   const hydrated = useRef(false);
   const storageKey = `scoutpro-team-analysis-uploaded-data:${user?.id || "anonymous"}`;
+
+  useEffect(() => {
+    if (tacticalViewOwner.current !== tacticalViewStorageKey) {
+      tacticalViewOwner.current = tacticalViewStorageKey;
+      try { setTacticalPadOpen(localStorage.getItem(tacticalViewStorageKey) === "tactical-pad"); } catch { setTacticalPadOpen(false); }
+      return;
+    }
+    try { localStorage.setItem(tacticalViewStorageKey, tacticalPadOpen ? "tactical-pad" : "dashboard"); } catch {}
+  }, [tacticalPadOpen, tacticalViewStorageKey]);
 
   useEffect(() => {
     hydrated.current = false;
