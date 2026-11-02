@@ -485,8 +485,8 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     if (!recorder || recorder.state === "inactive" || finishingVideo) return;
     const initial = videoBoardRef.current;
     const final = boardRef.current;
-    const startedAt = performance.now() + 350;
-    const duration = 1300;
+    const startedAt = performance.now() + 450;
+    const duration = 2000;
     let movements = 0;
     videoTransitionsRef.current.clear();
     final.players.forEach((player) => {
@@ -511,7 +511,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       setVideoRecording(false);
       setFinishingVideo(false);
       if (recorder.state !== "inactive") recorder.stop();
-    }, movements ? 2350 : 700);
+    }, movements ? 3050 : 700);
   };
 
   return (
