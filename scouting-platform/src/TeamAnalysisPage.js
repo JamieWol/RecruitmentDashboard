@@ -382,18 +382,20 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     if (draggingIds.length && dragStartRef.current) {
       const finalPoint = pointFromEvent(event);
       const delta = { x: finalPoint.x - dragStartRef.current.pointer.x, y: finalPoint.y - dragStartRef.current.pointer.y };
-      dragTargetsRef.current = Object.fromEntries(draggingIds.map((id) => [id, {
+      const finalTargets = Object.fromEntries(draggingIds.map((id) => [id, {
         x: Math.max(24, Math.min(976, dragStartRef.current.positions[id].x + delta.x)),
         y: Math.max(24, Math.min(616, dragStartRef.current.positions[id].y + delta.y)),
       }]));
-      setBoard((current) => ({ ...current, players: current.players.map((player) => dragTargetsRef.current[player.id] ? { ...player, ...dragTargetsRef.current[player.id] } : player) }));
+      dragTargetsRef.current = finalTargets;
+      setBoard((current) => ({ ...current, players: current.players.map((player) => finalTargets[player.id] ? { ...player, ...finalTargets[player.id] } : player) }));
     }
     if (draggingBall && dragStartRef.current) {
       const finalPoint = pointFromEvent(event);
       const origin = dragStartRef.current.positions["tactical-ball"];
       const delta = { x: finalPoint.x - dragStartRef.current.pointer.x, y: finalPoint.y - dragStartRef.current.pointer.y };
-      ballDragTargetRef.current = { x: Math.max(24, Math.min(976, origin.x + delta.x)), y: Math.max(24, Math.min(616, origin.y + delta.y)) };
-      setBoard((current) => ({ ...current, ball: ballDragTargetRef.current }));
+      const finalBall = { x: Math.max(24, Math.min(976, origin.x + delta.x)), y: Math.max(24, Math.min(616, origin.y + delta.y)) };
+      ballDragTargetRef.current = finalBall;
+      setBoard((current) => ({ ...current, ball: finalBall }));
     }
     if (arrowStart) {
       const end = pointFromEvent(event);
