@@ -277,7 +277,7 @@ header{z-index:1000!important}.sr-page{position:relative;z-index:1}.sr-pitch{z-i
 .sr-tactical-arrow{stroke:#ffe36e;stroke-width:6;stroke-linecap:round;pointer-events:stroke;cursor:pointer}
 .sr-tactical-arrow.selected{stroke-width:9;stroke-dasharray:11 7}
 .sr-tactical-arrow-preview{stroke-dasharray:12 9;opacity:.8}
-.sr-tactical-shape{cursor:pointer}
+.sr-tactical-shape{cursor:grab;touch-action:none}.sr-tactical-shape:active{cursor:grabbing}
 .sr-tactical-shape.selected{stroke:#ffe36e;stroke-opacity:1;stroke-dasharray:9 6}
 .sr-tactical-shape-preview{pointer-events:none;stroke-dasharray:8 6}
 .sr-tactical-shape.entering{transform-box:fill-box;transform-origin:center;animation:sr-tactical-shape-enter 420ms cubic-bezier(.2,.8,.2,1) both}

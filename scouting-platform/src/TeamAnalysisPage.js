@@ -166,6 +166,39 @@ const pointAlongPath = (points, progress, start, end) => {
   }
   return { ...end };
 };
+const interpolateTacticalShapes = (fromShapes = [], toShapes = [], progress = 0) => {
+  const fromById = new Map(fromShapes.map((shape) => [shape.id, shape]));
+  const toById = new Map(toShapes.map((shape) => [shape.id, shape]));
+  const ids = new Set([...fromById.keys(), ...toById.keys()]);
+  return [...ids].map((id) => {
+    const from = fromById.get(id);
+    const to = toById.get(id);
+    if (from && to) {
+      return {
+        ...to,
+        x: from.x + (to.x - from.x) * progress,
+        y: from.y + (to.y - from.y) * progress,
+        width: from.width + (to.width - from.width) * progress,
+        height: from.height + (to.height - from.height) * progress,
+        opacity: (from.opacity ?? (from.type === "text" ? 0.85 : 0.35)) + ((to.opacity ?? (to.type === "text" ? 0.85 : 0.35)) - (from.opacity ?? (from.type === "text" ? 0.85 : 0.35))) * progress,
+        _playbackOpacity: 1,
+      };
+    }
+    const shape = to || from;
+    const appearing = Boolean(to);
+    const amount = appearing ? progress : 1 - progress;
+    const width = Math.max(0.01, shape.width * amount);
+    const height = Math.max(0.01, shape.height * amount);
+    return {
+      ...shape,
+      x: shape.x + (shape.width - width) / 2,
+      y: shape.y + (shape.height - height) / 2,
+      width,
+      height,
+      _playbackOpacity: amount,
+    };
+  });
+};
 
 function TacticalToolIcon({ type }) {
   const common = { fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round" };
@@ -206,7 +239,8 @@ const drawTacticalVideoFrame = (canvas, board) => {
   context.beginPath(); context.arc(855, 320, 82, Math.PI - 0.83, Math.PI + 0.83); context.stroke();
   (board.shapes || []).forEach((shape) => {
     const opacity = Number(shape.opacity);
-    context.globalAlpha = Math.max(0, Math.min(1, Number.isFinite(opacity) ? opacity : 0.35));
+    const baseOpacity = Math.max(0, Math.min(1, Number.isFinite(opacity) ? opacity : 0.35));
+    context.globalAlpha = baseOpacity * (shape._playbackOpacity ?? 1);
     context.fillStyle = shape.type === "text" ? "#0c3769" : shape.color || "#62dcff";
     context.strokeStyle = shape.color || "#62dcff";
     context.lineWidth = 3;
@@ -220,7 +254,7 @@ const drawTacticalVideoFrame = (canvas, board) => {
       context.fillRect(shape.x, shape.y, shape.width, shape.height);
       context.strokeRect(shape.x, shape.y, shape.width, shape.height);
       if (shape.type === "text") {
-        context.globalAlpha = 1;
+        context.globalAlpha = shape._playbackOpacity ?? 1;
         context.fillStyle = "#fff";
         context.font = "bold 22px Arial, sans-serif";
         context.textAlign = "left";
@@ -273,6 +307,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const [mode, setMode] = useState("move");
   const [draggingIds, setDraggingIds] = useState([]);
   const [draggingBall, setDraggingBall] = useState(false);
+  const [draggingShapeId, setDraggingShapeId] = useState(null);
   const [multiSelectMode, setMultiSelectMode] = useState(false);
   const [arrowStart, setArrowStart] = useState(null);
   const [arrowPreview, setArrowPreview] = useState(null);
@@ -367,6 +402,16 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     dragStartRef.current = { pointer: point, positions: { "tactical-ball": { x: ball.x, y: ball.y } } };
     setDraggingBall(true);
   };
+  const beginShapeDrag = (event, shape) => {
+    if (mode !== "move" || finishingVideo) return;
+    event.stopPropagation();
+    pitchRef.current?.setPointerCapture?.(event.pointerId);
+    const point = pointFromEvent(event);
+    dragStartRef.current = { pointer: point, positions: { [shape.id]: { x: shape.x, y: shape.y } } };
+    setDraggingShapeId(shape.id);
+    setSelectedShapeId(shape.id);
+    setSelectedArrowId(null);
+  };
   const handlePitchPointerDown = (event) => {
     if (!(["arrow", "rectangle", "square", "circle", "triangle", "line", "text"].includes(mode)) || finishingVideo) return;
     pitchRef.current?.setPointerCapture?.(event.pointerId);
@@ -399,6 +444,12 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       }
       setBoard((current) => ({ ...current, ball: target }));
     }
+    if (draggingShapeId && dragStartRef.current) {
+      const origin = dragStartRef.current.positions[draggingShapeId];
+      const delta = { x: point.x - dragStartRef.current.pointer.x, y: point.y - dragStartRef.current.pointer.y };
+      const target = { x: Math.max(0, Math.min(1000, origin.x + delta.x)), y: Math.max(0, Math.min(640, origin.y + delta.y)) };
+      setBoard((current) => ({ ...current, shapes: (current.shapes || []).map((shape) => shape.id === draggingShapeId ? { ...shape, ...target } : shape) }));
+    }
     if (arrowStart) setArrowPreview(point);
   };
   const handlePitchPointerUp = (event) => {
@@ -424,6 +475,13 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
         if (!last || Math.hypot(finalBall.x - last.x, finalBall.y - last.y) > 0.5) path.push({ ...finalBall });
       }
       setBoard((current) => ({ ...current, ball: finalBall }));
+    }
+    if (draggingShapeId && dragStartRef.current) {
+      const finalPoint = pointFromEvent(event);
+      const origin = dragStartRef.current.positions[draggingShapeId];
+      const delta = { x: finalPoint.x - dragStartRef.current.pointer.x, y: finalPoint.y - dragStartRef.current.pointer.y };
+      const finalPosition = { x: Math.max(0, Math.min(1000, origin.x + delta.x)), y: Math.max(0, Math.min(640, origin.y + delta.y)) };
+      setBoard((current) => ({ ...current, shapes: (current.shapes || []).map((shape) => shape.id === draggingShapeId ? { ...shape, ...finalPosition } : shape) }));
     }
     if (arrowStart) {
       const end = pointFromEvent(event);
@@ -458,6 +516,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     ballDragTargetRef.current = null;
     setDraggingIds([]);
     setDraggingBall(false);
+    setDraggingShapeId(null);
   };
   const addPlayer = (side) => {
     setBoard((current) => {
@@ -500,13 +559,21 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       const origin = from.players.find((item) => item.id === player.id);
       return origin && Math.hypot(player.x - origin.x, player.y - origin.y) > 2;
     }).length;
+    const fromShapes = from.shapes || [];
+    const toShapes = to.shapes || [];
+    const movedShapes = new Set([...fromShapes, ...toShapes].filter((shape, index, all) => all.findIndex((item) => item.id === shape.id) === index).filter((shape) => {
+      const origin = fromShapes.find((item) => item.id === shape.id);
+      const destination = toShapes.find((item) => item.id === shape.id);
+      if (!origin || !destination) return true;
+      return Math.max(Math.abs(destination.x - origin.x), Math.abs(destination.y - origin.y), Math.abs(destination.width - origin.width), Math.abs(destination.height - origin.height)) > 2;
+    })).size;
     const fromBall = from.ball || { x: 500, y: 320 };
     const toBall = to.ball || { x: 500, y: 320 };
     const ballPath = [...(activeClipBallPathRef.current.length ? activeClipBallPathRef.current : [fromBall])];
     const lastPathPoint = ballPath[ballPath.length - 1];
     if (!lastPathPoint || Math.hypot(toBall.x - lastPathPoint.x, toBall.y - lastPathPoint.y) > 0.5) ballPath.push({ ...toBall });
     const ballMoved = pathLength(ballPath) > 2 || Math.hypot(toBall.x - fromBall.x, toBall.y - fromBall.y) > 2;
-    const movedCount = movedPlayers + (ballMoved ? 1 : 0);
+    const movedCount = movedPlayers + (ballMoved ? 1 : 0) + movedShapes;
     if (!movedCount) {
       setVideoStatus("No movement recorded yet. Move at least one disc or the ball, then save this clip.");
       return;
@@ -543,13 +610,14 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       const fromBall = clip.from.ball || { x: 500, y: 320 };
       const toBall = clip.to.ball || { x: 500, y: 320 };
       const ball = pointAlongPath(clip.ballPath, eased, fromBall, toBall);
+      const shapes = interpolateTacticalShapes(clip.from.shapes || [], clip.to.shapes || [], eased);
       setPlaybackBoard({
         ...clip.to,
         name: boardRef.current.name,
         homeName: boardRef.current.homeName,
         awayName: boardRef.current.awayName,
         arrows: boardRef.current.arrows,
-        shapes: boardRef.current.shapes,
+        shapes,
         players,
         ball,
       });
@@ -647,13 +715,14 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       const startBall = clip.from.ball || { x: 500, y: 320 };
       const endBall = clip.to.ball || { x: 500, y: 320 };
       const ball = pointAlongPath(clip.ballPath, eased, startBall, endBall);
+      const shapes = interpolateTacticalShapes(clip.from.shapes || [], clip.to.shapes || [], eased);
       const frameBoard = {
         ...clip.to,
         name: boardRef.current.name,
         homeName: boardRef.current.homeName,
         awayName: boardRef.current.awayName,
         arrows: boardRef.current.arrows,
-        shapes: boardRef.current.shapes,
+        shapes,
         players,
         ball,
       };
@@ -691,14 +760,15 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
           <circle cx="145" cy="320" r="4" className="sr-tactical-mark" />
           <circle cx="855" cy="320" r="4" className="sr-tactical-mark" />
           <path d="M35 55 A20 20 0 0 0 55 35 M945 35 A20 20 0 0 0 965 55 M35 585 A20 20 0 0 1 55 605 M945 605 A20 20 0 0 1 965 585" className="sr-tactical-line" />
-          {(board.shapes || []).map((shape) => {
+          {(displayedBoard.shapes || []).map((shape) => {
             const selected = selectedShapeId === shape.id;
             const entering = enteringGraphicIds.includes(shape.id);
             const graphicClass = `sr-tactical-shape ${selected ? "selected" : ""} ${entering ? "entering" : ""}`;
             const graphicEvents = {
               className: graphicClass,
+              style: { opacity: shape._playbackOpacity ?? 1 },
               onAnimationEnd: () => finishGraphicEntering(shape.id),
-              onPointerDown: (event) => { if (mode === "move" || (mode === "text" && shape.type === "text")) { event.stopPropagation(); setSelectedShapeId(shape.id); setSelectedArrowId(null); } },
+              onPointerDown: (event) => beginShapeDrag(event, shape),
             };
             const fill = shape.color || "#62dcff";
             const opacity = shape.opacity ?? 0.35;
