@@ -997,7 +997,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       <canvas ref={videoCanvasRef} width="1280" height="819" className="sr-tactical-video-canvas" aria-hidden="true" />
 
       <div className={`sr-tactical-pitch-wrap ${mode === "arrow" ? "drawing" : "moving"} ${pitchViewMode !== "full" ? "portrait" : "landscape"}`}>
-        <svg ref={pitchRef} className="sr-tactical-pitch" style={{ aspectRatio: pitchViewMode === "full" ? "25 / 16" : "16 / 25" }} viewBox={pitchViewMode === "full" ? "0 0 1000 640" : "0 0 640 1000"} role="img" aria-label={`${pitchViewMode === "full" ? "Full" : pitchViewMode === "half" ? "Portrait half" : "18-yard box"} tactical football pitch. Drag the discs to position players.`} onPointerDown={handlePitchPointerDown} onPointerMove={handlePitchPointerMove} onPointerUp={handlePitchPointerUp} onPointerCancel={handlePitchPointerUp}>
+        <svg ref={pitchRef} className="sr-tactical-pitch" preserveAspectRatio="none" style={{ aspectRatio: pitchViewMode === "full" ? "25 / 16" : "3 / 4" }} viewBox={pitchViewMode === "full" ? "0 0 1000 640" : "0 0 640 1000"} role="img" aria-label={`${pitchViewMode === "full" ? "Full" : pitchViewMode === "half" ? "Portrait half" : "18-yard box"} tactical football pitch. Drag the discs to position players.`} onPointerDown={handlePitchPointerDown} onPointerMove={handlePitchPointerMove} onPointerUp={handlePitchPointerUp} onPointerCancel={handlePitchPointerUp}>
           <defs>{(displayedBoard.arrows || []).map((arrow) => <marker key={`head-${arrow.id}`} id={`sr-tactical-arrowhead-${arrow.id}`} markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill={arrow.color || "#ffe36e"} fillOpacity={arrow.opacity ?? 1} /></marker>)}<marker id="sr-tactical-arrowhead-preview" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill={newShapeColour} /></marker></defs>
           {pitchViewMode === "full" ? <>
             <rect x="12" y="12" width="976" height="616" rx="7" className="sr-tactical-grass" />
@@ -1017,9 +1017,9 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
             <rect x="12" y="12" width="616" height="976" rx="7" className="sr-tactical-grass" />
               {pitchViewMode === "half" ? <>
               <rect x="35" y="35" width="570" height="930" className="sr-tactical-line" />
-              <line x1="35" y1="500" x2="605" y2="500" className="sr-tactical-line" />
-              <circle cx="320" cy="500" r="83" className="sr-tactical-line" />
-              <circle cx="320" cy="500" r="4" className="sr-tactical-mark" />
+              <line x1="35" y1="470" x2="605" y2="470" className="sr-tactical-line" />
+              <circle cx="320" cy="470" r="83" className="sr-tactical-line" />
+              <circle cx="320" cy="470" r="4" className="sr-tactical-mark" />
               <rect x="180" y="35" width="280" height="150" className="sr-tactical-line" />
               <rect x="245" y="35" width="150" height="58" className="sr-tactical-line" />
               <path d="M250 185 A82 82 0 0 0 390 185" className="sr-tactical-line" />
