@@ -347,6 +347,7 @@ const drawTacticalVideoFrame = (canvas, board) => {
 };
 
 function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
+  const clipStorageKey = `${storageKey}:movement-clips`;
   const [board, setBoard] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(storageKey) || "null");
@@ -375,7 +376,12 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const [newTextColor, setNewTextColor] = useState("#ffffff");
   const [newTextBoxColor, setNewTextBoxColor] = useState("#0c3769");
   const [dockPanel, setDockPanel] = useState("shapes");
-  const [movementClips, setMovementClips] = useState([]);
+  const [movementClips, setMovementClips] = useState(() => {
+    try {
+      const savedClips = JSON.parse(localStorage.getItem(clipStorageKey) || "[]");
+      return Array.isArray(savedClips) ? savedClips : [];
+    } catch { return []; }
+  });
   const [activeClipStart, setActiveClipStart] = useState(null);
   const [videoRecording, setVideoRecording] = useState(false);
   const [finishingVideo, setFinishingVideo] = useState(false);
@@ -408,6 +414,9 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     }, 250);
     return () => window.clearTimeout(saveTimer);
   }, [board, storageKey]);
+  useEffect(() => {
+    try { localStorage.setItem(clipStorageKey, JSON.stringify(movementClips)); } catch {}
+  }, [movementClips, clipStorageKey]);
   useEffect(() => () => {
     if (videoFrameRef.current) window.cancelAnimationFrame(videoFrameRef.current);
     if (clipPreviewFrameRef.current) window.cancelAnimationFrame(clipPreviewFrameRef.current);
