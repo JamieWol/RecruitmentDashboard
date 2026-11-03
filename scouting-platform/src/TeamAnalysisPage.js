@@ -201,6 +201,31 @@ const interpolateTacticalShapes = (fromShapes = [], toShapes = [], progress = 0)
     };
   });
 };
+const interpolateTacticalArrows = (fromArrows = [], toArrows = [], progress = 0) => {
+  const fromById = new Map(fromArrows.map((arrow) => [arrow.id, arrow]));
+  const toById = new Map(toArrows.map((arrow) => [arrow.id, arrow]));
+  const ids = new Set([...fromById.keys(), ...toById.keys()]);
+  return [...ids].map((id) => {
+    const from = fromById.get(id);
+    const to = toById.get(id);
+    if (from && to) {
+      return {
+        ...to,
+        from: { x: from.from.x + (to.from.x - from.from.x) * progress, y: from.from.y + (to.from.y - from.from.y) * progress },
+        to: { x: from.to.x + (to.to.x - from.to.x) * progress, y: from.to.y + (to.to.y - from.to.y) * progress },
+        opacity: (from.opacity ?? 1) + ((to.opacity ?? 1) - (from.opacity ?? 1)) * progress,
+        strokeWidth: (from.strokeWidth || 6) + ((to.strokeWidth || 6) - (from.strokeWidth || 6)) * progress,
+      };
+    }
+    const arrow = to || from;
+    const amount = to ? progress : 1 - progress;
+    return {
+      ...arrow,
+      to: { x: arrow.from.x + (arrow.to.x - arrow.from.x) * amount, y: arrow.from.y + (arrow.to.y - arrow.from.y) * amount },
+      opacity: (arrow.opacity ?? 1) * amount,
+    };
+  });
+};
 const resizeTacticalShape = (shape, corner, delta) => {
   const minSize = 24;
   let left = shape.x;
@@ -294,6 +319,7 @@ const drawTacticalVideoFrame = (canvas, board) => {
   context.fillText(board.awayName || "Opposition", 958, 76);
   (board.arrows || []).forEach((arrow) => {
     const angle = Math.atan2(arrow.to.y - arrow.from.y, arrow.to.x - arrow.from.x);
+    context.setLineDash(arrow.lineStyle === "dashed" ? [14, 9] : arrow.lineStyle === "dotted" ? [2, 8] : []);
     context.globalAlpha = arrow.opacity ?? 1;
     context.strokeStyle = arrow.color || "#ffe36e"; context.fillStyle = arrow.color || "#ffe36e"; context.lineWidth = Number(arrow.strokeWidth) || 6; context.lineCap = "round";
     context.beginPath(); context.moveTo(arrow.from.x, arrow.from.y); context.lineTo(arrow.to.x, arrow.to.y); context.stroke();
@@ -303,6 +329,7 @@ const drawTacticalVideoFrame = (canvas, board) => {
     context.closePath(); context.fill();
     context.globalAlpha = 1;
   });
+  context.setLineDash([]);
   board.players.forEach((player) => {
     context.beginPath(); context.arc(player.x, player.y + 3, 27, 0, Math.PI * 2); context.fillStyle = "#05223f70"; context.fill();
     context.beginPath(); context.arc(player.x, player.y, 24, 0, Math.PI * 2); context.fillStyle = player.side === "home" ? "#1485dd" : "#e64b50";
@@ -344,6 +371,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const [newShapeOpacity, setNewShapeOpacity] = useState(0.35);
   const [newShapeColour, setNewShapeColour] = useState("#62dcff");
   const [newShapeStrokeWidth, setNewShapeStrokeWidth] = useState(4);
+  const [newArrowLineStyle, setNewArrowLineStyle] = useState("solid");
   const [newTextColor, setNewTextColor] = useState("#ffffff");
   const [newTextBoxColor, setNewTextBoxColor] = useState("#0c3769");
   const [dockPanel, setDockPanel] = useState("shapes");
@@ -560,7 +588,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       const end = pointFromEvent(event);
       const distance = Math.hypot(end.x - arrowStart.x, end.y - arrowStart.y);
       if (distance > 12 && mode === "arrow") {
-        const newArrow = { id: `arrow-${Date.now()}`, from: arrowStart, to: end, color: newShapeColour, opacity: newShapeOpacity, strokeWidth: newShapeStrokeWidth };
+        const newArrow = { id: `arrow-${Date.now()}`, from: arrowStart, to: end, color: newShapeColour, opacity: newShapeOpacity, strokeWidth: newShapeStrokeWidth, lineStyle: newArrowLineStyle };
         setBoard((current) => ({ ...current, arrows: [...current.arrows, newArrow] }));
         markGraphicEntering(newArrow.id);
         setSelectedArrowId(newArrow.id);
@@ -693,13 +721,21 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       if (!origin || !destination) return true;
       return Math.max(Math.abs(destination.x - origin.x), Math.abs(destination.y - origin.y), Math.abs(destination.width - origin.width), Math.abs(destination.height - origin.height)) > 2;
     })).size;
+    const fromArrows = from.arrows || [];
+    const toArrows = to.arrows || [];
+    const movedArrows = new Set([...fromArrows, ...toArrows].filter((arrow, index, all) => all.findIndex((item) => item.id === arrow.id) === index).filter((arrow) => {
+      const origin = fromArrows.find((item) => item.id === arrow.id);
+      const destination = toArrows.find((item) => item.id === arrow.id);
+      if (!origin || !destination) return true;
+      return Math.max(Math.abs(destination.from.x - origin.from.x), Math.abs(destination.from.y - origin.from.y), Math.abs(destination.to.x - origin.to.x), Math.abs(destination.to.y - origin.to.y), Math.abs((destination.strokeWidth || 6) - (origin.strokeWidth || 6))) > 2 || destination.lineStyle !== origin.lineStyle || destination.color !== origin.color;
+    })).size;
     const fromBall = from.ball || { x: 500, y: 320 };
     const toBall = to.ball || { x: 500, y: 320 };
     const ballPath = [...(activeClipBallPathRef.current.length ? activeClipBallPathRef.current : [fromBall])];
     const lastPathPoint = ballPath[ballPath.length - 1];
     if (!lastPathPoint || Math.hypot(toBall.x - lastPathPoint.x, toBall.y - lastPathPoint.y) > 0.5) ballPath.push({ ...toBall });
     const ballMoved = pathLength(ballPath) > 2 || Math.hypot(toBall.x - fromBall.x, toBall.y - fromBall.y) > 2;
-    const movedCount = movedPlayers + (ballMoved ? 1 : 0) + movedShapes;
+    const movedCount = movedPlayers + (ballMoved ? 1 : 0) + movedShapes + movedArrows;
     if (!movedCount) {
       setVideoStatus("No movement recorded yet. Move at least one disc or the ball, then save this clip.");
       return;
@@ -737,12 +773,13 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       const toBall = clip.to.ball || { x: 500, y: 320 };
       const ball = pointAlongPath(clip.ballPath, eased, fromBall, toBall);
       const shapes = interpolateTacticalShapes(clip.from.shapes || [], clip.to.shapes || [], eased);
+      const arrows = interpolateTacticalArrows(clip.from.arrows || [], clip.to.arrows || [], eased);
       setPlaybackBoard({
         ...clip.to,
         name: boardRef.current.name,
         homeName: boardRef.current.homeName,
         awayName: boardRef.current.awayName,
-        arrows: boardRef.current.arrows,
+        arrows,
         shapes,
         players,
         ball,
@@ -818,7 +855,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       const elapsed = Math.max(0, now - startedAt);
       if (elapsed >= timelineDuration) {
         const lastBoard = clips[clips.length - 1].to;
-        const finalFrame = { ...lastBoard, name: boardRef.current.name, homeName: boardRef.current.homeName, awayName: boardRef.current.awayName, arrows: boardRef.current.arrows, shapes: boardRef.current.shapes };
+        const finalFrame = { ...lastBoard, name: boardRef.current.name, homeName: boardRef.current.homeName, awayName: boardRef.current.awayName, arrows: lastBoard.arrows || [], shapes: lastBoard.shapes || [] };
         drawTacticalVideoFrame(canvas, finalFrame);
         setPlaybackBoard(null);
         setVideoPlaying(false);
@@ -846,12 +883,13 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       const endBall = clip.to.ball || { x: 500, y: 320 };
       const ball = pointAlongPath(clip.ballPath, eased, startBall, endBall);
       const shapes = interpolateTacticalShapes(clip.from.shapes || [], clip.to.shapes || [], eased);
+      const arrows = interpolateTacticalArrows(clip.from.arrows || [], clip.to.arrows || [], eased);
       const frameBoard = {
         ...clip.to,
         name: boardRef.current.name,
         homeName: boardRef.current.homeName,
         awayName: boardRef.current.awayName,
-        arrows: boardRef.current.arrows,
+        arrows,
         shapes,
         players,
         ball,
@@ -876,7 +914,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
 
       <div className={`sr-tactical-pitch-wrap ${mode === "arrow" ? "drawing" : "moving"}`}>
         <svg ref={pitchRef} className="sr-tactical-pitch" viewBox="0 0 1000 640" role="img" aria-label="Tactical football pitch. Drag the discs to position players." onPointerDown={handlePitchPointerDown} onPointerMove={handlePitchPointerMove} onPointerUp={handlePitchPointerUp} onPointerCancel={handlePitchPointerUp}>
-          <defs>{(board.arrows || []).map((arrow) => <marker key={`head-${arrow.id}`} id={`sr-tactical-arrowhead-${arrow.id}`} markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill={arrow.color || "#ffe36e"} fillOpacity={arrow.opacity ?? 1} /></marker>)}<marker id="sr-tactical-arrowhead-preview" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill={newShapeColour} /></marker></defs>
+          <defs>{(displayedBoard.arrows || []).map((arrow) => <marker key={`head-${arrow.id}`} id={`sr-tactical-arrowhead-${arrow.id}`} markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill={arrow.color || "#ffe36e"} fillOpacity={arrow.opacity ?? 1} /></marker>)}<marker id="sr-tactical-arrowhead-preview" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill={newShapeColour} /></marker></defs>
           <rect x="12" y="12" width="976" height="616" rx="7" className="sr-tactical-grass" />
           <rect x="35" y="35" width="930" height="570" className="sr-tactical-line" />
           <line x1="500" y1="35" x2="500" y2="605" className="sr-tactical-line" />
@@ -922,11 +960,12 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
             if (mode === "triangle") return <polygon points={`${shape.x + shape.width / 2},${shape.y} ${shape.x + shape.width},${shape.y + shape.height} ${shape.x},${shape.y + shape.height}`} fill={newShapeColour} fillOpacity={newShapeOpacity} stroke={newShapeColour} strokeOpacity={newShapeOpacity} strokeWidth={3} className="sr-tactical-shape-preview" />;
             return <rect {...shape} fill={newShapeColour} fillOpacity={newShapeOpacity} stroke={newShapeColour} strokeOpacity={newShapeOpacity} strokeWidth={3} className="sr-tactical-shape-preview" />;
           })()}
-          {board.arrows.map((arrow) => {
+          {(displayedBoard.arrows || []).map((arrow) => {
             const selected = !videoPlaying && selectedArrowId === arrow.id;
             const strokeWidth = Number(arrow.strokeWidth) || 6;
+            const dashPattern = arrow.lineStyle === "dashed" ? "14 9" : arrow.lineStyle === "dotted" ? "2 8" : undefined;
             return <g key={arrow.id}>
-              <line x1={arrow.from.x} y1={arrow.from.y} x2={arrow.to.x} y2={arrow.to.y} stroke={arrow.color || "#ffe36e"} strokeOpacity={arrow.opacity ?? 1} strokeWidth={selected ? strokeWidth + 2 : strokeWidth} className={`sr-tactical-arrow ${selected ? "selected" : ""} ${enteringGraphicIds.includes(arrow.id) ? "entering" : ""}`} markerEnd={`url(#sr-tactical-arrowhead-${arrow.id})`} onAnimationEnd={() => finishGraphicEntering(arrow.id)} onPointerDown={(event) => { if (mode === "move") { event.stopPropagation(); setSelectedArrowId(arrow.id); setSelectedShapeId(null); } }} />
+              <line x1={arrow.from.x} y1={arrow.from.y} x2={arrow.to.x} y2={arrow.to.y} stroke={arrow.color || "#ffe36e"} strokeOpacity={arrow.opacity ?? 1} strokeWidth={selected ? strokeWidth + 2 : strokeWidth} strokeDasharray={dashPattern} strokeLinecap="round" className={`sr-tactical-arrow ${selected ? "selected" : ""} ${enteringGraphicIds.includes(arrow.id) ? "entering" : ""}`} markerEnd={`url(#sr-tactical-arrowhead-${arrow.id})`} onAnimationEnd={() => finishGraphicEntering(arrow.id)} onPointerDown={(event) => { if (mode === "move") { event.stopPropagation(); setSelectedArrowId(arrow.id); setSelectedShapeId(null); } }} />
               {selected && [["from", arrow.from], ["to", arrow.to]].map(([endpoint, point]) => <circle key={endpoint} className="sr-tactical-arrow-resize-handle" cx={point.x} cy={point.y} r="7" onPointerDown={(event) => beginArrowEndResize(event, arrow, endpoint)} />)}
             </g>;
           })}
@@ -966,6 +1005,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
             <label className="sr-tactical-color-control"><span>Colour</span><input type="color" value={selectedGraphic?.color || newShapeColour} onChange={(event) => { setNewShapeColour(event.target.value); updateSelectedGraphic({ color: event.target.value }); }} /></label>
             <label className="sr-tactical-opacity-control"><span>Transparency</span><input aria-label="Shape transparency" type="range" min="0" max="95" step="5" value={100 - Math.round((selectedGraphic?.opacity ?? newShapeOpacity) * 100)} onChange={(event) => { const opacity = 1 - Number(event.target.value) / 100; if (selectedGraphic) updateSelectedGraphic({ opacity }); else setNewShapeOpacity(opacity); }} /><output>{100 - Math.round((selectedGraphic?.opacity ?? newShapeOpacity) * 100)}%</output></label>
             <label className="sr-tactical-stroke-width-control"><span>Line width</span><input aria-label="Line width" type="range" min="1" max="16" step="1" value={selectedGraphic?.strokeWidth || newShapeStrokeWidth} onChange={(event) => { const strokeWidth = Number(event.target.value); setNewShapeStrokeWidth(strokeWidth); updateSelectedGraphic({ strokeWidth }); }} /><output>{selectedGraphic?.strokeWidth || newShapeStrokeWidth}px</output></label>
+            {selectedArrow && <label className="sr-tactical-line-style-control"><span>Arrow line</span><select aria-label="Arrow line style" value={selectedArrow.lineStyle || "solid"} onChange={(event) => { setNewArrowLineStyle(event.target.value); updateSelectedGraphic({ lineStyle: event.target.value }); }}><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select></label>}
             <button type="button" onClick={() => { if (selectedShape) setBoard((current) => ({ ...current, shapes: (current.shapes || []).filter((shape) => shape.id !== selectedShapeId) })); else if (selectedArrowId) setBoard((current) => ({ ...current, arrows: (current.arrows || []).filter((arrow) => arrow.id !== selectedArrowId) })); setSelectedShapeId(null); setSelectedArrowId(null); }} disabled={!selectedGraphic}>Delete selected</button>
             <button type="button" onClick={() => { setBoard((current) => ({ ...current, shapes: [], arrows: [] })); setSelectedShapeId(null); setSelectedArrowId(null); }} disabled={!(board.shapes || []).length && !board.arrows.length}>Clear shapes</button>
           </div>
