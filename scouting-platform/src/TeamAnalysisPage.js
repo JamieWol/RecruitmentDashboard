@@ -259,6 +259,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const videoFrameRef = useRef(null);
   const videoFinishTimerRef = useRef(null);
   const playbackTimerRef = useRef(null);
+  const playbackFrameRef = useRef(null);
 
   useEffect(() => { boardRef.current = board; }, [board]);
   useEffect(() => {
@@ -313,6 +314,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     if (videoFrameRef.current) window.cancelAnimationFrame(videoFrameRef.current);
     if (videoFinishTimerRef.current) window.clearTimeout(videoFinishTimerRef.current);
     if (playbackTimerRef.current) window.clearTimeout(playbackTimerRef.current);
+    if (playbackFrameRef.current) window.cancelAnimationFrame(playbackFrameRef.current);
     const recorder = videoRecorderRef.current;
     if (recorder && recorder.state !== "inactive") recorder.stop();
   }, []);
@@ -543,19 +545,52 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     setPlaybackBoard(startingPlayback);
     setVideoPlaying(movements > 0);
     setVideoStatus(movements ? "Playing the movement on the tactical pad and recording it…" : "No positions changed. Preparing your video…");
-    window.setTimeout(() => setPlaybackBoard(final), 450);
-    if (playbackTimerRef.current) window.clearTimeout(playbackTimerRef.current);
-    playbackTimerRef.current = window.setTimeout(() => {
+    if (playbackFrameRef.current) window.cancelAnimationFrame(playbackFrameRef.current);
+    if (movements) {
+      const animatePadFrame = () => {
+        const now = performance.now();
+        const progress = Math.min(1, Math.max(0, (now - startedAt) / duration));
+        const eased = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+        const players = final.players.map((player) => {
+          const from = initial.players.find((item) => item.id === player.id);
+          if (!from) return player;
+          return {
+            ...player,
+            x: from.x + (player.x - from.x) * eased,
+            y: from.y + (player.y - from.y) * eased,
+          };
+        });
+        const startBall = initial.ball || { x: 500, y: 320 };
+        const endBall = final.ball || { x: 500, y: 320 };
+        setPlaybackBoard({
+          ...final,
+          players,
+          ball: {
+            x: startBall.x + (endBall.x - startBall.x) * eased,
+            y: startBall.y + (endBall.y - startBall.y) * eased,
+          },
+        });
+        if (progress < 1) playbackFrameRef.current = window.requestAnimationFrame(animatePadFrame);
+        else {
+          playbackFrameRef.current = null;
+          setVideoPlaying(false);
+          // Return to live board state once the final positions have been reached.
+          setPlaybackBoard(null);
+        }
+      };
+      playbackFrameRef.current = window.requestAnimationFrame(animatePadFrame);
+    } else {
       setVideoPlaying(false);
-      // Drop the frozen playback snapshot so the editable board becomes live again.
       setPlaybackBoard(null);
-    }, movements ? duration + 600 : 700);
+    }
     videoFinishTimerRef.current = window.setTimeout(() => {
       if (videoFrameRef.current) window.cancelAnimationFrame(videoFrameRef.current);
       videoFrameRef.current = null;
       setVideoRecording(false);
       setFinishingVideo(false);
       setVideoPlaying(false);
+      if (playbackFrameRef.current) window.cancelAnimationFrame(playbackFrameRef.current);
+      playbackFrameRef.current = null;
       setPlaybackBoard(null);
       if (recorder.state !== "inactive") recorder.stop();
     }, movements ? duration + 1100 : 700);
@@ -591,7 +626,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
         </div>
       </div>
       {videoStatus && <p className="sr-tactical-video-status" role="status">{videoStatus}</p>}
-      {recordedVideo && <div className="sr-tactical-video-preview"><button type="button" className="sr-tactical-video-close" aria-label="Close video preview" title="Close video preview" onClick={() => { setRecordedVideo(null); setPlaybackBoard(null); setVideoPlaying(false); setVideoStatus(""); setMode("move"); setMultiSelectMode(false); }}>×</button><video controls playsInline preload="metadata" src={recordedVideo.url}>Your browser cannot play this recording.</video><a href={recordedVideo.url} download={recordedVideo.filename}>Download video</a></div>}
+      {recordedVideo && <div className="sr-tactical-video-preview"><button type="button" className="sr-tactical-video-close" aria-label="Close video preview" title="Close video preview" onClick={() => { setRecordedVideo(null); setPlaybackBoard(null); setVideoPlaying(false); if (playbackFrameRef.current) window.cancelAnimationFrame(playbackFrameRef.current); playbackFrameRef.current = null; setVideoStatus(""); setMode("move"); setMultiSelectMode(false); }}>×</button><video controls playsInline preload="metadata" src={recordedVideo.url}>Your browser cannot play this recording.</video><a href={recordedVideo.url} download={recordedVideo.filename}>Download video</a></div>}
       <canvas ref={videoCanvasRef} width="1280" height="819" className="sr-tactical-video-canvas" aria-hidden="true" />
 
       <div className={`sr-tactical-pitch-wrap ${mode === "arrow" ? "drawing" : "moving"}`}>
@@ -614,11 +649,11 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
           {arrowPreview && arrowStart && mode === "arrow" && <line x1={arrowStart.x} y1={arrowStart.y} x2={arrowPreview.x} y2={arrowPreview.y} className="sr-tactical-arrow sr-tactical-arrow-preview" stroke={newShapeColour} markerEnd="url(#sr-tactical-arrowhead-preview)" />}
           {arrowPreview && arrowStart && ["rectangle", "square"].includes(mode) && (() => { const shape = shapeForDrag(arrowStart, arrowPreview, mode); return <rect {...shape} fill={newShapeColour} fillOpacity={newShapeOpacity} stroke={newShapeColour} strokeOpacity={newShapeOpacity} strokeWidth={3} className="sr-tactical-shape-preview" />; })()}
           {board.arrows.map((arrow) => <line key={arrow.id} x1={arrow.from.x} y1={arrow.from.y} x2={arrow.to.x} y2={arrow.to.y} stroke={arrow.color || "#ffe36e"} strokeOpacity={arrow.opacity ?? 1} className={`sr-tactical-arrow ${selectedArrowId === arrow.id ? "selected" : ""}`} markerEnd={`url(#sr-tactical-arrowhead-${arrow.id})`} onPointerDown={(event) => { if (mode === "move") { event.stopPropagation(); setSelectedArrowId(arrow.id); setSelectedShapeId(null); } }} />)}
-          <g className={`sr-tactical-ball ${draggingBall ? "dragging" : ""} ${videoPlaying ? "video-playing" : ""}`} style={videoPlaying ? { transition: "transform 3.4s cubic-bezier(.42,0,.58,1)" } : undefined} transform={`translate(${displayedBoard.ball?.x ?? 500} ${displayedBoard.ball?.y ?? 320})`} onPointerDown={beginBallDrag}>
+          <g className={`sr-tactical-ball ${draggingBall ? "dragging" : ""} ${videoPlaying ? "video-playing" : ""}`} transform={`translate(${displayedBoard.ball?.x ?? 500} ${displayedBoard.ball?.y ?? 320})`} onPointerDown={beginBallDrag}>
             <circle r="13" className="sr-tactical-ball-shadow" /><circle r="10" className="sr-tactical-ball-shell" />
             <path d="M0 -5 L4 -2 L3 3 L-3 3 L-4 -2 Z" className="sr-tactical-ball-patch" />
           </g>
-          {displayedBoard.players.map((player) => <g key={player.id} className={`sr-tactical-player ${player.side} ${selectedTokens.includes(player.id) ? "selected" : ""} ${draggingIds.includes(player.id) ? "dragging" : ""} ${videoPlaying ? "video-playing" : ""}`} style={videoPlaying ? { transition: "transform 3.4s cubic-bezier(.42,0,.58,1)" } : undefined} transform={`translate(${player.x} ${player.y})`} onPointerDown={(event) => beginPlayerDrag(event, player)}>
+          {displayedBoard.players.map((player) => <g key={player.id} className={`sr-tactical-player ${player.side} ${selectedTokens.includes(player.id) ? "selected" : ""} ${draggingIds.includes(player.id) ? "dragging" : ""} ${videoPlaying ? "video-playing" : ""}`} transform={`translate(${player.x} ${player.y})`} onPointerDown={(event) => beginPlayerDrag(event, player)}>
             <circle r="27" className="sr-tactical-disc-shadow" />
             <circle r="24" className="sr-tactical-disc" />
             <text y="1">{player.number}</text>
