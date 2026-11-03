@@ -247,6 +247,25 @@ const resizeTacticalShape = (shape, corner, delta) => {
   }
   return { x: left, y: top, width: right - left, height: bottom - top };
 };
+const resizePortraitTextBox = (shape, corner, delta) => {
+  const scaleX = 750 / 640;
+  const screenDeltaX = delta.y * scaleX;
+  const screenDeltaY = -delta.x;
+  const growsEast = corner.endsWith("e");
+  const growsSouth = corner.endsWith("s");
+  const width = Math.max(40, Math.min(1000, shape.width + (growsEast ? screenDeltaX : -screenDeltaX) / scaleX));
+  const height = Math.max(30, Math.min(640, shape.height + (growsSouth ? screenDeltaY : -screenDeltaY)));
+  const centerViewX = scaleX * (shape.y + shape.height / 2) + screenDeltaX / 2;
+  const centerViewY = 1000 - (shape.x + shape.width / 2) + screenDeltaY / 2;
+  const centerY = centerViewX / scaleX;
+  const centerX = 1000 - centerViewY;
+  return {
+    x: Math.max(0, Math.min(1000 - width, centerX - width / 2)),
+    y: Math.max(0, Math.min(640 - height, centerY - height / 2)),
+    width,
+    height,
+  };
+};
 
 function TacticalToolIcon({ type }) {
   const common = { fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round" };
@@ -482,6 +501,14 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     }
     return { x: Math.min(start.x, start.x + dx), y: Math.min(start.y, start.y + dy), width: Math.abs(dx), height: Math.abs(dy) };
   };
+  const textBoxForDrag = (start, end) => {
+    if (pitchMode === "full") return shapeForDrag(start, end, "rectangle");
+    const centerX = (start.x + end.x) / 2;
+    const centerY = (start.y + end.y) / 2;
+    const width = Math.abs(end.y - start.y);
+    const height = Math.abs(end.x - start.x);
+    return { x: centerX - width / 2, y: centerY - height / 2, width, height };
+  };
   const beginPlayerDrag = (event, player) => {
     if (mode !== "move" || finishingVideo) return;
     event.stopPropagation();
@@ -601,7 +628,9 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     if (resizingShapeId && dragStartRef.current?.resizeShape) {
       const start = dragStartRef.current;
       const delta = { x: point.x - start.pointer.x, y: point.y - start.pointer.y };
-      const size = resizeTacticalShape(start.resizeShape, start.resizeCorner, delta);
+      const size = pitchMode !== "full" && start.resizeShape.type === "text"
+        ? resizePortraitTextBox(start.resizeShape, start.resizeCorner, delta)
+        : resizeTacticalShape(start.resizeShape, start.resizeCorner, delta);
       setBoard((current) => ({ ...current, shapes: (current.shapes || []).map((shape) => shape.id === resizingShapeId ? { ...shape, ...size } : shape) }));
     }
     if (resizingArrowEnd && dragStartRef.current?.resizeArrow) {
@@ -658,7 +687,9 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       const start = dragStartRef.current;
       const finalPoint = pointFromEvent(event);
       const delta = { x: finalPoint.x - start.pointer.x, y: finalPoint.y - start.pointer.y };
-      const size = resizeTacticalShape(start.resizeShape, start.resizeCorner, delta);
+      const size = pitchMode !== "full" && start.resizeShape.type === "text"
+        ? resizePortraitTextBox(start.resizeShape, start.resizeCorner, delta)
+        : resizeTacticalShape(start.resizeShape, start.resizeCorner, delta);
       setBoard((current) => ({ ...current, shapes: (current.shapes || []).map((shape) => shape.id === resizingShapeId ? { ...shape, ...size } : shape) }));
     }
     if (resizingArrowEnd && dragStartRef.current?.resizeArrow) {
@@ -685,11 +716,15 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
         setSelectedArrowId(null);
       }
       if (mode === "text") {
-        const drawnBox = distance > 12 ? shapeForDrag(arrowStart, end, "rectangle") : { x: arrowStart.x, y: arrowStart.y, width: 220, height: 48 };
+        const drawnBox = distance > 12 ? textBoxForDrag(arrowStart, end) : pitchMode === "full"
+          ? { x: arrowStart.x, y: arrowStart.y, width: 220, height: 48 }
+          : { x: arrowStart.x - 110, y: arrowStart.y - 24, width: 220, height: 48 };
         const width = Math.max(140, drawnBox.width);
         const height = Math.max(48, drawnBox.height);
-        const x = Math.max(0, Math.min(1000 - width, drawnBox.x));
-        const y = Math.max(0, Math.min(640 - height, drawnBox.y));
+        const centerX = drawnBox.x + drawnBox.width / 2;
+        const centerY = drawnBox.y + drawnBox.height / 2;
+        const x = Math.max(0, Math.min(1000 - width, centerX - width / 2));
+        const y = Math.max(0, Math.min(640 - height, centerY - height / 2));
         const newTextBox = { id: `text-${Date.now()}`, type: "text", x, y, width, height, text: "Text", fontSize: 22, color: newShapeColour, textColor: newTextColor, backgroundColor: newTextBoxColor, opacity: 0.85 };
         setBoard((current) => ({ ...current, shapes: [...(current.shapes || []), newTextBox] }));
         markGraphicEntering(newTextBox.id);
@@ -1055,12 +1090,14 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
             else if (shape.type === "triangle") shapeBody = <polygon points={`${shape.x + shape.width / 2},${shape.y} ${shape.x + shape.width},${shape.y + shape.height} ${shape.x},${shape.y + shape.height}`} fill={fill} fillOpacity={opacity} stroke={selected ? "#ffe36e" : fill} strokeOpacity={selected ? 1 : opacity} strokeWidth={selected ? strokeWidth + 2 : strokeWidth} />;
             else shapeBody = <rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="2" fill={fill} fillOpacity={opacity} stroke={selected ? "#ffe36e" : fill} strokeOpacity={selected ? 1 : opacity} strokeWidth={selected ? strokeWidth + 2 : strokeWidth} />;
             const handles = selected && !videoPlaying ? [["nw", shape.x, shape.y], ["ne", shape.x + shape.width, shape.y], ["sw", shape.x, shape.y + shape.height], ["se", shape.x + shape.width, shape.y + shape.height]] : [];
-            return <g key={`${shape.id}-${pitchViewMode}`} {...graphicEvents}>{shapeBody}{handles.map(([corner, x, y]) => <circle key={corner} className="sr-tactical-resize-handle" style={{ cursor: corner === "nw" || corner === "se" ? "nwse-resize" : "nesw-resize" }} cx={x} cy={y} r="7" onPointerDown={(event) => beginShapeResize(event, shape, corner)} />)}</g>;
+            const keepTextReadable = shape.type === "text" && pitchViewMode !== "full";
+            const counterRotation = keepTextReadable ? `rotate(90 ${shape.x + shape.width / 2} ${shape.y + shape.height / 2})` : undefined;
+            return <g key={`${shape.id}-${pitchViewMode}`} {...graphicEvents}><g transform={counterRotation}>{shapeBody}{handles.map(([corner, x, y]) => <circle key={corner} className="sr-tactical-resize-handle" style={{ cursor: corner === "nw" || corner === "se" ? "nwse-resize" : "nesw-resize" }} cx={x} cy={y} r="7" onPointerDown={(event) => beginShapeResize(event, shape, corner)} />)}</g></g>;
           })}
           {arrowPreview && arrowStart && mode === "arrow" && <line x1={arrowStart.x} y1={arrowStart.y} x2={arrowPreview.x} y2={arrowPreview.y} className="sr-tactical-arrow sr-tactical-arrow-preview" stroke={newShapeColour} markerEnd="url(#sr-tactical-arrowhead-preview)" />}
           {arrowPreview && arrowStart && ["rectangle", "square", "circle", "triangle", "line", "text"].includes(mode) && (() => {
-            const shape = shapeForDrag(arrowStart, arrowPreview, mode);
-            if (mode === "text") return <rect {...shape} rx="5" fill={newTextBoxColor} fillOpacity="0.85" stroke={newShapeColour} strokeWidth={2} className="sr-tactical-shape-preview" />;
+            const shape = mode === "text" ? textBoxForDrag(arrowStart, arrowPreview) : shapeForDrag(arrowStart, arrowPreview, mode);
+            if (mode === "text") return <g transform={pitchViewMode === "full" ? undefined : `rotate(90 ${shape.x + shape.width / 2} ${shape.y + shape.height / 2})`}><rect {...shape} rx="5" fill={newTextBoxColor} fillOpacity="0.85" stroke={newShapeColour} strokeWidth={2} className="sr-tactical-shape-preview" /></g>;
             if (mode === "line") return <line x1={arrowStart.x} y1={arrowStart.y} x2={arrowPreview.x} y2={arrowPreview.y} stroke={newShapeColour} strokeOpacity={newShapeOpacity} strokeWidth={3} className="sr-tactical-shape-preview" />;
             if (mode === "circle") return <ellipse cx={shape.x + shape.width / 2} cy={shape.y + shape.height / 2} rx={shape.width / 2} ry={shape.height / 2} fill={newShapeColour} fillOpacity={newShapeOpacity} stroke={newShapeColour} strokeOpacity={newShapeOpacity} strokeWidth={3} className="sr-tactical-shape-preview" />;
             if (mode === "triangle") return <polygon points={`${shape.x + shape.width / 2},${shape.y} ${shape.x + shape.width},${shape.y + shape.height} ${shape.x},${shape.y + shape.height}`} fill={newShapeColour} fillOpacity={newShapeOpacity} stroke={newShapeColour} strokeOpacity={newShapeOpacity} strokeWidth={3} className="sr-tactical-shape-preview" />;
