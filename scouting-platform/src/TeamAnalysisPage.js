@@ -314,6 +314,8 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const [arrowPreview, setArrowPreview] = useState(null);
   const [selectedTokens, setSelectedTokens] = useState([]);
   const [selectedShapeId, setSelectedShapeId] = useState(null);
+  const [editingTextId, setEditingTextId] = useState(null);
+  const [copiedTextBox, setCopiedTextBox] = useState(null);
   const [selectedArrowId, setSelectedArrowId] = useState(null);
   const [enteringGraphicIds, setEnteringGraphicIds] = useState([]);
   const [newShapeOpacity, setNewShapeOpacity] = useState(0.35);
@@ -410,6 +412,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     const point = pointFromEvent(event);
     dragStartRef.current = { pointer: point, positions: { [shape.id]: { x: shape.x, y: shape.y } } };
     setDraggingShapeId(shape.id);
+    setEditingTextId(null);
     setSelectedShapeId(shape.id);
     setSelectedArrowId(null);
   };
@@ -503,11 +506,19 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
         setSelectedArrowId(null);
       }
       if (mode === "text") {
-        const newTextBox = { id: `text-${Date.now()}`, type: "text", x: arrowStart.x, y: arrowStart.y, width: 220, height: 48, text: "Text", color: newShapeColour, opacity: 0.85 };
+        const drawnBox = distance > 12 ? shapeForDrag(arrowStart, end, "rectangle") : { x: arrowStart.x, y: arrowStart.y, width: 220, height: 48 };
+        const width = Math.max(140, drawnBox.width);
+        const height = Math.max(48, drawnBox.height);
+        const x = Math.max(0, Math.min(1000 - width, drawnBox.x));
+        const y = Math.max(0, Math.min(640 - height, drawnBox.y));
+        const newTextBox = { id: `text-${Date.now()}`, type: "text", x, y, width, height, text: "Text", color: newShapeColour, opacity: 0.85 };
         setBoard((current) => ({ ...current, shapes: [...(current.shapes || []), newTextBox] }));
         markGraphicEntering(newTextBox.id);
         setSelectedShapeId(newTextBox.id);
         setSelectedArrowId(null);
+        setMode("move");
+        setMultiSelectMode(false);
+        setEditingTextId(newTextBox.id);
       }
       setArrowStart(null);
       setArrowPreview(null);
@@ -539,6 +550,26 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const updateSelectedShape = (changes) => {
     if (!selectedShapeId) return;
     setBoard((current) => ({ ...current, shapes: (current.shapes || []).map((shape) => shape.id === selectedShapeId ? { ...shape, ...changes } : shape) }));
+  };
+  const copySelectedTextBox = () => {
+    if (selectedShape?.type === "text") setCopiedTextBox({ ...selectedShape });
+  };
+  const pasteTextBox = () => {
+    if (!copiedTextBox) return;
+    const width = copiedTextBox.width || 220;
+    const height = copiedTextBox.height || 48;
+    const pasted = {
+      ...copiedTextBox,
+      id: `text-${Date.now()}`,
+      x: Math.max(0, Math.min(1000 - width, copiedTextBox.x + 24)),
+      y: Math.max(0, Math.min(640 - height, copiedTextBox.y + 24)),
+    };
+    setBoard((current) => ({ ...current, shapes: [...(current.shapes || []), pasted] }));
+    markGraphicEntering(pasted.id);
+    setSelectedShapeId(pasted.id);
+    setSelectedArrowId(null);
+    setEditingTextId(null);
+    setMode("move");
   };
   const updateSelectedGraphic = (changes) => {
     if (selectedShape) updateSelectedShape(changes);
@@ -777,14 +808,14 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
             };
             const fill = shape.color || "#62dcff";
             const opacity = shape.opacity ?? 0.35;
-            if (shape.type === "text") return <g key={shape.id} {...graphicEvents}><rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="5" fill="#0c3769" fillOpacity={shape.opacity ?? 0.85} stroke={selected ? "#ffe36e" : fill} strokeOpacity={1} strokeWidth={selected ? 4 : 2} /><text x={shape.x + 10} y={shape.y + shape.height / 2} fill="#fff" fontSize="22" fontWeight="700" dominantBaseline="middle" pointerEvents="none">{shape.text || "Text"}</text></g>;
+            if (shape.type === "text") return <g key={shape.id} {...graphicEvents}><rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="5" fill="#0c3769" fillOpacity={shape.opacity ?? 0.85} stroke={selected ? "#ffe36e" : fill} strokeOpacity={1} strokeWidth={selected ? 4 : 2} />{editingTextId === shape.id && !videoPlaying ? <foreignObject x={shape.x + 5} y={shape.y + 4} width={Math.max(20, shape.width - 10)} height={Math.max(24, shape.height - 8)}><textarea xmlns="http://www.w3.org/1999/xhtml" className="sr-tactical-inline-text" autoFocus aria-label="Edit text on pitch" value={shape.text || ""} onPointerDown={(event) => event.stopPropagation()} onChange={(event) => setBoard((current) => ({ ...current, shapes: (current.shapes || []).map((item) => item.id === shape.id ? { ...item, text: event.target.value } : item) }))} onBlur={() => setEditingTextId(null)} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); setEditingTextId(null); event.currentTarget.blur(); } }} /></foreignObject> : <text x={shape.x + 10} y={shape.y + shape.height / 2} fill="#fff" fontSize="22" fontWeight="700" dominantBaseline="middle" onDoubleClick={(event) => { event.stopPropagation(); setSelectedShapeId(shape.id); setEditingTextId(shape.id); }}>{shape.text || "Text"}</text>}</g>;
             if (shape.type === "line") return <line key={shape.id} {...graphicEvents} x1={shape.x} y1={shape.y} x2={shape.x + shape.width} y2={shape.y + shape.height} stroke={selected ? "#ffe36e" : fill} strokeOpacity={opacity} strokeWidth={selected ? 6 : 4} />;
             if (shape.type === "circle") return <ellipse key={shape.id} {...graphicEvents} cx={shape.x + shape.width / 2} cy={shape.y + shape.height / 2} rx={shape.width / 2} ry={shape.height / 2} fill={fill} fillOpacity={opacity} stroke={selected ? "#ffe36e" : fill} strokeOpacity={selected ? 1 : opacity} strokeWidth={selected ? 5 : 3} />;
             if (shape.type === "triangle") return <polygon key={shape.id} {...graphicEvents} points={`${shape.x + shape.width / 2},${shape.y} ${shape.x + shape.width},${shape.y + shape.height} ${shape.x},${shape.y + shape.height}`} fill={fill} fillOpacity={opacity} stroke={selected ? "#ffe36e" : fill} strokeOpacity={selected ? 1 : opacity} strokeWidth={selected ? 5 : 3} />;
             return <rect key={shape.id} {...graphicEvents} x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="2" fill={fill} fillOpacity={opacity} stroke={selected ? "#ffe36e" : fill} strokeOpacity={selected ? 1 : opacity} strokeWidth={selected ? 5 : 3} />;
           })}
           {arrowPreview && arrowStart && mode === "arrow" && <line x1={arrowStart.x} y1={arrowStart.y} x2={arrowPreview.x} y2={arrowPreview.y} className="sr-tactical-arrow sr-tactical-arrow-preview" stroke={newShapeColour} markerEnd="url(#sr-tactical-arrowhead-preview)" />}
-          {arrowPreview && arrowStart && ["rectangle", "square", "circle", "triangle", "line"].includes(mode) && (() => {
+          {arrowPreview && arrowStart && ["rectangle", "square", "circle", "triangle", "line", "text"].includes(mode) && (() => {
             const shape = shapeForDrag(arrowStart, arrowPreview, mode);
             if (mode === "line") return <line x1={arrowStart.x} y1={arrowStart.y} x2={arrowPreview.x} y2={arrowPreview.y} stroke={newShapeColour} strokeOpacity={newShapeOpacity} strokeWidth={3} className="sr-tactical-shape-preview" />;
             if (mode === "circle") return <ellipse cx={shape.x + shape.width / 2} cy={shape.y + shape.height / 2} rx={shape.width / 2} ry={shape.height / 2} fill={newShapeColour} fillOpacity={newShapeOpacity} stroke={newShapeColour} strokeOpacity={newShapeOpacity} strokeWidth={3} className="sr-tactical-shape-preview" />;
@@ -833,8 +864,10 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
           <small>{selectedShape ? "Adjusting selected shape" : selectedArrow ? "Adjusting selected arrow" : "Choose a tool, then draw directly on the pitch."}</small>
         </div>}
         {dockPanel === "text" && <div className="sr-tactical-dock-panel sr-tactical-text-panel" role="tabpanel">
-          <button type="button" className={`sr-tactical-icon-tool ${mode === "text" ? "selected" : ""}`} onClick={() => { setMode("text"); setSelectedShapeId(null); setSelectedArrowId(null); }}><TacticalToolIcon type="text" /><span>Place text box</span></button>
-          {selectedShape?.type === "text" ? <label><span>Edit selected text</span><input value={selectedShape.text || ""} onChange={(event) => updateSelectedShape({ text: event.target.value })} /></label> : <small>Choose Place text box, then click the pitch. Select a text box with the Move tool to edit it here.</small>}
+          <button type="button" className={`sr-tactical-icon-tool ${mode === "text" ? "selected" : ""}`} onClick={() => { setMode("text"); setSelectedShapeId(null); setSelectedArrowId(null); setEditingTextId(null); }}><TacticalToolIcon type="text" /><span>Draw text box</span></button>
+          {selectedShape?.type === "text" && <label><span>Edit selected text</span><input value={selectedShape.text || ""} onChange={(event) => updateSelectedShape({ text: event.target.value })} /></label>}
+          <div className="sr-tactical-tools sr-tactical-text-actions"><button type="button" onClick={copySelectedTextBox} disabled={selectedShape?.type !== "text"}>Copy text box</button><button type="button" onClick={pasteTextBox} disabled={!copiedTextBox}>Paste text box</button></div>
+          <small>{selectedShape?.type === "text" ? "Drag to move. Double-click the box to edit text directly on the pitch." : "Choose Draw text box, then drag on the pitch to set its size. New boxes switch back to Select automatically."}</small>
         </div>}
         {dockPanel === "tools" && <div className="sr-tactical-dock-panel" role="tabpanel">
           <div className="sr-tactical-tools" role="toolbar" aria-label="Player and pitch tools">
