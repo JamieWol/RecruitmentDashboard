@@ -358,6 +358,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const [draggingIds, setDraggingIds] = useState([]);
   const [draggingBall, setDraggingBall] = useState(false);
   const [draggingShapeId, setDraggingShapeId] = useState(null);
+  const [draggingArrowId, setDraggingArrowId] = useState(null);
   const [resizingShapeId, setResizingShapeId] = useState(null);
   const [resizingArrowEnd, setResizingArrowEnd] = useState(null);
   const [multiSelectMode, setMultiSelectMode] = useState(false);
@@ -500,6 +501,16 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     setSelectedArrowId(arrow.id);
     setSelectedShapeId(null);
   };
+  const beginArrowDrag = (event, arrow) => {
+    if (mode !== "move" || finishingVideo) return;
+    event.stopPropagation();
+    pitchRef.current?.setPointerCapture?.(event.pointerId);
+    const point = pointFromEvent(event);
+    dragStartRef.current = { pointer: point, dragArrow: { ...arrow, from: { ...arrow.from }, to: { ...arrow.to } } };
+    setDraggingArrowId(arrow.id);
+    setSelectedArrowId(arrow.id);
+    setSelectedShapeId(null);
+  };
   const handlePitchPointerDown = (event) => {
     if (!(["arrow", "rectangle", "square", "circle", "triangle", "line", "text"].includes(mode)) || finishingVideo) return;
     pitchRef.current?.setPointerCapture?.(event.pointerId);
@@ -537,6 +548,18 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       const delta = { x: point.x - dragStartRef.current.pointer.x, y: point.y - dragStartRef.current.pointer.y };
       const target = { x: Math.max(0, Math.min(1000, origin.x + delta.x)), y: Math.max(0, Math.min(640, origin.y + delta.y)) };
       setBoard((current) => ({ ...current, shapes: (current.shapes || []).map((shape) => shape.id === draggingShapeId ? { ...shape, ...target } : shape) }));
+    }
+    if (draggingArrowId && dragStartRef.current?.dragArrow) {
+      const start = dragStartRef.current;
+      const deltaX = point.x - start.pointer.x;
+      const deltaY = point.y - start.pointer.y;
+      const minDeltaX = -Math.min(start.dragArrow.from.x, start.dragArrow.to.x);
+      const maxDeltaX = 1000 - Math.max(start.dragArrow.from.x, start.dragArrow.to.x);
+      const minDeltaY = -Math.min(start.dragArrow.from.y, start.dragArrow.to.y);
+      const maxDeltaY = 640 - Math.max(start.dragArrow.from.y, start.dragArrow.to.y);
+      const dx = Math.max(minDeltaX, Math.min(maxDeltaX, deltaX));
+      const dy = Math.max(minDeltaY, Math.min(maxDeltaY, deltaY));
+      setBoard((current) => ({ ...current, arrows: (current.arrows || []).map((arrow) => arrow.id === draggingArrowId ? { ...arrow, from: { x: start.dragArrow.from.x + dx, y: start.dragArrow.from.y + dy }, to: { x: start.dragArrow.to.x + dx, y: start.dragArrow.to.y + dy } } : arrow) }));
     }
     if (resizingShapeId && dragStartRef.current?.resizeShape) {
       const start = dragStartRef.current;
@@ -580,6 +603,19 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       const delta = { x: finalPoint.x - dragStartRef.current.pointer.x, y: finalPoint.y - dragStartRef.current.pointer.y };
       const finalPosition = { x: Math.max(0, Math.min(1000, origin.x + delta.x)), y: Math.max(0, Math.min(640, origin.y + delta.y)) };
       setBoard((current) => ({ ...current, shapes: (current.shapes || []).map((shape) => shape.id === draggingShapeId ? { ...shape, ...finalPosition } : shape) }));
+    }
+    if (draggingArrowId && dragStartRef.current?.dragArrow) {
+      const start = dragStartRef.current;
+      const finalPoint = pointFromEvent(event);
+      const deltaX = finalPoint.x - start.pointer.x;
+      const deltaY = finalPoint.y - start.pointer.y;
+      const minDeltaX = -Math.min(start.dragArrow.from.x, start.dragArrow.to.x);
+      const maxDeltaX = 1000 - Math.max(start.dragArrow.from.x, start.dragArrow.to.x);
+      const minDeltaY = -Math.min(start.dragArrow.from.y, start.dragArrow.to.y);
+      const maxDeltaY = 640 - Math.max(start.dragArrow.from.y, start.dragArrow.to.y);
+      const dx = Math.max(minDeltaX, Math.min(maxDeltaX, deltaX));
+      const dy = Math.max(minDeltaY, Math.min(maxDeltaY, deltaY));
+      setBoard((current) => ({ ...current, arrows: (current.arrows || []).map((arrow) => arrow.id === draggingArrowId ? { ...arrow, from: { x: start.dragArrow.from.x + dx, y: start.dragArrow.from.y + dy }, to: { x: start.dragArrow.to.x + dx, y: start.dragArrow.to.y + dy } } : arrow) }));
     }
     if (resizingShapeId && dragStartRef.current?.resizeShape) {
       const start = dragStartRef.current;
@@ -635,6 +671,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     setDraggingIds([]);
     setDraggingBall(false);
     setDraggingShapeId(null);
+    setDraggingArrowId(null);
     setResizingShapeId(null);
     setResizingArrowEnd(null);
   };
@@ -953,7 +990,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
             let shapeBody;
             if (shape.type === "text") {
               shapeBody = <><rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="5" fill={shape.backgroundColor || "#0c3769"} fillOpacity={shape.opacity ?? 0.85} stroke={selected ? "#ffe36e" : fill} strokeOpacity={1} strokeWidth={selected ? strokeWidth + 2 : strokeWidth} />{editingTextId === shape.id && !videoPlaying ? <foreignObject x={shape.x + 5} y={shape.y + 4} width={Math.max(20, shape.width - 10)} height={Math.max(24, shape.height - 8)}><textarea xmlns="http://www.w3.org/1999/xhtml" className="sr-tactical-inline-text" style={{ fontSize: `${shape.fontSize || 22}px`, color: shape.textColor || "#fff", backgroundColor: shape.backgroundColor || "#0c3769" }} autoFocus aria-label="Edit text on pitch" value={shape.text || ""} onPointerDown={(event) => event.stopPropagation()} onChange={(event) => setBoard((current) => ({ ...current, shapes: (current.shapes || []).map((item) => item.id === shape.id ? { ...item, text: event.target.value } : item) }))} onBlur={() => setEditingTextId(null)} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); setEditingTextId(null); event.currentTarget.blur(); } }} /></foreignObject> : <foreignObject x={shape.x + 5} y={shape.y + 4} width={Math.max(20, shape.width - 10)} height={Math.max(24, shape.height - 8)}><div xmlns="http://www.w3.org/1999/xhtml" className="sr-tactical-text-render" style={{ fontSize: `${shape.fontSize || 22}px`, color: shape.textColor || "#fff" }} onDoubleClick={(event) => { event.stopPropagation(); setSelectedShapeId(shape.id); setEditingTextId(shape.id); }}>{shape.text || "Text"}</div></foreignObject>}</>;
-            } else if (shape.type === "line") shapeBody = <line x1={shape.x} y1={shape.y} x2={shape.x + shape.width} y2={shape.y + shape.height} stroke={selected ? "#ffe36e" : fill} strokeOpacity={opacity} strokeWidth={selected ? strokeWidth + 2 : strokeWidth} />;
+            } else if (shape.type === "line") shapeBody = <line x1={shape.x} y1={shape.y} x2={shape.x + shape.width} y2={shape.y + shape.height} stroke={selected ? "#ffe36e" : fill} strokeOpacity={opacity} strokeWidth={selected ? strokeWidth + 2 : strokeWidth} pointerEvents="stroke" />;
             else if (shape.type === "circle") shapeBody = <ellipse cx={shape.x + shape.width / 2} cy={shape.y + shape.height / 2} rx={shape.width / 2} ry={shape.height / 2} fill={fill} fillOpacity={opacity} stroke={selected ? "#ffe36e" : fill} strokeOpacity={selected ? 1 : opacity} strokeWidth={selected ? strokeWidth + 2 : strokeWidth} />;
             else if (shape.type === "triangle") shapeBody = <polygon points={`${shape.x + shape.width / 2},${shape.y} ${shape.x + shape.width},${shape.y + shape.height} ${shape.x},${shape.y + shape.height}`} fill={fill} fillOpacity={opacity} stroke={selected ? "#ffe36e" : fill} strokeOpacity={selected ? 1 : opacity} strokeWidth={selected ? strokeWidth + 2 : strokeWidth} />;
             else shapeBody = <rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="2" fill={fill} fillOpacity={opacity} stroke={selected ? "#ffe36e" : fill} strokeOpacity={selected ? 1 : opacity} strokeWidth={selected ? strokeWidth + 2 : strokeWidth} />;
@@ -974,7 +1011,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
             const strokeWidth = Number(arrow.strokeWidth) || 6;
             const dashPattern = arrow.lineStyle === "dashed" ? "14 9" : arrow.lineStyle === "dotted" ? "2 8" : undefined;
             return <g key={arrow.id}>
-              <line x1={arrow.from.x} y1={arrow.from.y} x2={arrow.to.x} y2={arrow.to.y} stroke={arrow.color || "#ffe36e"} strokeOpacity={arrow.opacity ?? 1} strokeWidth={selected ? strokeWidth + 2 : strokeWidth} strokeDasharray={dashPattern} strokeLinecap="round" className={`sr-tactical-arrow ${selected ? "selected" : ""} ${enteringGraphicIds.includes(arrow.id) ? "entering" : ""}`} markerEnd={`url(#sr-tactical-arrowhead-${arrow.id})`} onAnimationEnd={() => finishGraphicEntering(arrow.id)} onPointerDown={(event) => { if (mode === "move") { event.stopPropagation(); setSelectedArrowId(arrow.id); setSelectedShapeId(null); } }} />
+              <line x1={arrow.from.x} y1={arrow.from.y} x2={arrow.to.x} y2={arrow.to.y} stroke={arrow.color || "#ffe36e"} strokeOpacity={arrow.opacity ?? 1} strokeWidth={selected ? strokeWidth + 2 : strokeWidth} strokeDasharray={dashPattern} strokeLinecap="round" className={`sr-tactical-arrow ${selected ? "selected" : ""} ${draggingArrowId === arrow.id ? "dragging" : ""} ${enteringGraphicIds.includes(arrow.id) ? "entering" : ""}`} markerEnd={`url(#sr-tactical-arrowhead-${arrow.id})`} onAnimationEnd={() => finishGraphicEntering(arrow.id)} onPointerDown={(event) => beginArrowDrag(event, arrow)} />
               {selected && [["from", arrow.from], ["to", arrow.to]].map(([endpoint, point]) => <circle key={endpoint} className="sr-tactical-arrow-resize-handle" cx={point.x} cy={point.y} r="7" onPointerDown={(event) => beginArrowEndResize(event, arrow, endpoint)} />)}
             </g>;
           })}

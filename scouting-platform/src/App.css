@@ -274,7 +274,8 @@ header{z-index:1000!important}.sr-page{position:relative;z-index:1}.sr-pitch{z-i
 .sr-tactical-ball-shadow{fill:#05223f70}
 .sr-tactical-ball-shell{fill:#f7f8f3;stroke:#142234;stroke-width:2}
 .sr-tactical-ball-patch{fill:#142234;pointer-events:none}
-.sr-tactical-arrow{stroke:#ffe36e;stroke-linecap:round;pointer-events:stroke;cursor:pointer}
+.sr-tactical-arrow{stroke-linecap:round;pointer-events:stroke;cursor:grab;touch-action:none}
+.sr-tactical-arrow:active,.sr-tactical-arrow.dragging{cursor:grabbing}
 .sr-tactical-arrow.selected{stroke-dasharray:11 7}
 .sr-tactical-arrow-resize-handle{fill:#fff;stroke:#0c3769;stroke-width:2;cursor:move;touch-action:none}
 .sr-tactical-arrow-preview{stroke-dasharray:12 9;opacity:.8}
