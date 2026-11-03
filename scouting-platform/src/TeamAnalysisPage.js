@@ -263,7 +263,7 @@ const drawTacticalVideoFrame = (canvas, board) => {
     const opacity = Number(shape.opacity);
     const baseOpacity = Math.max(0, Math.min(1, Number.isFinite(opacity) ? opacity : 0.35));
     context.globalAlpha = baseOpacity * (shape._playbackOpacity ?? 1);
-    context.fillStyle = shape.type === "text" ? "#0c3769" : shape.color || "#62dcff";
+    context.fillStyle = shape.type === "text" ? shape.backgroundColor || "#0c3769" : shape.color || "#62dcff";
     context.strokeStyle = shape.color || "#62dcff";
     context.lineWidth = 3;
     if (shape.type === "line") {
@@ -277,7 +277,7 @@ const drawTacticalVideoFrame = (canvas, board) => {
       context.strokeRect(shape.x, shape.y, shape.width, shape.height);
       if (shape.type === "text") {
         context.globalAlpha = shape._playbackOpacity ?? 1;
-        context.fillStyle = "#fff";
+        context.fillStyle = shape.textColor || "#fff";
         context.font = `bold ${Number(shape.fontSize) || 22}px Arial, sans-serif`;
         context.textAlign = "left";
         context.textBaseline = "middle";
@@ -342,6 +342,8 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const [enteringGraphicIds, setEnteringGraphicIds] = useState([]);
   const [newShapeOpacity, setNewShapeOpacity] = useState(0.35);
   const [newShapeColour, setNewShapeColour] = useState("#62dcff");
+  const [newTextColor, setNewTextColor] = useState("#ffffff");
+  const [newTextBoxColor, setNewTextBoxColor] = useState("#0c3769");
   const [dockPanel, setDockPanel] = useState("shapes");
   const [movementClips, setMovementClips] = useState([]);
   const [activeClipStart, setActiveClipStart] = useState(null);
@@ -557,7 +559,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
         const height = Math.max(48, drawnBox.height);
         const x = Math.max(0, Math.min(1000 - width, drawnBox.x));
         const y = Math.max(0, Math.min(640 - height, drawnBox.y));
-        const newTextBox = { id: `text-${Date.now()}`, type: "text", x, y, width, height, text: "Text", fontSize: 22, color: newShapeColour, opacity: 0.85 };
+        const newTextBox = { id: `text-${Date.now()}`, type: "text", x, y, width, height, text: "Text", fontSize: 22, color: newShapeColour, textColor: newTextColor, backgroundColor: newTextBoxColor, opacity: 0.85 };
         setBoard((current) => ({ ...current, shapes: [...(current.shapes || []), newTextBox] }));
         markGraphicEntering(newTextBox.id);
         setSelectedShapeId(newTextBox.id);
@@ -881,7 +883,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
           <circle cx="855" cy="320" r="4" className="sr-tactical-mark" />
           <path d="M35 55 A20 20 0 0 0 55 35 M945 35 A20 20 0 0 0 965 55 M35 585 A20 20 0 0 1 55 605 M945 605 A20 20 0 0 1 965 585" className="sr-tactical-line" />
           {(displayedBoard.shapes || []).map((shape) => {
-            const selected = selectedShapeId === shape.id;
+            const selected = !videoPlaying && selectedShapeId === shape.id;
             const entering = enteringGraphicIds.includes(shape.id);
             const graphicClass = `sr-tactical-shape ${selected ? "selected" : ""} ${entering ? "entering" : ""}`;
             const graphicEvents = {
@@ -894,7 +896,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
             const opacity = shape.opacity ?? 0.35;
             let shapeBody;
             if (shape.type === "text") {
-              shapeBody = <><rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="5" fill="#0c3769" fillOpacity={shape.opacity ?? 0.85} stroke={selected ? "#ffe36e" : fill} strokeOpacity={1} strokeWidth={selected ? 4 : 2} />{editingTextId === shape.id && !videoPlaying ? <foreignObject x={shape.x + 5} y={shape.y + 4} width={Math.max(20, shape.width - 10)} height={Math.max(24, shape.height - 8)}><textarea xmlns="http://www.w3.org/1999/xhtml" className="sr-tactical-inline-text" style={{ fontSize: `${shape.fontSize || 22}px` }} autoFocus aria-label="Edit text on pitch" value={shape.text || ""} onPointerDown={(event) => event.stopPropagation()} onChange={(event) => setBoard((current) => ({ ...current, shapes: (current.shapes || []).map((item) => item.id === shape.id ? { ...item, text: event.target.value } : item) }))} onBlur={() => setEditingTextId(null)} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); setEditingTextId(null); event.currentTarget.blur(); } }} /></foreignObject> : <foreignObject x={shape.x + 5} y={shape.y + 4} width={Math.max(20, shape.width - 10)} height={Math.max(24, shape.height - 8)}><div xmlns="http://www.w3.org/1999/xhtml" className="sr-tactical-text-render" style={{ fontSize: `${shape.fontSize || 22}px` }} onDoubleClick={(event) => { event.stopPropagation(); setSelectedShapeId(shape.id); setEditingTextId(shape.id); }}>{shape.text || "Text"}</div></foreignObject>}</>;
+              shapeBody = <><rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="5" fill={shape.backgroundColor || "#0c3769"} fillOpacity={shape.opacity ?? 0.85} stroke={selected ? "#ffe36e" : fill} strokeOpacity={1} strokeWidth={selected ? 4 : 2} />{editingTextId === shape.id && !videoPlaying ? <foreignObject x={shape.x + 5} y={shape.y + 4} width={Math.max(20, shape.width - 10)} height={Math.max(24, shape.height - 8)}><textarea xmlns="http://www.w3.org/1999/xhtml" className="sr-tactical-inline-text" style={{ fontSize: `${shape.fontSize || 22}px`, color: shape.textColor || "#fff", backgroundColor: shape.backgroundColor || "#0c3769" }} autoFocus aria-label="Edit text on pitch" value={shape.text || ""} onPointerDown={(event) => event.stopPropagation()} onChange={(event) => setBoard((current) => ({ ...current, shapes: (current.shapes || []).map((item) => item.id === shape.id ? { ...item, text: event.target.value } : item) }))} onBlur={() => setEditingTextId(null)} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); setEditingTextId(null); event.currentTarget.blur(); } }} /></foreignObject> : <foreignObject x={shape.x + 5} y={shape.y + 4} width={Math.max(20, shape.width - 10)} height={Math.max(24, shape.height - 8)}><div xmlns="http://www.w3.org/1999/xhtml" className="sr-tactical-text-render" style={{ fontSize: `${shape.fontSize || 22}px`, color: shape.textColor || "#fff" }} onDoubleClick={(event) => { event.stopPropagation(); setSelectedShapeId(shape.id); setEditingTextId(shape.id); }}>{shape.text || "Text"}</div></foreignObject>}</>;
             } else if (shape.type === "line") shapeBody = <line x1={shape.x} y1={shape.y} x2={shape.x + shape.width} y2={shape.y + shape.height} stroke={selected ? "#ffe36e" : fill} strokeOpacity={opacity} strokeWidth={selected ? 6 : 4} />;
             else if (shape.type === "circle") shapeBody = <ellipse cx={shape.x + shape.width / 2} cy={shape.y + shape.height / 2} rx={shape.width / 2} ry={shape.height / 2} fill={fill} fillOpacity={opacity} stroke={selected ? "#ffe36e" : fill} strokeOpacity={selected ? 1 : opacity} strokeWidth={selected ? 5 : 3} />;
             else if (shape.type === "triangle") shapeBody = <polygon points={`${shape.x + shape.width / 2},${shape.y} ${shape.x + shape.width},${shape.y + shape.height} ${shape.x},${shape.y + shape.height}`} fill={fill} fillOpacity={opacity} stroke={selected ? "#ffe36e" : fill} strokeOpacity={selected ? 1 : opacity} strokeWidth={selected ? 5 : 3} />;
@@ -905,17 +907,18 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
           {arrowPreview && arrowStart && mode === "arrow" && <line x1={arrowStart.x} y1={arrowStart.y} x2={arrowPreview.x} y2={arrowPreview.y} className="sr-tactical-arrow sr-tactical-arrow-preview" stroke={newShapeColour} markerEnd="url(#sr-tactical-arrowhead-preview)" />}
           {arrowPreview && arrowStart && ["rectangle", "square", "circle", "triangle", "line", "text"].includes(mode) && (() => {
             const shape = shapeForDrag(arrowStart, arrowPreview, mode);
+            if (mode === "text") return <rect {...shape} rx="5" fill={newTextBoxColor} fillOpacity="0.85" stroke={newShapeColour} strokeWidth={2} className="sr-tactical-shape-preview" />;
             if (mode === "line") return <line x1={arrowStart.x} y1={arrowStart.y} x2={arrowPreview.x} y2={arrowPreview.y} stroke={newShapeColour} strokeOpacity={newShapeOpacity} strokeWidth={3} className="sr-tactical-shape-preview" />;
             if (mode === "circle") return <ellipse cx={shape.x + shape.width / 2} cy={shape.y + shape.height / 2} rx={shape.width / 2} ry={shape.height / 2} fill={newShapeColour} fillOpacity={newShapeOpacity} stroke={newShapeColour} strokeOpacity={newShapeOpacity} strokeWidth={3} className="sr-tactical-shape-preview" />;
             if (mode === "triangle") return <polygon points={`${shape.x + shape.width / 2},${shape.y} ${shape.x + shape.width},${shape.y + shape.height} ${shape.x},${shape.y + shape.height}`} fill={newShapeColour} fillOpacity={newShapeOpacity} stroke={newShapeColour} strokeOpacity={newShapeOpacity} strokeWidth={3} className="sr-tactical-shape-preview" />;
             return <rect {...shape} fill={newShapeColour} fillOpacity={newShapeOpacity} stroke={newShapeColour} strokeOpacity={newShapeOpacity} strokeWidth={3} className="sr-tactical-shape-preview" />;
           })()}
-          {board.arrows.map((arrow) => <line key={arrow.id} x1={arrow.from.x} y1={arrow.from.y} x2={arrow.to.x} y2={arrow.to.y} stroke={arrow.color || "#ffe36e"} strokeOpacity={arrow.opacity ?? 1} className={`sr-tactical-arrow ${selectedArrowId === arrow.id ? "selected" : ""} ${enteringGraphicIds.includes(arrow.id) ? "entering" : ""}`} markerEnd={`url(#sr-tactical-arrowhead-${arrow.id})`} onAnimationEnd={() => finishGraphicEntering(arrow.id)} onPointerDown={(event) => { if (mode === "move") { event.stopPropagation(); setSelectedArrowId(arrow.id); setSelectedShapeId(null); } }} />)}
+          {board.arrows.map((arrow) => <line key={arrow.id} x1={arrow.from.x} y1={arrow.from.y} x2={arrow.to.x} y2={arrow.to.y} stroke={arrow.color || "#ffe36e"} strokeOpacity={arrow.opacity ?? 1} className={`sr-tactical-arrow ${!videoPlaying && selectedArrowId === arrow.id ? "selected" : ""} ${enteringGraphicIds.includes(arrow.id) ? "entering" : ""}`} markerEnd={`url(#sr-tactical-arrowhead-${arrow.id})`} onAnimationEnd={() => finishGraphicEntering(arrow.id)} onPointerDown={(event) => { if (mode === "move") { event.stopPropagation(); setSelectedArrowId(arrow.id); setSelectedShapeId(null); } }} />)}
           <g className={`sr-tactical-ball ${draggingBall ? "dragging" : ""} ${videoPlaying ? "video-playing" : ""}`} transform={`translate(${displayedBoard.ball?.x ?? 500} ${displayedBoard.ball?.y ?? 320})`} onPointerDown={beginBallDrag}>
             <circle r="13" className="sr-tactical-ball-shadow" /><circle r="10" className="sr-tactical-ball-shell" />
             <path d="M0 -5 L4 -2 L3 3 L-3 3 L-4 -2 Z" className="sr-tactical-ball-patch" />
           </g>
-          {displayedBoard.players.map((player) => <g key={player.id} className={`sr-tactical-player ${player.side} ${selectedTokens.includes(player.id) ? "selected" : ""} ${draggingIds.includes(player.id) ? "dragging" : ""} ${videoPlaying ? "video-playing" : ""}`} transform={`translate(${player.x} ${player.y})`} onPointerDown={(event) => beginPlayerDrag(event, player)}>
+          {displayedBoard.players.map((player) => <g key={player.id} className={`sr-tactical-player ${player.side} ${!videoPlaying && selectedTokens.includes(player.id) ? "selected" : ""} ${draggingIds.includes(player.id) ? "dragging" : ""} ${videoPlaying ? "video-playing" : ""}`} transform={`translate(${player.x} ${player.y})`} onPointerDown={(event) => beginPlayerDrag(event, player)}>
             <circle r="27" className="sr-tactical-disc-shadow" />
             <circle r="24" className="sr-tactical-disc" />
             <text y="1">{player.number}</text>
@@ -954,6 +957,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
         {dockPanel === "text" && <div className="sr-tactical-dock-panel sr-tactical-text-panel" role="tabpanel">
           <button type="button" className={`sr-tactical-icon-tool ${mode === "text" ? "selected" : ""}`} onClick={() => { setMode("text"); setSelectedShapeId(null); setSelectedArrowId(null); setEditingTextId(null); }}><TacticalToolIcon type="text" /><span>Draw text box</span></button>
           {selectedShape?.type === "text" && <><label><span>Edit selected text</span><input value={selectedShape.text || ""} onChange={(event) => updateSelectedShape({ text: event.target.value })} /></label><label className="sr-tactical-font-size-control"><span>Text size</span><input aria-label="Text size" type="range" min="12" max="42" step="1" value={selectedShape.fontSize || 22} onChange={(event) => updateSelectedShape({ fontSize: Number(event.target.value) })} /><output>{selectedShape.fontSize || 22}px</output></label></>}
+          <div className="sr-tactical-text-colours"><label><span>Text colour</span><input aria-label="Text colour" type="color" value={selectedShape?.type === "text" ? selectedShape.textColor || "#ffffff" : newTextColor} onChange={(event) => { setNewTextColor(event.target.value); if (selectedShape?.type === "text") updateSelectedShape({ textColor: event.target.value }); }} /></label><label><span>Box colour</span><input aria-label="Text box colour" type="color" value={selectedShape?.type === "text" ? selectedShape.backgroundColor || "#0c3769" : newTextBoxColor} onChange={(event) => { setNewTextBoxColor(event.target.value); if (selectedShape?.type === "text") updateSelectedShape({ backgroundColor: event.target.value }); }} /></label></div>
           <small>{selectedShape?.type === "text" ? "Drag the box to move it or its corner handles to resize. Double-click it to edit on the pitch. Use Cmd/Ctrl+C and Cmd/Ctrl+V to copy and paste boxes." : "Choose Draw text box, then drag on the pitch to set its size. New boxes switch back to Select automatically."}</small>
         </div>}
         {dockPanel === "tools" && <div className="sr-tactical-dock-panel" role="tabpanel">
