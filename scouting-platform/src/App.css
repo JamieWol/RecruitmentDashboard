@@ -257,7 +257,7 @@ header{z-index:1000!important}.sr-page{position:relative;z-index:1}.sr-pitch{z-i
 .sr-tactical-video-preview a{display:inline-flex;padding:8px 13px;border:1px solid #62dcff;border-radius:6px;background:#62dcff;color:#063d63;font-weight:700;text-decoration:none}
 .sr-tactical-video-canvas{position:fixed;left:-2000px;top:0;width:1280px;height:819px;pointer-events:none}
 .sr-tactical-pitch-wrap{display:flex;justify-content:center;width:100%;overflow:hidden;border:1px solid #83bdd5;border-radius:10px;background:#185f48;touch-action:none}
-.sr-tactical-pitch{display:block;width:100%;max-width:1400px;height:auto;max-height:82vh;aspect-ratio:25/16;touch-action:none;user-select:none}
+.sr-tactical-pitch{display:block;width:auto;height:min(64vh,calc(100vh - 250px));max-width:100%;max-height:min(64vh,calc(100vh - 250px));aspect-ratio:25/16;touch-action:none;user-select:none}
 .sr-tactical-grass{fill:#24734e}
 .sr-tactical-line{fill:none;stroke:#e8f4e9;stroke-width:3;opacity:.9}
 .sr-tactical-mark{fill:#e8f4e9}
@@ -293,7 +293,7 @@ header{z-index:1000!important}.sr-page{position:relative;z-index:1}.sr-pitch{z-i
 .sr-tactical-legend i.away{background:#e64b50}
 .sr-tactical-legend i.ball{background:#f7f8f3;border-color:#142234}
 .sr-tactical-legend small{color:#b9d8f1}
-@media(max-width:700px){.sr-team-analysis-header{align-items:flex-start}.sr-team-analysis-header h1{font-size:38px!important}.sr-team-analysis-header p{font-size:15px!important}.sr-team-analysis-more-trigger{padding:9px 13px}.sr-tactical-pad{padding:12px}.sr-tactical-pitch{max-width:100%;max-height:68vh}.sr-tactical-title-fields{grid-template-columns:1fr}.sr-tactical-tools button{flex:1 1 auto}.sr-tactical-drawing-toolbar .sr-tactical-opacity-control{flex:1 1 100%;flex-wrap:wrap}.sr-tactical-drawing-toolbar .sr-tactical-opacity-control input{flex:1 1 100%;width:100%}.sr-tactical-legend{align-items:flex-start}.sr-tactical-legend small{flex-basis:100%}}
+@media(max-width:700px){.sr-team-analysis-header{align-items:flex-start}.sr-team-analysis-header h1{font-size:38px!important}.sr-team-analysis-header p{font-size:15px!important}.sr-team-analysis-more-trigger{padding:9px 13px}.sr-tactical-pad{padding:12px}.sr-tactical-pitch{width:auto;height:min(52vh,calc(100vh - 300px));max-width:100%;max-height:min(52vh,calc(100vh - 300px))}.sr-tactical-title-fields{grid-template-columns:1fr}.sr-tactical-tools button{flex:1 1 auto}.sr-tactical-drawing-toolbar .sr-tactical-opacity-control{flex:1 1 100%;flex-wrap:wrap}.sr-tactical-drawing-toolbar .sr-tactical-opacity-control input{flex:1 1 100%;width:100%}.sr-tactical-legend{align-items:flex-start}.sr-tactical-legend small{flex-basis:100%}}
 .sr-assignment-fixture-heading{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:28px;cursor:pointer;text-transform:none;line-height:1.2}
 .sr-assignment-fixture-heading>span{display:inline-flex;align-items:center;gap:8px}
 .sr-assignment-fixture-heading>b{font-family:inherit;font-size:15px;letter-spacing:0;text-transform:uppercase;color:#b9d8f1}
@@ -301,17 +301,21 @@ header{z-index:1000!important}.sr-page{position:relative;z-index:1}.sr-pitch{z-i
 .sr-fixture-assigned-players strong{color:#fff}
 
 .sr-tactical-dock{margin-top:12px;border:1px solid #496277;border-radius:10px;background:#101d2b;color:#e6f2ff;overflow:hidden}
-.sr-tactical-dock-tabs{display:flex;gap:2px;padding:7px;background:#081522;border-bottom:1px solid #496277}
+.sr-tactical-dock-tabs{display:flex;flex-wrap:wrap;gap:2px;padding:7px;background:#081522;border-bottom:1px solid #496277}
 .sr-tactical-dock-tabs button{display:inline-flex;align-items:center;gap:7px;padding:9px 15px;border:0;border-radius:6px;background:transparent;color:#c5d7e8;font:inherit;font-weight:700;cursor:pointer}
 .sr-tactical-dock-tabs button:hover,.sr-tactical-dock-tabs button.active{background:#2a4862;color:#fff;box-shadow:inset 0 -2px #62dcff}
-.sr-tactical-dock-panel{display:grid;gap:10px;padding:12px}
+.sr-tactical-dock-panel{display:grid;gap:8px;padding:10px}
 .sr-tactical-dock-panel>small{color:#b9d8f1}
-.sr-tactical-shape-palette{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:7px}
-.sr-tactical-shape-palette button.sr-tactical-icon-tool{min-height:66px;flex-direction:column;gap:4px;padding:8px;background:#203246;border-color:#3c5871}
+.sr-tactical-shape-palette{display:grid;grid-template-columns:repeat(8,minmax(72px,1fr));grid-auto-flow:row;gap:7px;max-width:1160px}
+.sr-tactical-shape-palette>button.sr-tactical-icon-tool{grid-row:1;min-width:0;min-height:54px;flex-direction:column;gap:3px;padding:6px;background:#203246;border-color:#3c5871}
+.sr-tactical-shape-palette>.sr-tactical-color-control{grid-row:2;grid-column:1/3;min-width:0}
+.sr-tactical-shape-palette>.sr-tactical-opacity-control{grid-row:2;grid-column:3/9;min-width:0}
+.sr-tactical-shape-palette>button:nth-of-type(9){grid-row:3;grid-column:1/5}
+.sr-tactical-shape-palette>button:nth-of-type(10){grid-row:3;grid-column:5/9}
 .sr-tactical-shape-palette button.sr-tactical-icon-tool.selected,.sr-tactical-shape-palette button.sr-tactical-icon-tool:hover{background:#0d668f;border-color:#62dcff}
 .sr-tactical-shape-palette .sr-tactical-icon-tool svg{width:24px;height:24px}
 .sr-tactical-text-panel{grid-template-columns:minmax(120px,auto) minmax(220px,1fr);align-items:center}
 .sr-tactical-text-panel>label{display:grid;gap:5px;color:#d2e5fa;font-size:13px;font-weight:700}
 .sr-tactical-text-panel input{min-width:0;padding:9px 11px;border:1px solid #78b4d8;border-radius:6px;background:#0c3769;color:#fff;font:inherit}
 .sr-tactical-dock .sr-tactical-clip-list{margin-top:0}
-@media(max-width:700px){.sr-tactical-dock-tabs{overflow-x:auto}.sr-tactical-dock-tabs button{flex:0 0 auto;padding:8px 10px;font-size:13px}.sr-tactical-text-panel{grid-template-columns:1fr}.sr-tactical-shape-palette{grid-template-columns:repeat(4,minmax(64px,1fr))}.sr-tactical-drawing-toolbar .sr-tactical-opacity-control{flex:1 1 100%;flex-wrap:wrap}.sr-tactical-drawing-toolbar .sr-tactical-opacity-control input{flex:1 1 100%;width:100%}}
+@media(max-width:700px){.sr-tactical-dock-tabs{overflow-x:auto;flex-wrap:nowrap}.sr-tactical-dock-tabs button{flex:0 0 auto;padding:8px 10px;font-size:13px}.sr-tactical-text-panel{grid-template-columns:1fr}.sr-tactical-shape-palette{grid-template-columns:repeat(4,minmax(0,1fr));max-width:none}.sr-tactical-shape-palette>button.sr-tactical-icon-tool{grid-row:auto}.sr-tactical-shape-palette>.sr-tactical-color-control{grid-row:auto;grid-column:span 2}.sr-tactical-shape-palette>.sr-tactical-opacity-control{grid-row:auto;grid-column:1/-1;flex-wrap:wrap}.sr-tactical-shape-palette>.sr-tactical-opacity-control input{flex:1 1 100%;width:100%}.sr-tactical-shape-palette>button:nth-of-type(9),.sr-tactical-shape-palette>button:nth-of-type(10){grid-row:auto;grid-column:span 2}.sr-tactical-drawing-toolbar .sr-tactical-opacity-control{flex:1 1 100%;flex-wrap:wrap}.sr-tactical-drawing-toolbar .sr-tactical-opacity-control input{flex:1 1 100%;width:100%}}
