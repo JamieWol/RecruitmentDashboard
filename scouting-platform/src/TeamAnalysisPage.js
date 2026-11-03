@@ -241,6 +241,8 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const [enteringGraphicIds, setEnteringGraphicIds] = useState([]);
   const [newShapeOpacity, setNewShapeOpacity] = useState(0.35);
   const [newShapeColour, setNewShapeColour] = useState("#62dcff");
+  const [movementClips, setMovementClips] = useState([]);
+  const [activeClipStart, setActiveClipStart] = useState(null);
   const [videoRecording, setVideoRecording] = useState(false);
   const [finishingVideo, setFinishingVideo] = useState(false);
   const [videoStatus, setVideoStatus] = useState("");
@@ -250,8 +252,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const pitchRef = useRef(null);
   const videoCanvasRef = useRef(null);
   const boardRef = useRef(board);
-  const videoBoardRef = useRef(board);
-  const videoTransitionsRef = useRef(new Map());
+  const activeClipStartRef = useRef(null);
   const dragStartRef = useRef(null);
   const dragTargetsRef = useRef({});
   const ballDragTargetRef = useRef(null);
@@ -259,54 +260,11 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const videoChunksRef = useRef([]);
   const videoFrameRef = useRef(null);
   const videoFinishTimerRef = useRef(null);
-  const playbackTimerRef = useRef(null);
-  const playbackFrameRef = useRef(null);
 
   const markGraphicEntering = (id) => setEnteringGraphicIds((current) => [...current, id]);
   const finishGraphicEntering = (id) => setEnteringGraphicIds((current) => current.filter((item) => item !== id));
 
   useEffect(() => { boardRef.current = board; }, [board]);
-  useEffect(() => {
-    if (!videoRecording) return;
-    const current = videoBoardRef.current;
-    videoBoardRef.current = {
-      ...current,
-      name: board.name,
-      homeName: board.homeName,
-      awayName: board.awayName,
-      arrows: board.arrows,
-      shapes: board.shapes || [],
-      ball: current.ball || board.ball || { x: 500, y: 320 },
-      players: board.players.map((player) => {
-        const existing = current.players.find((item) => item.id === player.id);
-        return existing ? { ...existing, number: player.number, side: player.side } : { ...player };
-      }),
-    };
-  }, [board, videoRecording]);
-
-  const getVideoFrameBoard = (now = performance.now()) => {
-    const transitions = videoTransitionsRef.current;
-    const positionAt = (id, position) => {
-      const transition = transitions.get(id);
-      if (!transition) return { ...position, moving: false };
-      const progress = Math.min(1, Math.max(0, (now - transition.startedAt) / transition.duration));
-      const eased = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
-      const interpolated = {
-        x: transition.from.x + (transition.to.x - transition.from.x) * eased,
-        y: transition.from.y + (transition.to.y - transition.from.y) * eased,
-      };
-      if (progress >= 1) {
-        transitions.delete(id);
-        return { ...position, ...transition.to, moving: false };
-      }
-      return { ...position, ...interpolated, moving: true };
-    };
-    const players = videoBoardRef.current.players.map((player) => ({ ...player, ...positionAt(player.id, player) }));
-    const ball = positionAt("tactical-ball", videoBoardRef.current.ball || { x: 500, y: 320 });
-    const frameBoard = { ...videoBoardRef.current, players, ball };
-    videoBoardRef.current = frameBoard;
-    return frameBoard;
-  };
 
   useEffect(() => {
     const saveTimer = window.setTimeout(() => {
@@ -317,8 +275,6 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   useEffect(() => () => {
     if (videoFrameRef.current) window.cancelAnimationFrame(videoFrameRef.current);
     if (videoFinishTimerRef.current) window.clearTimeout(videoFinishTimerRef.current);
-    if (playbackTimerRef.current) window.clearTimeout(playbackTimerRef.current);
-    if (playbackFrameRef.current) window.cancelAnimationFrame(playbackFrameRef.current);
     const recorder = videoRecorderRef.current;
     if (recorder && recorder.state !== "inactive") recorder.stop();
   }, []);
@@ -467,15 +423,47 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     else if (selectedArrowId) setBoard((current) => ({ ...current, arrows: (current.arrows || []).map((arrow) => arrow.id === selectedArrowId ? { ...arrow, ...changes } : arrow) }));
   };
   const displayedBoard = playbackBoard || board;
-  const startVideoRecording = () => {
+  const beginOrSaveMovementClip = () => {
+    if (!activeClipStartRef.current) {
+      const start = JSON.parse(JSON.stringify(boardRef.current));
+      activeClipStartRef.current = start;
+      setActiveClipStart(start);
+      setVideoStatus(`Movement clip ${movementClips.length + 1} started. Move the players or ball, then save the clip.`);
+      return;
+    }
+    const from = activeClipStartRef.current;
+    const to = JSON.parse(JSON.stringify(boardRef.current));
+    const movedPlayers = to.players.filter((player) => {
+      const origin = from.players.find((item) => item.id === player.id);
+      return origin && Math.hypot(player.x - origin.x, player.y - origin.y) > 2;
+    }).length;
+    const fromBall = from.ball || { x: 500, y: 320 };
+    const toBall = to.ball || { x: 500, y: 320 };
+    const movedCount = movedPlayers + (Math.hypot(toBall.x - fromBall.x, toBall.y - fromBall.y) > 2 ? 1 : 0);
+    if (!movedCount) {
+      setVideoStatus("No movement recorded yet. Move at least one disc or the ball, then save this clip.");
+      return;
+    }
+    const clip = { id: `movement-${Date.now()}`, from, to, movedCount };
+    setMovementClips((current) => [...current, clip]);
+    activeClipStartRef.current = null;
+    setActiveClipStart(null);
+    setVideoStatus(`Movement clip ${movementClips.length + 1} saved. Add another clip or play all clips.`);
+  };
+  const cancelMovementClip = () => {
+    activeClipStartRef.current = null;
+    setActiveClipStart(null);
+    setVideoStatus("Movement clip cancelled.");
+  };
+  const playAllMovementClips = () => {
+    const clips = JSON.parse(JSON.stringify(movementClips));
+    if (!clips.length || finishingVideo) return;
     const canvas = videoCanvasRef.current;
     if (!canvas?.captureStream || typeof MediaRecorder === "undefined") {
       setVideoStatus("Video recording is not supported by this browser. Try Chrome, Edge, or Safari.");
       return;
     }
-    drawTacticalVideoFrame(canvas, boardRef.current);
-    videoBoardRef.current = JSON.parse(JSON.stringify(boardRef.current));
-    videoTransitionsRef.current.clear();
+    drawTacticalVideoFrame(canvas, clips[0].from);
     const stream = canvas.captureStream(30);
     const formats = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm", "video/mp4"];
     const mimeType = formats.find((format) => MediaRecorder.isTypeSupported?.(format));
@@ -490,8 +478,11 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     videoChunksRef.current = [];
     if (recordedVideo?.url) URL.revokeObjectURL(recordedVideo.url);
     setRecordedVideo(null);
-    setPlaybackBoard(null);
-    setVideoPlaying(false);
+    setPlaybackBoard(clips[0].from);
+    const durationPerClip = 3400;
+    const pauseBetweenClips = 450;
+    const timelineDuration = clips.length * durationPerClip + Math.max(0, clips.length - 1) * pauseBetweenClips;
+    const startedAt = performance.now() + 450;
     recorder.ondataavailable = (event) => { if (event.data?.size) videoChunksRef.current.push(event.data); };
     recorder.onstop = () => {
       const blob = new Blob(videoChunksRef.current, { type: recorder.mimeType || mimeType || "video/webm" });
@@ -500,108 +491,68 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
         const extension = blob.type.includes("mp4") ? "mp4" : "webm";
         const filename = (boardRef.current.name || "tactical-movement").trim().replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "tactical-movement";
         setRecordedVideo({ url, filename: `${filename}.${extension}` });
-        setVideoStatus("Recording ready. Play it here or download it when you're finished.");
+        setVideoStatus("Combined video ready. Play it here or download it when you're finished.");
       } else setVideoStatus("No video frames were recorded. Please try again.");
       stream.getTracks().forEach((track) => track.stop());
       videoRecorderRef.current = null;
+      setVideoRecording(false);
+      setFinishingVideo(false);
     };
-    recorder.onerror = () => setVideoStatus("Video recording stopped because of a browser error.");
+    recorder.onerror = () => {
+      setVideoStatus("Video recording stopped because of a browser error.");
+      stream.getTracks().forEach((track) => track.stop());
+      setVideoRecording(false);
+      setFinishingVideo(false);
+    };
     videoRecorderRef.current = recorder;
     recorder.start(250);
     setVideoRecording(true);
-    setVideoStatus("Recording your starting positions. Arrange the final positions, then choose Play movement to animate them together.");
+    setFinishingVideo(true);
+    setVideoPlaying(true);
+    setVideoStatus(`Playing ${clips.length} movement clip${clips.length === 1 ? "" : "s"} in sequence and recording one video…`);
     const drawFrame = () => {
-      drawTacticalVideoFrame(videoCanvasRef.current, getVideoFrameBoard());
+      const now = performance.now();
+      const elapsed = Math.max(0, now - startedAt);
+      if (elapsed >= timelineDuration) {
+        const lastBoard = clips[clips.length - 1].to;
+        const finalFrame = { ...lastBoard, name: boardRef.current.name, homeName: boardRef.current.homeName, awayName: boardRef.current.awayName, arrows: boardRef.current.arrows, shapes: boardRef.current.shapes };
+        drawTacticalVideoFrame(canvas, finalFrame);
+        setPlaybackBoard(null);
+        setVideoPlaying(false);
+        setBoard((current) => ({ ...current, players: finalFrame.players, ball: finalFrame.ball }));
+        videoFrameRef.current = null;
+        videoFinishTimerRef.current = window.setTimeout(() => { if (recorder.state !== "inactive") recorder.stop(); }, 500);
+        return;
+      }
+      const segmentSpan = durationPerClip + pauseBetweenClips;
+      const clipIndex = Math.min(clips.length - 1, Math.floor(elapsed / segmentSpan));
+      const clip = clips[clipIndex];
+      const clipElapsed = elapsed - clipIndex * segmentSpan;
+      const progress = Math.min(1, clipElapsed / durationPerClip);
+      const eased = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+      const players = clip.to.players.map((player) => {
+        const origin = clip.from.players.find((item) => item.id === player.id);
+        if (!origin) return player;
+        return { ...player, x: origin.x + (player.x - origin.x) * eased, y: origin.y + (player.y - origin.y) * eased };
+      });
+      const startBall = clip.from.ball || { x: 500, y: 320 };
+      const endBall = clip.to.ball || { x: 500, y: 320 };
+      const frameBoard = {
+        ...clip.to,
+        name: boardRef.current.name,
+        homeName: boardRef.current.homeName,
+        awayName: boardRef.current.awayName,
+        arrows: boardRef.current.arrows,
+        shapes: boardRef.current.shapes,
+        players,
+        ball: { x: startBall.x + (endBall.x - startBall.x) * eased, y: startBall.y + (endBall.y - startBall.y) * eased },
+      };
+      drawTacticalVideoFrame(canvas, frameBoard);
+      setPlaybackBoard(frameBoard);
       videoFrameRef.current = window.requestAnimationFrame(drawFrame);
     };
     videoFrameRef.current = window.requestAnimationFrame(drawFrame);
   };
-  const stopVideoRecording = () => {
-    const recorder = videoRecorderRef.current;
-    if (!recorder || recorder.state === "inactive" || finishingVideo) return;
-    const initial = videoBoardRef.current;
-    const final = boardRef.current;
-    const startedAt = performance.now() + 450;
-    const duration = 3400;
-    let movements = 0;
-    videoTransitionsRef.current.clear();
-    final.players.forEach((player) => {
-      const from = initial.players.find((item) => item.id === player.id);
-      if (!from) return;
-      if (Math.hypot(player.x - from.x, player.y - from.y) > 2) {
-        videoTransitionsRef.current.set(player.id, { from: { x: from.x, y: from.y }, to: { x: player.x, y: player.y }, startedAt, duration });
-        movements += 1;
-      }
-    });
-    const initialBall = initial.ball || { x: 500, y: 320 };
-    const finalBall = final.ball || { x: 500, y: 320 };
-    if (Math.hypot(finalBall.x - initialBall.x, finalBall.y - initialBall.y) > 2) {
-      videoTransitionsRef.current.set("tactical-ball", { from: { ...initialBall }, to: { ...finalBall }, startedAt, duration });
-      movements += 1;
-    }
-    setFinishingVideo(true);
-    const startingPlayback = {
-      ...final,
-      players: final.players.map((player) => {
-        const from = initial.players.find((item) => item.id === player.id);
-        return from ? { ...player, x: from.x, y: from.y } : player;
-      }),
-      ball: initial.ball || { x: 500, y: 320 },
-    };
-    setPlaybackBoard(startingPlayback);
-    setVideoPlaying(movements > 0);
-    setVideoStatus(movements ? "Playing the movement on the tactical pad and recording it…" : "No positions changed. Preparing your video…");
-    if (playbackFrameRef.current) window.cancelAnimationFrame(playbackFrameRef.current);
-    if (movements) {
-      const animatePadFrame = () => {
-        const now = performance.now();
-        const progress = Math.min(1, Math.max(0, (now - startedAt) / duration));
-        const eased = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
-        const players = final.players.map((player) => {
-          const from = initial.players.find((item) => item.id === player.id);
-          if (!from) return player;
-          return {
-            ...player,
-            x: from.x + (player.x - from.x) * eased,
-            y: from.y + (player.y - from.y) * eased,
-          };
-        });
-        const startBall = initial.ball || { x: 500, y: 320 };
-        const endBall = final.ball || { x: 500, y: 320 };
-        setPlaybackBoard({
-          ...final,
-          players,
-          ball: {
-            x: startBall.x + (endBall.x - startBall.x) * eased,
-            y: startBall.y + (endBall.y - startBall.y) * eased,
-          },
-        });
-        if (progress < 1) playbackFrameRef.current = window.requestAnimationFrame(animatePadFrame);
-        else {
-          playbackFrameRef.current = null;
-          setVideoPlaying(false);
-          // Return to live board state once the final positions have been reached.
-          setPlaybackBoard(null);
-        }
-      };
-      playbackFrameRef.current = window.requestAnimationFrame(animatePadFrame);
-    } else {
-      setVideoPlaying(false);
-      setPlaybackBoard(null);
-    }
-    videoFinishTimerRef.current = window.setTimeout(() => {
-      if (videoFrameRef.current) window.cancelAnimationFrame(videoFrameRef.current);
-      videoFrameRef.current = null;
-      setVideoRecording(false);
-      setFinishingVideo(false);
-      setVideoPlaying(false);
-      if (playbackFrameRef.current) window.cancelAnimationFrame(playbackFrameRef.current);
-      playbackFrameRef.current = null;
-      setPlaybackBoard(null);
-      if (recorder.state !== "inactive") recorder.stop();
-    }, movements ? duration + 1100 : 700);
-  };
-
   return (
     <section className="sr-tactical-pad">
       <div className="sr-tactical-toolbar">
@@ -610,29 +561,18 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
           <label><span>Home team</span><input value={board.homeName} onChange={(event) => setBoard((current) => ({ ...current, homeName: event.target.value }))} /></label>
           <label><span>Opposition</span><input value={board.awayName} onChange={(event) => setBoard((current) => ({ ...current, awayName: event.target.value }))} /></label>
         </div>
-        <div className="sr-tactical-tools" role="toolbar" aria-label="Tactical pad tools">
-          <button type="button" className={`sr-tactical-icon-tool ${mode === "move" && !multiSelectMode ? "selected" : ""}`} title="Move players and select shapes" aria-label="Move players and select shapes" onClick={() => { setMode("move"); setMultiSelectMode(false); }}><TacticalToolIcon type="move" /><span>Move</span></button>
-          <button type="button" className={`sr-tactical-icon-tool ${multiSelectMode ? "selected" : ""}`} title="Select multiple players" aria-label="Select multiple players" onClick={() => { setMode("move"); setMultiSelectMode((value) => !value); }}><TacticalToolIcon type="multiple" /><span>Select multiple</span></button>
-          <button type="button" className={`sr-tactical-icon-tool ${mode === "arrow" ? "selected" : ""}`} title="Draw arrows" aria-label="Draw arrows" onClick={() => { setMode("arrow"); setSelectedShapeId(null); setSelectedArrowId(null); }}><TacticalToolIcon type="arrow" /><span>Arrow</span></button>
-          <button type="button" className={`sr-tactical-icon-tool ${mode === "rectangle" ? "selected" : ""}`} title="Draw rectangle" aria-label="Draw rectangle" onClick={() => { setMode("rectangle"); setSelectedShapeId(null); setSelectedArrowId(null); }}><TacticalToolIcon type="rectangle" /><span>Rectangle</span></button>
-          <button type="button" className={`sr-tactical-icon-tool ${mode === "square" ? "selected" : ""}`} title="Draw square" aria-label="Draw square" onClick={() => { setMode("square"); setSelectedShapeId(null); setSelectedArrowId(null); }}><TacticalToolIcon type="square" /><span>Square</span></button>
+        <div className="sr-tactical-tools" role="toolbar" aria-label="Tactical pad actions">
           <button type="button" onClick={() => addPlayer("home")}>+ Home disc</button>
           <button type="button" onClick={() => addPlayer("away")}>+ Opponent disc</button>
           <button type="button" onClick={removeSelectedPlayer} disabled={!selectedTokens.length}>Remove selected</button>
           <button type="button" onClick={() => { setBoard((current) => ({ ...current, arrows: [] })); setSelectedArrowId(null); }} disabled={!board.arrows.length}>Clear arrows</button>
           <button type="button" onClick={() => { setBoard(freshTacticalBoard(homeTeamName, oppositionName)); setSelectedTokens([]); setSelectedShapeId(null); setSelectedArrowId(null); }}>Reset pitch</button>
-          <button type="button" className={videoRecording ? "sr-tactical-recording" : "sr-tactical-video"} onClick={videoRecording ? stopVideoRecording : startVideoRecording} disabled={finishingVideo}>{finishingVideo ? "Playing movement…" : videoRecording ? "Play movement" : "Record video"}</button>
-        </div>
-        <div className="sr-tactical-shape-controls">
-          <label><span>Shape / arrow colour</span><input type="color" value={selectedGraphic?.color || newShapeColour} onChange={(event) => { setNewShapeColour(event.target.value); updateSelectedGraphic({ color: event.target.value }); }} /></label>
-          <label className="sr-tactical-opacity-control"><span>Transparency</span><input aria-label="Shape transparency" type="range" min="0" max="95" step="5" value={100 - Math.round((selectedGraphic?.opacity ?? newShapeOpacity) * 100)} onChange={(event) => { const opacity = 1 - Number(event.target.value) / 100; if (selectedGraphic) updateSelectedGraphic({ opacity }); else setNewShapeOpacity(opacity); }} /><output>{100 - Math.round((selectedGraphic?.opacity ?? newShapeOpacity) * 100)}%</output></label>
-          <button type="button" onClick={() => { if (selectedShape) setBoard((current) => ({ ...current, shapes: (current.shapes || []).filter((shape) => shape.id !== selectedShapeId) })); else if (selectedArrowId) setBoard((current) => ({ ...current, arrows: (current.arrows || []).filter((arrow) => arrow.id !== selectedArrowId) })); setSelectedShapeId(null); setSelectedArrowId(null); }} disabled={!selectedGraphic}>Delete selected graphic</button>
-          <button type="button" onClick={() => { setBoard((current) => ({ ...current, shapes: [] })); setSelectedShapeId(null); }} disabled={!(board.shapes || []).length}>Clear shapes</button>
-          <small>{selectedShape ? "Adjusting selected shape" : selectedArrow ? "Adjusting selected arrow" : "Set colour and transparency for the next shape or arrow"}</small>
+          <button type="button" className={activeClipStart ? "sr-tactical-recording" : "sr-tactical-video"} onClick={beginOrSaveMovementClip} disabled={finishingVideo}>{activeClipStart ? "Save movement clip" : "Start movement clip"}</button>
+          {activeClipStart && <button type="button" onClick={cancelMovementClip} disabled={finishingVideo}>Cancel clip</button>}
+          <button type="button" className={videoRecording ? "sr-tactical-recording" : "sr-tactical-video"} onClick={playAllMovementClips} disabled={!movementClips.length || finishingVideo || Boolean(activeClipStart)}>{finishingVideo ? "Playing clips…" : `Play all clips${movementClips.length ? ` (${movementClips.length})` : ""}`}</button>
         </div>
       </div>
       {videoStatus && <p className="sr-tactical-video-status" role="status">{videoStatus}</p>}
-      {recordedVideo && <div className="sr-tactical-video-preview"><button type="button" className="sr-tactical-video-close" aria-label="Close video preview" title="Close video preview" onClick={() => { setRecordedVideo(null); setPlaybackBoard(null); setVideoPlaying(false); if (playbackFrameRef.current) window.cancelAnimationFrame(playbackFrameRef.current); playbackFrameRef.current = null; setVideoStatus(""); setMode("move"); setMultiSelectMode(false); }}>×</button><video controls playsInline preload="metadata" src={recordedVideo.url}>Your browser cannot play this recording.</video><a href={recordedVideo.url} download={recordedVideo.filename}>Download video</a></div>}
       <canvas ref={videoCanvasRef} width="1280" height="819" className="sr-tactical-video-canvas" aria-hidden="true" />
 
       <div className={`sr-tactical-pitch-wrap ${mode === "arrow" ? "drawing" : "moving"}`}>
@@ -666,7 +606,23 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
           </g>)}
         </svg>
       </div>
-      <div className="sr-tactical-legend"><span><i className="home" />{board.homeName}</span><span><i className="away" />{board.awayName}</span><span><i className="ball" />Ball</span><small>Drag discs or the ball to set the final positions. Record video, make your changes, then choose Play movement. The board saves automatically on this device.</small></div>
+      <div className="sr-tactical-drawing-toolbar">
+        <div className="sr-tactical-tools" role="toolbar" aria-label="Pitch drawing tools">
+          <button type="button" className={`sr-tactical-icon-tool ${mode === "move" && !multiSelectMode ? "selected" : ""}`} title="Move players and select shapes" aria-label="Move players and select shapes" onClick={() => { setMode("move"); setMultiSelectMode(false); }}><TacticalToolIcon type="move" /><span>Move</span></button>
+          <button type="button" className={`sr-tactical-icon-tool ${multiSelectMode ? "selected" : ""}`} title="Select multiple players" aria-label="Select multiple players" onClick={() => { setMode("move"); setMultiSelectMode((value) => !value); }}><TacticalToolIcon type="multiple" /><span>Select multiple</span></button>
+          <button type="button" className={`sr-tactical-icon-tool ${mode === "arrow" ? "selected" : ""}`} title="Draw arrows" aria-label="Draw arrows" onClick={() => { setMode("arrow"); setSelectedShapeId(null); setSelectedArrowId(null); }}><TacticalToolIcon type="arrow" /><span>Arrow</span></button>
+          <button type="button" className={`sr-tactical-icon-tool ${mode === "rectangle" ? "selected" : ""}`} title="Draw rectangle" aria-label="Draw rectangle" onClick={() => { setMode("rectangle"); setSelectedShapeId(null); setSelectedArrowId(null); }}><TacticalToolIcon type="rectangle" /><span>Rectangle</span></button>
+          <button type="button" className={`sr-tactical-icon-tool ${mode === "square" ? "selected" : ""}`} title="Draw square" aria-label="Draw square" onClick={() => { setMode("square"); setSelectedShapeId(null); setSelectedArrowId(null); }}><TacticalToolIcon type="square" /><span>Square</span></button>
+          <label className="sr-tactical-color-control"><span>Colour</span><input type="color" value={selectedGraphic?.color || newShapeColour} onChange={(event) => { setNewShapeColour(event.target.value); updateSelectedGraphic({ color: event.target.value }); }} /></label>
+          <label className="sr-tactical-opacity-control"><span>Transparency</span><input aria-label="Shape transparency" type="range" min="0" max="95" step="5" value={100 - Math.round((selectedGraphic?.opacity ?? newShapeOpacity) * 100)} onChange={(event) => { const opacity = 1 - Number(event.target.value) / 100; if (selectedGraphic) updateSelectedGraphic({ opacity }); else setNewShapeOpacity(opacity); }} /><output>{100 - Math.round((selectedGraphic?.opacity ?? newShapeOpacity) * 100)}%</output></label>
+          <button type="button" onClick={() => { if (selectedShape) setBoard((current) => ({ ...current, shapes: (current.shapes || []).filter((shape) => shape.id !== selectedShapeId) })); else if (selectedArrowId) setBoard((current) => ({ ...current, arrows: (current.arrows || []).filter((arrow) => arrow.id !== selectedArrowId) })); setSelectedShapeId(null); setSelectedArrowId(null); }} disabled={!selectedGraphic}>Delete selected</button>
+          <button type="button" onClick={() => { setBoard((current) => ({ ...current, shapes: [] })); setSelectedShapeId(null); }} disabled={!(board.shapes || []).length}>Clear shapes</button>
+        </div>
+        <small>{selectedShape ? "Adjusting selected shape" : selectedArrow ? "Adjusting selected arrow" : "Set colour and transparency for the next shape or arrow"}</small>
+      </div>
+      {movementClips.length > 0 && <div className="sr-tactical-clip-list"><strong>Movement clips</strong><ol>{movementClips.map((clip, index) => <li key={clip.id}><span>Clip {index + 1}: {clip.movedCount} piece{clip.movedCount === 1 ? "" : "s"} moved</span><button type="button" onClick={() => setMovementClips((current) => current.filter((item) => item.id !== clip.id))} disabled={finishingVideo}>Remove</button></li>)}</ol><div className="sr-tactical-clip-list-actions"><button type="button" onClick={() => setMovementClips((current) => current.slice(0, -1))} disabled={finishingVideo}>Undo last clip</button><button type="button" onClick={() => setMovementClips([])} disabled={finishingVideo}>Clear clips</button></div></div>}
+      {recordedVideo && <div className="sr-tactical-video-preview"><button type="button" className="sr-tactical-video-close" aria-label="Close video preview" title="Close video preview" onClick={() => { setRecordedVideo(null); setPlaybackBoard(null); setVideoPlaying(false); setVideoStatus(""); setMode("move"); setMultiSelectMode(false); }}>×</button><video controls playsInline preload="metadata" src={recordedVideo.url}>Your browser cannot play this recording.</video><a href={recordedVideo.url} download={recordedVideo.filename}>Download video</a></div>}
+      <div className="sr-tactical-legend"><span><i className="home" />{board.homeName}</span><span><i className="away" />{board.awayName}</span><span><i className="ball" />Ball</span><small>Start a movement clip, move players or the ball, and save it. Repeat for each movement, then play all clips as one video. The board saves automatically on this device.</small></div>
     </section>
   );
 }
