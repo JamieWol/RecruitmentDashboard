@@ -299,3 +299,19 @@ header{z-index:1000!important}.sr-page{position:relative;z-index:1}.sr-pitch{z-i
 .sr-assignment-fixture-heading>b{font-family:inherit;font-size:15px;letter-spacing:0;text-transform:uppercase;color:#b9d8f1}
 .sr-fixture-assigned-players{margin:12px 0 0;color:#d2e5fa;line-height:1.5}
 .sr-fixture-assigned-players strong{color:#fff}
+
+.sr-tactical-dock{margin-top:12px;border:1px solid #496277;border-radius:10px;background:#101d2b;color:#e6f2ff;overflow:hidden}
+.sr-tactical-dock-tabs{display:flex;gap:2px;padding:7px;background:#081522;border-bottom:1px solid #496277}
+.sr-tactical-dock-tabs button{display:inline-flex;align-items:center;gap:7px;padding:9px 15px;border:0;border-radius:6px;background:transparent;color:#c5d7e8;font:inherit;font-weight:700;cursor:pointer}
+.sr-tactical-dock-tabs button:hover,.sr-tactical-dock-tabs button.active{background:#2a4862;color:#fff;box-shadow:inset 0 -2px #62dcff}
+.sr-tactical-dock-panel{display:grid;gap:10px;padding:12px}
+.sr-tactical-dock-panel>small{color:#b9d8f1}
+.sr-tactical-shape-palette{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:7px}
+.sr-tactical-shape-palette button.sr-tactical-icon-tool{min-height:66px;flex-direction:column;gap:4px;padding:8px;background:#203246;border-color:#3c5871}
+.sr-tactical-shape-palette button.sr-tactical-icon-tool.selected,.sr-tactical-shape-palette button.sr-tactical-icon-tool:hover{background:#0d668f;border-color:#62dcff}
+.sr-tactical-shape-palette .sr-tactical-icon-tool svg{width:24px;height:24px}
+.sr-tactical-text-panel{grid-template-columns:minmax(120px,auto) minmax(220px,1fr);align-items:center}
+.sr-tactical-text-panel>label{display:grid;gap:5px;color:#d2e5fa;font-size:13px;font-weight:700}
+.sr-tactical-text-panel input{min-width:0;padding:9px 11px;border:1px solid #78b4d8;border-radius:6px;background:#0c3769;color:#fff;font:inherit}
+.sr-tactical-dock .sr-tactical-clip-list{margin-top:0}
+@media(max-width:700px){.sr-tactical-dock-tabs{overflow-x:auto}.sr-tactical-dock-tabs button{flex:0 0 auto;padding:8px 10px;font-size:13px}.sr-tactical-text-panel{grid-template-columns:1fr}.sr-tactical-shape-palette{grid-template-columns:repeat(4,minmax(64px,1fr))}.sr-tactical-drawing-toolbar .sr-tactical-opacity-control{flex:1 1 100%;flex-wrap:wrap}.sr-tactical-drawing-toolbar .sr-tactical-opacity-control input{flex:1 1 100%;width:100%}}

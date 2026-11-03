@@ -152,8 +152,12 @@ function TacticalToolIcon({ type }) {
     {type === "move" && <><path d="M5 3 19 13l-6 .7-3.2 5.3L5 3Z" /><path d="m13 14 3 6" /></>}
     {type === "multiple" && <><circle cx="7" cy="7" r="3" /><circle cx="17" cy="7" r="3" /><circle cx="7" cy="17" r="3" /><circle cx="17" cy="17" r="3" /></>}
     {type === "arrow" && <><path d="M4 18 18 6" /><path d="M11 6h7v7" /></>}
+    {type === "line" && <path d="M4 19 20 5" />}
     {type === "rectangle" && <rect x="3" y="6" width="18" height="12" rx="1" />}
     {type === "square" && <rect x="5" y="5" width="14" height="14" rx="1" />}
+    {type === "circle" && <circle cx="12" cy="12" r="8" />}
+    {type === "triangle" && <path d="m12 4 9 16H3L12 4Z" />}
+    {type === "text" && <><path d="M4 6h16M12 6v13M8 19h8" /><path d="M7 6h10" /></>}
   </svg>;
 }
 
@@ -182,11 +186,27 @@ const drawTacticalVideoFrame = (canvas, board) => {
   (board.shapes || []).forEach((shape) => {
     const opacity = Number(shape.opacity);
     context.globalAlpha = Math.max(0, Math.min(1, Number.isFinite(opacity) ? opacity : 0.35));
-    context.fillStyle = shape.color || "#62dcff";
+    context.fillStyle = shape.type === "text" ? "#0c3769" : shape.color || "#62dcff";
     context.strokeStyle = shape.color || "#62dcff";
     context.lineWidth = 3;
-    context.fillRect(shape.x, shape.y, shape.width, shape.height);
-    context.strokeRect(shape.x, shape.y, shape.width, shape.height);
+    if (shape.type === "line") {
+      context.beginPath(); context.moveTo(shape.x, shape.y); context.lineTo(shape.x + shape.width, shape.y + shape.height); context.stroke();
+    } else if (shape.type === "circle") {
+      context.beginPath(); context.ellipse(shape.x + shape.width / 2, shape.y + shape.height / 2, shape.width / 2, shape.height / 2, 0, 0, Math.PI * 2); context.fill(); context.stroke();
+    } else if (shape.type === "triangle") {
+      context.beginPath(); context.moveTo(shape.x + shape.width / 2, shape.y); context.lineTo(shape.x + shape.width, shape.y + shape.height); context.lineTo(shape.x, shape.y + shape.height); context.closePath(); context.fill(); context.stroke();
+    } else {
+      context.fillRect(shape.x, shape.y, shape.width, shape.height);
+      context.strokeRect(shape.x, shape.y, shape.width, shape.height);
+      if (shape.type === "text") {
+        context.globalAlpha = 1;
+        context.fillStyle = "#fff";
+        context.font = "bold 22px Arial, sans-serif";
+        context.textAlign = "left";
+        context.textBaseline = "middle";
+        context.fillText(shape.text || "Text", shape.x + 10, shape.y + shape.height / 2, Math.max(20, shape.width - 20));
+      }
+    }
   });
   context.globalAlpha = 1;
   context.fillStyle = "#fff";
@@ -241,6 +261,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const [enteringGraphicIds, setEnteringGraphicIds] = useState([]);
   const [newShapeOpacity, setNewShapeOpacity] = useState(0.35);
   const [newShapeColour, setNewShapeColour] = useState("#62dcff");
+  const [dockPanel, setDockPanel] = useState("shapes");
   const [movementClips, setMovementClips] = useState([]);
   const [activeClipStart, setActiveClipStart] = useState(null);
   const [videoRecording, setVideoRecording] = useState(false);
@@ -293,7 +314,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const shapeForDrag = (start, end, type) => {
     let dx = end.x - start.x;
     let dy = end.y - start.y;
-    if (type === "square") {
+    if (["square", "circle"].includes(type)) {
       const side = Math.max(Math.abs(dx), Math.abs(dy));
       dx = (dx < 0 ? -1 : 1) * side;
       dy = (dy < 0 ? -1 : 1) * side;
@@ -325,7 +346,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     setDraggingBall(true);
   };
   const handlePitchPointerDown = (event) => {
-    if (!(["arrow", "rectangle", "square"].includes(mode)) || finishingVideo) return;
+    if (!(["arrow", "rectangle", "square", "circle", "triangle", "line", "text"].includes(mode)) || finishingVideo) return;
     pitchRef.current?.setPointerCapture?.(event.pointerId);
     const point = pointFromEvent(event);
     setArrowStart(point);
@@ -382,12 +403,19 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
         setSelectedArrowId(newArrow.id);
         setSelectedShapeId(null);
       }
-      if (distance > 12 && ["rectangle", "square"].includes(mode)) {
+      if (distance > 12 && ["rectangle", "square", "circle", "triangle", "line"].includes(mode)) {
         const box = shapeForDrag(arrowStart, end, mode);
         const newShape = { id: `shape-${Date.now()}`, type: mode, ...box, color: newShapeColour, opacity: newShapeOpacity };
         setBoard((current) => ({ ...current, shapes: [...(current.shapes || []), newShape] }));
         markGraphicEntering(newShape.id);
         setSelectedShapeId(newShape.id);
+        setSelectedArrowId(null);
+      }
+      if (mode === "text") {
+        const newTextBox = { id: `text-${Date.now()}`, type: "text", x: arrowStart.x, y: arrowStart.y, width: 220, height: 48, text: "Text", color: newShapeColour, opacity: 0.85 };
+        setBoard((current) => ({ ...current, shapes: [...(current.shapes || []), newTextBox] }));
+        markGraphicEntering(newTextBox.id);
+        setSelectedShapeId(newTextBox.id);
         setSelectedArrowId(null);
       }
       setArrowStart(null);
@@ -602,16 +630,6 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
           <label><span>Home team</span><input value={board.homeName} onChange={(event) => setBoard((current) => ({ ...current, homeName: event.target.value }))} /></label>
           <label><span>Opposition</span><input value={board.awayName} onChange={(event) => setBoard((current) => ({ ...current, awayName: event.target.value }))} /></label>
         </div>
-        <div className="sr-tactical-tools" role="toolbar" aria-label="Tactical pad actions">
-          <button type="button" onClick={() => addPlayer("home")}>+ Home disc</button>
-          <button type="button" onClick={() => addPlayer("away")}>+ Opponent disc</button>
-          <button type="button" onClick={removeSelectedPlayer} disabled={!selectedTokens.length}>Remove selected</button>
-          <button type="button" onClick={() => { setBoard((current) => ({ ...current, arrows: [] })); setSelectedArrowId(null); }} disabled={!board.arrows.length}>Clear arrows</button>
-          <button type="button" onClick={() => { setBoard(freshTacticalBoard(homeTeamName, oppositionName)); setSelectedTokens([]); setSelectedShapeId(null); setSelectedArrowId(null); }}>Reset pitch</button>
-          <button type="button" className={activeClipStart ? "sr-tactical-recording" : "sr-tactical-video"} onClick={beginOrSaveMovementClip} disabled={finishingVideo}>{activeClipStart ? "Save movement clip" : "Start movement clip"}</button>
-          {activeClipStart && <button type="button" onClick={cancelMovementClip} disabled={finishingVideo}>Cancel clip</button>}
-          <button type="button" className={videoRecording ? "sr-tactical-recording" : "sr-tactical-video"} onClick={playAllMovementClips} disabled={!movementClips.length || finishingVideo || Boolean(activeClipStart)}>{finishingVideo ? "Playing clips…" : `Play all clips${movementClips.length ? ` (${movementClips.length})` : ""}`}</button>
-        </div>
       </div>
       {videoStatus && <p className="sr-tactical-video-status" role="status">{videoStatus}</p>}
       <canvas ref={videoCanvasRef} width="1280" height="819" className="sr-tactical-video-canvas" aria-hidden="true" />
@@ -632,9 +650,31 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
           <circle cx="145" cy="320" r="4" className="sr-tactical-mark" />
           <circle cx="855" cy="320" r="4" className="sr-tactical-mark" />
           <path d="M35 55 A20 20 0 0 0 55 35 M945 35 A20 20 0 0 0 965 55 M35 585 A20 20 0 0 1 55 605 M945 605 A20 20 0 0 1 965 585" className="sr-tactical-line" />
-          {(board.shapes || []).map((shape) => <rect key={shape.id} x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="2" fill={shape.color || "#62dcff"} fillOpacity={shape.opacity ?? 0.35} stroke={shape.color || "#62dcff"} strokeOpacity={shape.opacity ?? 0.35} strokeWidth={3} className={`sr-tactical-shape ${selectedShapeId === shape.id ? "selected" : ""} ${enteringGraphicIds.includes(shape.id) ? "entering" : ""}`} onAnimationEnd={() => finishGraphicEntering(shape.id)} onPointerDown={(event) => { if (mode === "move") { event.stopPropagation(); setSelectedShapeId(shape.id); setSelectedArrowId(null); } }} />)}
+          {(board.shapes || []).map((shape) => {
+            const selected = selectedShapeId === shape.id;
+            const entering = enteringGraphicIds.includes(shape.id);
+            const graphicClass = `sr-tactical-shape ${selected ? "selected" : ""} ${entering ? "entering" : ""}`;
+            const graphicEvents = {
+              className: graphicClass,
+              onAnimationEnd: () => finishGraphicEntering(shape.id),
+              onPointerDown: (event) => { if (mode === "move" || (mode === "text" && shape.type === "text")) { event.stopPropagation(); setSelectedShapeId(shape.id); setSelectedArrowId(null); } },
+            };
+            const fill = shape.color || "#62dcff";
+            const opacity = shape.opacity ?? 0.35;
+            if (shape.type === "text") return <g key={shape.id} {...graphicEvents}><rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="5" fill="#0c3769" fillOpacity={shape.opacity ?? 0.85} stroke={selected ? "#ffe36e" : fill} strokeOpacity={1} strokeWidth={selected ? 4 : 2} /><text x={shape.x + 10} y={shape.y + shape.height / 2} fill="#fff" fontSize="22" fontWeight="700" dominantBaseline="middle" pointerEvents="none">{shape.text || "Text"}</text></g>;
+            if (shape.type === "line") return <line key={shape.id} {...graphicEvents} x1={shape.x} y1={shape.y} x2={shape.x + shape.width} y2={shape.y + shape.height} stroke={selected ? "#ffe36e" : fill} strokeOpacity={opacity} strokeWidth={selected ? 6 : 4} />;
+            if (shape.type === "circle") return <ellipse key={shape.id} {...graphicEvents} cx={shape.x + shape.width / 2} cy={shape.y + shape.height / 2} rx={shape.width / 2} ry={shape.height / 2} fill={fill} fillOpacity={opacity} stroke={selected ? "#ffe36e" : fill} strokeOpacity={selected ? 1 : opacity} strokeWidth={selected ? 5 : 3} />;
+            if (shape.type === "triangle") return <polygon key={shape.id} {...graphicEvents} points={`${shape.x + shape.width / 2},${shape.y} ${shape.x + shape.width},${shape.y + shape.height} ${shape.x},${shape.y + shape.height}`} fill={fill} fillOpacity={opacity} stroke={selected ? "#ffe36e" : fill} strokeOpacity={selected ? 1 : opacity} strokeWidth={selected ? 5 : 3} />;
+            return <rect key={shape.id} {...graphicEvents} x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="2" fill={fill} fillOpacity={opacity} stroke={selected ? "#ffe36e" : fill} strokeOpacity={selected ? 1 : opacity} strokeWidth={selected ? 5 : 3} />;
+          })}
           {arrowPreview && arrowStart && mode === "arrow" && <line x1={arrowStart.x} y1={arrowStart.y} x2={arrowPreview.x} y2={arrowPreview.y} className="sr-tactical-arrow sr-tactical-arrow-preview" stroke={newShapeColour} markerEnd="url(#sr-tactical-arrowhead-preview)" />}
-          {arrowPreview && arrowStart && ["rectangle", "square"].includes(mode) && (() => { const shape = shapeForDrag(arrowStart, arrowPreview, mode); return <rect {...shape} fill={newShapeColour} fillOpacity={newShapeOpacity} stroke={newShapeColour} strokeOpacity={newShapeOpacity} strokeWidth={3} className="sr-tactical-shape-preview" />; })()}
+          {arrowPreview && arrowStart && ["rectangle", "square", "circle", "triangle", "line"].includes(mode) && (() => {
+            const shape = shapeForDrag(arrowStart, arrowPreview, mode);
+            if (mode === "line") return <line x1={arrowStart.x} y1={arrowStart.y} x2={arrowPreview.x} y2={arrowPreview.y} stroke={newShapeColour} strokeOpacity={newShapeOpacity} strokeWidth={3} className="sr-tactical-shape-preview" />;
+            if (mode === "circle") return <ellipse cx={shape.x + shape.width / 2} cy={shape.y + shape.height / 2} rx={shape.width / 2} ry={shape.height / 2} fill={newShapeColour} fillOpacity={newShapeOpacity} stroke={newShapeColour} strokeOpacity={newShapeOpacity} strokeWidth={3} className="sr-tactical-shape-preview" />;
+            if (mode === "triangle") return <polygon points={`${shape.x + shape.width / 2},${shape.y} ${shape.x + shape.width},${shape.y + shape.height} ${shape.x},${shape.y + shape.height}`} fill={newShapeColour} fillOpacity={newShapeOpacity} stroke={newShapeColour} strokeOpacity={newShapeOpacity} strokeWidth={3} className="sr-tactical-shape-preview" />;
+            return <rect {...shape} fill={newShapeColour} fillOpacity={newShapeOpacity} stroke={newShapeColour} strokeOpacity={newShapeOpacity} strokeWidth={3} className="sr-tactical-shape-preview" />;
+          })()}
           {board.arrows.map((arrow) => <line key={arrow.id} x1={arrow.from.x} y1={arrow.from.y} x2={arrow.to.x} y2={arrow.to.y} stroke={arrow.color || "#ffe36e"} strokeOpacity={arrow.opacity ?? 1} className={`sr-tactical-arrow ${selectedArrowId === arrow.id ? "selected" : ""} ${enteringGraphicIds.includes(arrow.id) ? "entering" : ""}`} markerEnd={`url(#sr-tactical-arrowhead-${arrow.id})`} onAnimationEnd={() => finishGraphicEntering(arrow.id)} onPointerDown={(event) => { if (mode === "move") { event.stopPropagation(); setSelectedArrowId(arrow.id); setSelectedShapeId(null); } }} />)}
           <g className={`sr-tactical-ball ${draggingBall ? "dragging" : ""} ${videoPlaying ? "video-playing" : ""}`} transform={`translate(${displayedBoard.ball?.x ?? 500} ${displayedBoard.ball?.y ?? 320})`} onPointerDown={beginBallDrag}>
             <circle r="13" className="sr-tactical-ball-shadow" /><circle r="10" className="sr-tactical-ball-shell" />
@@ -647,21 +687,49 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
           </g>)}
         </svg>
       </div>
-      <div className="sr-tactical-drawing-toolbar">
-        <div className="sr-tactical-tools" role="toolbar" aria-label="Pitch drawing tools">
-          <button type="button" className={`sr-tactical-icon-tool ${mode === "move" && !multiSelectMode ? "selected" : ""}`} title="Move players and select shapes" aria-label="Move players and select shapes" onClick={() => { setMode("move"); setMultiSelectMode(false); }}><TacticalToolIcon type="move" /><span>Move</span></button>
-          <button type="button" className={`sr-tactical-icon-tool ${multiSelectMode ? "selected" : ""}`} title="Select multiple players" aria-label="Select multiple players" onClick={() => { setMode("move"); setMultiSelectMode((value) => !value); }}><TacticalToolIcon type="multiple" /><span>Select multiple</span></button>
-          <button type="button" className={`sr-tactical-icon-tool ${mode === "arrow" ? "selected" : ""}`} title="Draw arrows" aria-label="Draw arrows" onClick={() => { setMode("arrow"); setSelectedShapeId(null); setSelectedArrowId(null); }}><TacticalToolIcon type="arrow" /><span>Arrow</span></button>
-          <button type="button" className={`sr-tactical-icon-tool ${mode === "rectangle" ? "selected" : ""}`} title="Draw rectangle" aria-label="Draw rectangle" onClick={() => { setMode("rectangle"); setSelectedShapeId(null); setSelectedArrowId(null); }}><TacticalToolIcon type="rectangle" /><span>Rectangle</span></button>
-          <button type="button" className={`sr-tactical-icon-tool ${mode === "square" ? "selected" : ""}`} title="Draw square" aria-label="Draw square" onClick={() => { setMode("square"); setSelectedShapeId(null); setSelectedArrowId(null); }}><TacticalToolIcon type="square" /><span>Square</span></button>
-          <label className="sr-tactical-color-control"><span>Colour</span><input type="color" value={selectedGraphic?.color || newShapeColour} onChange={(event) => { setNewShapeColour(event.target.value); updateSelectedGraphic({ color: event.target.value }); }} /></label>
-          <label className="sr-tactical-opacity-control"><span>Transparency</span><input aria-label="Shape transparency" type="range" min="0" max="95" step="5" value={100 - Math.round((selectedGraphic?.opacity ?? newShapeOpacity) * 100)} onChange={(event) => { const opacity = 1 - Number(event.target.value) / 100; if (selectedGraphic) updateSelectedGraphic({ opacity }); else setNewShapeOpacity(opacity); }} /><output>{100 - Math.round((selectedGraphic?.opacity ?? newShapeOpacity) * 100)}%</output></label>
-          <button type="button" onClick={() => { if (selectedShape) setBoard((current) => ({ ...current, shapes: (current.shapes || []).filter((shape) => shape.id !== selectedShapeId) })); else if (selectedArrowId) setBoard((current) => ({ ...current, arrows: (current.arrows || []).filter((arrow) => arrow.id !== selectedArrowId) })); setSelectedShapeId(null); setSelectedArrowId(null); }} disabled={!selectedGraphic}>Delete selected</button>
-          <button type="button" onClick={() => { setBoard((current) => ({ ...current, shapes: [] })); setSelectedShapeId(null); }} disabled={!(board.shapes || []).length}>Clear shapes</button>
+      <div className="sr-tactical-dock">
+        <div className="sr-tactical-dock-tabs" role="tablist" aria-label="Tactical pad toolbar">
+          <button type="button" role="tab" aria-selected={dockPanel === "animation"} className={dockPanel === "animation" ? "active" : ""} onClick={() => setDockPanel("animation")}>▶ Animation</button>
+          <button type="button" role="tab" aria-selected={dockPanel === "shapes"} className={dockPanel === "shapes" ? "active" : ""} onClick={() => setDockPanel("shapes")}>◇ Shapes</button>
+          <button type="button" role="tab" aria-selected={dockPanel === "text"} className={dockPanel === "text" ? "active" : ""} onClick={() => { setDockPanel("text"); if (mode !== "text" && selectedShape?.type !== "text") setMode("move"); }}>T Text</button>
+          <button type="button" role="tab" aria-selected={dockPanel === "tools"} className={dockPanel === "tools" ? "active" : ""} onClick={() => setDockPanel("tools")}>⚙ Tools</button>
         </div>
-        <small>{selectedShape ? "Adjusting selected shape" : selectedArrow ? "Adjusting selected arrow" : "Set colour and transparency for the next shape or arrow"}</small>
+        {dockPanel === "animation" && <div className="sr-tactical-dock-panel" role="tabpanel">
+          <div className="sr-tactical-tools" role="toolbar" aria-label="Movement clip tools">
+            <button type="button" className={activeClipStart ? "sr-tactical-recording" : "sr-tactical-video"} onClick={beginOrSaveMovementClip} disabled={finishingVideo}>{activeClipStart ? "Save movement clip" : "Start movement clip"}</button>
+            {activeClipStart && <button type="button" onClick={cancelMovementClip} disabled={finishingVideo}>Cancel clip</button>}
+            <button type="button" className={videoRecording ? "sr-tactical-recording" : "sr-tactical-video"} onClick={playAllMovementClips} disabled={!movementClips.length || finishingVideo || Boolean(activeClipStart)}>{finishingVideo ? "Playing clips…" : `Play all clips${movementClips.length ? ` (${movementClips.length})` : ""}`}</button>
+            <small>Start a clip, move the discs or ball, then save it. Repeat to build a sequence.</small>
+          </div>
+          {movementClips.length > 0 && <div className="sr-tactical-clip-list"><strong>Movement clips — select one to preview</strong><ol>{movementClips.map((clip, index) => <li key={clip.id}><button type="button" className="sr-tactical-clip-preview-button" onClick={() => previewMovementClip(clip, index + 1)} disabled={finishingVideo || Boolean(activeClipStart)}>Clip {index + 1}: {clip.movedCount} piece{clip.movedCount === 1 ? "" : "s"} moved <span>Preview on pitch</span></button><button type="button" onClick={() => setMovementClips((current) => current.filter((item) => item.id !== clip.id))} disabled={finishingVideo}>Remove</button></li>)}</ol><div className="sr-tactical-clip-list-actions"><button type="button" onClick={() => setMovementClips((current) => current.slice(0, -1))} disabled={finishingVideo}>Undo last clip</button><button type="button" onClick={() => setMovementClips([])} disabled={finishingVideo}>Clear clips</button></div></div>}
+        </div>}
+        {dockPanel === "shapes" && <div className="sr-tactical-dock-panel" role="tabpanel">
+          <div className="sr-tactical-tools sr-tactical-shape-palette" role="toolbar" aria-label="Shape and drawing tools">
+            <button type="button" className={`sr-tactical-icon-tool ${mode === "move" && !multiSelectMode ? "selected" : ""}`} onClick={() => { setMode("move"); setMultiSelectMode(false); }}><TacticalToolIcon type="move" /><span>Select</span></button>
+            <button type="button" className={`sr-tactical-icon-tool ${multiSelectMode ? "selected" : ""}`} onClick={() => { setMode("move"); setMultiSelectMode((value) => !value); }}><TacticalToolIcon type="multiple" /><span>Multi</span></button>
+            <button type="button" className={`sr-tactical-icon-tool ${mode === "arrow" ? "selected" : ""}`} onClick={() => { setMode("arrow"); setSelectedShapeId(null); setSelectedArrowId(null); }}><TacticalToolIcon type="arrow" /><span>Arrow</span></button>
+            {[["line", "Line"], ["rectangle", "Rectangle"], ["square", "Square"], ["circle", "Circle"], ["triangle", "Triangle"]].map(([tool, label]) => <button key={tool} type="button" className={`sr-tactical-icon-tool ${mode === tool ? "selected" : ""}`} onClick={() => { setMode(tool); setSelectedShapeId(null); setSelectedArrowId(null); }}><TacticalToolIcon type={tool} /><span>{label}</span></button>)}
+            <label className="sr-tactical-color-control"><span>Colour</span><input type="color" value={selectedGraphic?.color || newShapeColour} onChange={(event) => { setNewShapeColour(event.target.value); updateSelectedGraphic({ color: event.target.value }); }} /></label>
+            <label className="sr-tactical-opacity-control"><span>Transparency</span><input aria-label="Shape transparency" type="range" min="0" max="95" step="5" value={100 - Math.round((selectedGraphic?.opacity ?? newShapeOpacity) * 100)} onChange={(event) => { const opacity = 1 - Number(event.target.value) / 100; if (selectedGraphic) updateSelectedGraphic({ opacity }); else setNewShapeOpacity(opacity); }} /><output>{100 - Math.round((selectedGraphic?.opacity ?? newShapeOpacity) * 100)}%</output></label>
+            <button type="button" onClick={() => { if (selectedShape) setBoard((current) => ({ ...current, shapes: (current.shapes || []).filter((shape) => shape.id !== selectedShapeId) })); else if (selectedArrowId) setBoard((current) => ({ ...current, arrows: (current.arrows || []).filter((arrow) => arrow.id !== selectedArrowId) })); setSelectedShapeId(null); setSelectedArrowId(null); }} disabled={!selectedGraphic}>Delete selected</button>
+            <button type="button" onClick={() => { setBoard((current) => ({ ...current, shapes: [] })); setSelectedShapeId(null); }} disabled={!(board.shapes || []).length}>Clear shapes</button>
+          </div>
+          <small>{selectedShape ? "Adjusting selected shape" : selectedArrow ? "Adjusting selected arrow" : "Choose a tool, then draw directly on the pitch."}</small>
+        </div>}
+        {dockPanel === "text" && <div className="sr-tactical-dock-panel sr-tactical-text-panel" role="tabpanel">
+          <button type="button" className={`sr-tactical-icon-tool ${mode === "text" ? "selected" : ""}`} onClick={() => { setMode("text"); setSelectedShapeId(null); setSelectedArrowId(null); }}><TacticalToolIcon type="text" /><span>Place text box</span></button>
+          {selectedShape?.type === "text" ? <label><span>Edit selected text</span><input value={selectedShape.text || ""} onChange={(event) => updateSelectedShape({ text: event.target.value })} /></label> : <small>Choose Place text box, then click the pitch. Select a text box with the Move tool to edit it here.</small>}
+        </div>}
+        {dockPanel === "tools" && <div className="sr-tactical-dock-panel" role="tabpanel">
+          <div className="sr-tactical-tools" role="toolbar" aria-label="Player and pitch tools">
+            <button type="button" onClick={() => addPlayer("home")}>+ Home disc</button>
+            <button type="button" onClick={() => addPlayer("away")}>+ Opponent disc</button>
+            <button type="button" onClick={removeSelectedPlayer} disabled={!selectedTokens.length}>Remove selected player</button>
+            <button type="button" onClick={() => { setBoard((current) => ({ ...current, arrows: [] })); setSelectedArrowId(null); }} disabled={!board.arrows.length}>Clear arrows</button>
+            <button type="button" onClick={() => { setBoard(freshTacticalBoard(homeTeamName, oppositionName)); setSelectedTokens([]); setSelectedShapeId(null); setSelectedArrowId(null); activeClipStartRef.current = null; setActiveClipStart(null); }}>Reset pitch</button>
+          </div>
+        </div>}
       </div>
-      {movementClips.length > 0 && <div className="sr-tactical-clip-list"><strong>Movement clips — select one to preview</strong><ol>{movementClips.map((clip, index) => <li key={clip.id}><button type="button" className="sr-tactical-clip-preview-button" onClick={() => previewMovementClip(clip, index + 1)} disabled={finishingVideo || Boolean(activeClipStart)}>Clip {index + 1}: {clip.movedCount} piece{clip.movedCount === 1 ? "" : "s"} moved <span>Preview on pitch</span></button><button type="button" onClick={() => setMovementClips((current) => current.filter((item) => item.id !== clip.id))} disabled={finishingVideo}>Remove</button></li>)}</ol><div className="sr-tactical-clip-list-actions"><button type="button" onClick={() => setMovementClips((current) => current.slice(0, -1))} disabled={finishingVideo}>Undo last clip</button><button type="button" onClick={() => setMovementClips([])} disabled={finishingVideo}>Clear clips</button></div></div>}
       {recordedVideo && <div className="sr-tactical-video-preview"><button type="button" className="sr-tactical-video-close" aria-label="Close video preview" title="Close video preview" onClick={() => { setRecordedVideo(null); setPlaybackBoard(null); setVideoPlaying(false); setVideoStatus(""); setMode("move"); setMultiSelectMode(false); }}>×</button><video controls playsInline preload="metadata" src={recordedVideo.url}>Your browser cannot play this recording.</video><a href={recordedVideo.url} download={recordedVideo.filename}>Download video</a></div>}
       <div className="sr-tactical-legend"><span><i className="home" />{board.homeName}</span><span><i className="away" />{board.awayName}</span><span><i className="ball" />Ball</span><small>Start a movement clip, move players or the ball, and save it. Repeat for each movement, then play all clips as one video. The board saves automatically on this device.</small></div>
     </section>
