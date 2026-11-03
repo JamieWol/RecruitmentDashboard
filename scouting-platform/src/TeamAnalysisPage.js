@@ -466,11 +466,11 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     const rect = pitchRef.current?.getBoundingClientRect();
     if (!rect) return { x: 500, y: 320 };
     const activePitchMode = videoPlaying ? (playbackBoard?.pitchMode || pitchMode) : pitchMode;
-    const viewX = ((event.clientX - rect.left) / rect.width) * (activePitchMode === "full" ? 1000 : 640);
+    const viewX = ((event.clientX - rect.left) / rect.width) * (activePitchMode === "full" ? 1000 : 750);
     const viewY = ((event.clientY - rect.top) / rect.height) * (activePitchMode === "full" ? 640 : 1000);
     return activePitchMode === "full"
       ? { x: Math.max(24, Math.min(976, viewX)), y: Math.max(24, Math.min(616, viewY)) }
-      : { x: Math.max(24, Math.min(976, 1000 - viewY)), y: Math.max(24, Math.min(616, viewX)) };
+      : { x: Math.max(24, Math.min(976, 1000 - viewY)), y: Math.max(24, Math.min(616, viewX * (640 / 750))) };
   };
   const shapeForDrag = (start, end, type) => {
     let dx = end.x - start.x;
@@ -997,7 +997,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       <canvas ref={videoCanvasRef} width="1280" height="819" className="sr-tactical-video-canvas" aria-hidden="true" />
 
       <div className={`sr-tactical-pitch-wrap ${mode === "arrow" ? "drawing" : "moving"} ${pitchViewMode !== "full" ? "portrait" : "landscape"}`}>
-        <svg ref={pitchRef} className="sr-tactical-pitch" preserveAspectRatio="none" style={{ aspectRatio: pitchViewMode === "full" ? "25 / 16" : "3 / 4" }} viewBox={pitchViewMode === "full" ? "0 0 1000 640" : "0 0 640 1000"} role="img" aria-label={`${pitchViewMode === "full" ? "Full" : pitchViewMode === "half" ? "Portrait half" : "18-yard box"} tactical football pitch. Drag the discs to position players.`} onPointerDown={handlePitchPointerDown} onPointerMove={handlePitchPointerMove} onPointerUp={handlePitchPointerUp} onPointerCancel={handlePitchPointerUp}>
+        <svg ref={pitchRef} className="sr-tactical-pitch" preserveAspectRatio="none" style={{ aspectRatio: pitchViewMode === "full" ? "25 / 16" : "3 / 4" }} viewBox={pitchViewMode === "full" ? "0 0 1000 640" : "0 0 750 1000"} role="img" aria-label={`${pitchViewMode === "full" ? "Full" : pitchViewMode === "half" ? "Portrait half" : "18-yard box"} tactical football pitch. Drag the discs to position players.`} onPointerDown={handlePitchPointerDown} onPointerMove={handlePitchPointerMove} onPointerUp={handlePitchPointerUp} onPointerCancel={handlePitchPointerUp}>
           <defs>{(displayedBoard.arrows || []).map((arrow) => <marker key={`head-${arrow.id}`} id={`sr-tactical-arrowhead-${arrow.id}`} markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill={arrow.color || "#ffe36e"} fillOpacity={arrow.opacity ?? 1} /></marker>)}<marker id="sr-tactical-arrowhead-preview" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill={newShapeColour} /></marker></defs>
           {pitchViewMode === "full" ? <>
             <rect x="12" y="12" width="976" height="616" rx="7" className="sr-tactical-grass" />
@@ -1013,7 +1013,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
             <circle cx="145" cy="320" r="4" className="sr-tactical-mark" />
             <circle cx="855" cy="320" r="4" className="sr-tactical-mark" />
             <path d="M35 55 A20 20 0 0 0 55 35 M945 35 A20 20 0 0 0 965 55 M35 585 A20 20 0 0 1 55 605 M945 605 A20 20 0 0 1 965 585" className="sr-tactical-line" />
-          </> : <>
+          </> : <g transform="scale(1.171875 1)">
             <rect x="12" y="12" width="616" height="976" rx="7" className="sr-tactical-grass" />
               {pitchViewMode === "half" ? <>
               <rect x="35" y="35" width="570" height="930" className="sr-tactical-line" />
@@ -1032,8 +1032,8 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
               <circle cx="320" cy="260" r="4" className="sr-tactical-mark" />
               <line x1="270" y1="20" x2="370" y2="20" className="sr-tactical-line" />
             </>}
-          </>}
-          <g transform={pitchViewMode === "full" ? undefined : "translate(0 1000) rotate(-90)"}>
+          </g>}
+          <g transform={pitchViewMode === "full" ? undefined : "scale(1.171875 1) translate(0 1000) rotate(-90)"}>
           {(displayedBoard.shapes || []).map((shape) => {
             const selected = !videoPlaying && selectedShapeId === shape.id;
             const entering = enteringGraphicIds.includes(shape.id);
