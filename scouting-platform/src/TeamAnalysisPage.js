@@ -147,6 +147,7 @@ const freshTacticalBoard = (homeName = "Home Team", awayName = "Opposition") => 
 });
 
 const pathLength = (points = []) => points.slice(1).reduce((total, point, index) => total + Math.hypot(point.x - points[index].x, point.y - points[index].y), 0);
+const tacticalClipDuration = (clip) => Math.max(3400, Math.min(9000, (pathLength(clip.ballPath || []) / 0.18) || 3400));
 const pointAlongPath = (points, progress, start, end) => {
   const path = points?.length > 1 ? points : [start, end];
   const lengths = path.slice(1).map((point, index) => Math.hypot(point.x - path[index].x, point.y - path[index].y));
@@ -595,7 +596,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     if (finishingVideo || activeClipStartRef.current) return;
     if (clipPreviewFrameRef.current) window.cancelAnimationFrame(clipPreviewFrameRef.current);
     const startedAt = performance.now() + 50;
-    const duration = 3400;
+    const duration = tacticalClipDuration(clip);
     setFinishingVideo(true);
     setVideoPlaying(true);
     setPlaybackBoard(clip.from);
@@ -656,9 +657,9 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     if (recordedVideo?.url) URL.revokeObjectURL(recordedVideo.url);
     setRecordedVideo(null);
     setPlaybackBoard(clips[0].from);
-    const durationPerClip = 3400;
+    const clipDurations = clips.map(tacticalClipDuration);
     const pauseBetweenClips = 450;
-    const timelineDuration = clips.length * durationPerClip + Math.max(0, clips.length - 1) * pauseBetweenClips;
+    const timelineDuration = clipDurations.reduce((total, duration) => total + duration, 0) + Math.max(0, clips.length - 1) * pauseBetweenClips;
     const startedAt = performance.now() + 450;
     recorder.ondataavailable = (event) => { if (event.data?.size) videoChunksRef.current.push(event.data); };
     recorder.onstop = () => {
@@ -701,11 +702,15 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
         videoFinishTimerRef.current = window.setTimeout(() => { if (recorder.state !== "inactive") recorder.stop(); }, 500);
         return;
       }
-      const segmentSpan = durationPerClip + pauseBetweenClips;
-      const clipIndex = Math.min(clips.length - 1, Math.floor(elapsed / segmentSpan));
+      let clipIndex = 0;
+      let clipStart = 0;
+      while (clipIndex < clips.length - 1 && elapsed >= clipStart + clipDurations[clipIndex] + pauseBetweenClips) {
+        clipStart += clipDurations[clipIndex] + pauseBetweenClips;
+        clipIndex += 1;
+      }
       const clip = clips[clipIndex];
-      const clipElapsed = elapsed - clipIndex * segmentSpan;
-      const progress = Math.min(1, clipElapsed / durationPerClip);
+      const clipElapsed = Math.max(0, elapsed - clipStart);
+      const progress = Math.min(1, clipElapsed / clipDurations[clipIndex]);
       const eased = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
       const players = clip.to.players.map((player) => {
         const origin = clip.from.players.find((item) => item.id === player.id);
