@@ -238,6 +238,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const [selectedTokens, setSelectedTokens] = useState([]);
   const [selectedShapeId, setSelectedShapeId] = useState(null);
   const [selectedArrowId, setSelectedArrowId] = useState(null);
+  const [enteringGraphicIds, setEnteringGraphicIds] = useState([]);
   const [newShapeOpacity, setNewShapeOpacity] = useState(0.35);
   const [newShapeColour, setNewShapeColour] = useState("#62dcff");
   const [videoRecording, setVideoRecording] = useState(false);
@@ -260,6 +261,9 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const videoFinishTimerRef = useRef(null);
   const playbackTimerRef = useRef(null);
   const playbackFrameRef = useRef(null);
+
+  const markGraphicEntering = (id) => setEnteringGraphicIds((current) => [...current, id]);
+  const finishGraphicEntering = (id) => setEnteringGraphicIds((current) => current.filter((item) => item !== id));
 
   useEffect(() => { boardRef.current = board; }, [board]);
   useEffect(() => {
@@ -416,6 +420,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       if (distance > 12 && mode === "arrow") {
         const newArrow = { id: `arrow-${Date.now()}`, from: arrowStart, to: end, color: newShapeColour, opacity: newShapeOpacity };
         setBoard((current) => ({ ...current, arrows: [...current.arrows, newArrow] }));
+        markGraphicEntering(newArrow.id);
         setSelectedArrowId(newArrow.id);
         setSelectedShapeId(null);
       }
@@ -423,6 +428,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
         const box = shapeForDrag(arrowStart, end, mode);
         const newShape = { id: `shape-${Date.now()}`, type: mode, ...box, color: newShapeColour, opacity: newShapeOpacity };
         setBoard((current) => ({ ...current, shapes: [...(current.shapes || []), newShape] }));
+        markGraphicEntering(newShape.id);
         setSelectedShapeId(newShape.id);
         setSelectedArrowId(null);
       }
@@ -645,10 +651,10 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
           <circle cx="145" cy="320" r="4" className="sr-tactical-mark" />
           <circle cx="855" cy="320" r="4" className="sr-tactical-mark" />
           <path d="M35 55 A20 20 0 0 0 55 35 M945 35 A20 20 0 0 0 965 55 M35 585 A20 20 0 0 1 55 605 M945 605 A20 20 0 0 1 965 585" className="sr-tactical-line" />
-          {(board.shapes || []).map((shape) => <rect key={shape.id} x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="2" fill={shape.color || "#62dcff"} fillOpacity={shape.opacity ?? 0.35} stroke={shape.color || "#62dcff"} strokeOpacity={shape.opacity ?? 0.35} strokeWidth={3} className={`sr-tactical-shape ${selectedShapeId === shape.id ? "selected" : ""}`} onPointerDown={(event) => { if (mode === "move") { event.stopPropagation(); setSelectedShapeId(shape.id); setSelectedArrowId(null); } }} />)}
+          {(board.shapes || []).map((shape) => <rect key={shape.id} x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="2" fill={shape.color || "#62dcff"} fillOpacity={shape.opacity ?? 0.35} stroke={shape.color || "#62dcff"} strokeOpacity={shape.opacity ?? 0.35} strokeWidth={3} className={`sr-tactical-shape ${selectedShapeId === shape.id ? "selected" : ""} ${enteringGraphicIds.includes(shape.id) ? "entering" : ""}`} onAnimationEnd={() => finishGraphicEntering(shape.id)} onPointerDown={(event) => { if (mode === "move") { event.stopPropagation(); setSelectedShapeId(shape.id); setSelectedArrowId(null); } }} />)}
           {arrowPreview && arrowStart && mode === "arrow" && <line x1={arrowStart.x} y1={arrowStart.y} x2={arrowPreview.x} y2={arrowPreview.y} className="sr-tactical-arrow sr-tactical-arrow-preview" stroke={newShapeColour} markerEnd="url(#sr-tactical-arrowhead-preview)" />}
           {arrowPreview && arrowStart && ["rectangle", "square"].includes(mode) && (() => { const shape = shapeForDrag(arrowStart, arrowPreview, mode); return <rect {...shape} fill={newShapeColour} fillOpacity={newShapeOpacity} stroke={newShapeColour} strokeOpacity={newShapeOpacity} strokeWidth={3} className="sr-tactical-shape-preview" />; })()}
-          {board.arrows.map((arrow) => <line key={arrow.id} x1={arrow.from.x} y1={arrow.from.y} x2={arrow.to.x} y2={arrow.to.y} stroke={arrow.color || "#ffe36e"} strokeOpacity={arrow.opacity ?? 1} className={`sr-tactical-arrow ${selectedArrowId === arrow.id ? "selected" : ""}`} markerEnd={`url(#sr-tactical-arrowhead-${arrow.id})`} onPointerDown={(event) => { if (mode === "move") { event.stopPropagation(); setSelectedArrowId(arrow.id); setSelectedShapeId(null); } }} />)}
+          {board.arrows.map((arrow) => <line key={arrow.id} x1={arrow.from.x} y1={arrow.from.y} x2={arrow.to.x} y2={arrow.to.y} stroke={arrow.color || "#ffe36e"} strokeOpacity={arrow.opacity ?? 1} className={`sr-tactical-arrow ${selectedArrowId === arrow.id ? "selected" : ""} ${enteringGraphicIds.includes(arrow.id) ? "entering" : ""}`} markerEnd={`url(#sr-tactical-arrowhead-${arrow.id})`} onAnimationEnd={() => finishGraphicEntering(arrow.id)} onPointerDown={(event) => { if (mode === "move") { event.stopPropagation(); setSelectedArrowId(arrow.id); setSelectedShapeId(null); } }} />)}
           <g className={`sr-tactical-ball ${draggingBall ? "dragging" : ""} ${videoPlaying ? "video-playing" : ""}`} transform={`translate(${displayedBoard.ball?.x ?? 500} ${displayedBoard.ball?.y ?? 320})`} onPointerDown={beginBallDrag}>
             <circle r="13" className="sr-tactical-ball-shadow" /><circle r="10" className="sr-tactical-ball-shell" />
             <path d="M0 -5 L4 -2 L3 3 L-3 3 L-4 -2 Z" className="sr-tactical-ball-patch" />

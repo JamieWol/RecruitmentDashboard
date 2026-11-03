@@ -263,6 +263,11 @@ header{z-index:1000!important}.sr-page{position:relative;z-index:1}.sr-pitch{z-i
 .sr-tactical-shape{cursor:pointer}
 .sr-tactical-shape.selected{stroke:#ffe36e;stroke-opacity:1;stroke-dasharray:9 6}
 .sr-tactical-shape-preview{pointer-events:none;stroke-dasharray:8 6}
+.sr-tactical-shape.entering{transform-box:fill-box;transform-origin:center;animation:sr-tactical-shape-enter 420ms cubic-bezier(.2,.8,.2,1) both}
+.sr-tactical-arrow.entering{animation:sr-tactical-arrow-enter 520ms cubic-bezier(.2,.75,.25,1) both}
+@keyframes sr-tactical-shape-enter{0%{opacity:0;transform:scale(.84)}72%{opacity:1;transform:scale(1.025)}100%{opacity:1;transform:scale(1)}}
+@keyframes sr-tactical-arrow-enter{0%{opacity:.15;stroke-dasharray:0 1800}100%{opacity:1;stroke-dasharray:1800 0}}
+@media(prefers-reduced-motion:reduce){.sr-tactical-shape.entering,.sr-tactical-arrow.entering{animation-duration:1ms}}
 .sr-tactical-pitch-wrap.drawing{cursor:crosshair}
 .sr-tactical-legend{display:flex;flex-wrap:wrap;align-items:center;gap:16px;margin-top:14px;color:#d2e5fa}
 .sr-tactical-legend>span{display:inline-flex;align-items:center;gap:7px;font-weight:700}
