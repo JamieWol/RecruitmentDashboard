@@ -146,6 +146,27 @@ const freshTacticalBoard = (homeName = "Home Team", awayName = "Opposition") => 
   shapes: [],
 });
 
+const pathLength = (points = []) => points.slice(1).reduce((total, point, index) => total + Math.hypot(point.x - points[index].x, point.y - points[index].y), 0);
+const pointAlongPath = (points, progress, start, end) => {
+  const path = points?.length > 1 ? points : [start, end];
+  const lengths = path.slice(1).map((point, index) => Math.hypot(point.x - path[index].x, point.y - path[index].y));
+  const totalLength = lengths.reduce((sum, length) => sum + length, 0);
+  if (totalLength < 0.001) return { x: start.x + (end.x - start.x) * progress, y: start.y + (end.y - start.y) * progress };
+  let remaining = totalLength * Math.max(0, Math.min(1, progress));
+  for (let index = 0; index < lengths.length; index += 1) {
+    const segmentLength = lengths[index];
+    if (remaining <= segmentLength || index === lengths.length - 1) {
+      const fraction = segmentLength < 0.001 ? 1 : Math.max(0, Math.min(1, remaining / segmentLength));
+      return {
+        x: path[index].x + (path[index + 1].x - path[index].x) * fraction,
+        y: path[index].y + (path[index + 1].y - path[index].y) * fraction,
+      };
+    }
+    remaining -= segmentLength;
+  }
+  return { ...end };
+};
+
 function TacticalToolIcon({ type }) {
   const common = { fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round" };
   return <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" {...common}>
@@ -274,6 +295,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const videoCanvasRef = useRef(null);
   const boardRef = useRef(board);
   const activeClipStartRef = useRef(null);
+  const activeClipBallPathRef = useRef([]);
   const dragStartRef = useRef(null);
   const dragTargetsRef = useRef({});
   const ballDragTargetRef = useRef(null);
@@ -370,6 +392,11 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       const delta = { x: point.x - dragStartRef.current.pointer.x, y: point.y - dragStartRef.current.pointer.y };
       const target = { x: Math.max(24, Math.min(976, origin.x + delta.x)), y: Math.max(24, Math.min(616, origin.y + delta.y)) };
       ballDragTargetRef.current = target;
+      if (activeClipStartRef.current) {
+        const path = activeClipBallPathRef.current;
+        const last = path[path.length - 1];
+        if (path.length < 600 && (!last || Math.hypot(target.x - last.x, target.y - last.y) >= 4)) path.push({ ...target });
+      }
       setBoard((current) => ({ ...current, ball: target }));
     }
     if (arrowStart) setArrowPreview(point);
@@ -391,6 +418,11 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       const delta = { x: finalPoint.x - dragStartRef.current.pointer.x, y: finalPoint.y - dragStartRef.current.pointer.y };
       const finalBall = { x: Math.max(24, Math.min(976, origin.x + delta.x)), y: Math.max(24, Math.min(616, origin.y + delta.y)) };
       ballDragTargetRef.current = finalBall;
+      if (activeClipStartRef.current) {
+        const path = activeClipBallPathRef.current;
+        const last = path[path.length - 1];
+        if (!last || Math.hypot(finalBall.x - last.x, finalBall.y - last.y) > 0.5) path.push({ ...finalBall });
+      }
       setBoard((current) => ({ ...current, ball: finalBall }));
     }
     if (arrowStart) {
@@ -457,6 +489,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     if (!activeClipStartRef.current) {
       const start = JSON.parse(JSON.stringify(boardRef.current));
       activeClipStartRef.current = start;
+      activeClipBallPathRef.current = [{ ...(start.ball || { x: 500, y: 320 }) }];
       setActiveClipStart(start);
       setVideoStatus(`Movement clip ${movementClips.length + 1} started. Move the players or ball, then save the clip.`);
       return;
@@ -469,19 +502,25 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     }).length;
     const fromBall = from.ball || { x: 500, y: 320 };
     const toBall = to.ball || { x: 500, y: 320 };
-    const movedCount = movedPlayers + (Math.hypot(toBall.x - fromBall.x, toBall.y - fromBall.y) > 2 ? 1 : 0);
+    const ballPath = [...(activeClipBallPathRef.current.length ? activeClipBallPathRef.current : [fromBall])];
+    const lastPathPoint = ballPath[ballPath.length - 1];
+    if (!lastPathPoint || Math.hypot(toBall.x - lastPathPoint.x, toBall.y - lastPathPoint.y) > 0.5) ballPath.push({ ...toBall });
+    const ballMoved = pathLength(ballPath) > 2 || Math.hypot(toBall.x - fromBall.x, toBall.y - fromBall.y) > 2;
+    const movedCount = movedPlayers + (ballMoved ? 1 : 0);
     if (!movedCount) {
       setVideoStatus("No movement recorded yet. Move at least one disc or the ball, then save this clip.");
       return;
     }
-    const clip = { id: `movement-${Date.now()}`, from, to, movedCount };
+    const clip = { id: `movement-${Date.now()}`, from, to, ballPath, movedCount };
     setMovementClips((current) => [...current, clip]);
     activeClipStartRef.current = null;
+    activeClipBallPathRef.current = [];
     setActiveClipStart(null);
     setVideoStatus(`Movement clip ${movementClips.length + 1} saved. Add another clip or play all clips.`);
   };
   const cancelMovementClip = () => {
     activeClipStartRef.current = null;
+    activeClipBallPathRef.current = [];
     setActiveClipStart(null);
     setVideoStatus("Movement clip cancelled.");
   };
@@ -503,6 +542,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       });
       const fromBall = clip.from.ball || { x: 500, y: 320 };
       const toBall = clip.to.ball || { x: 500, y: 320 };
+      const ball = pointAlongPath(clip.ballPath, eased, fromBall, toBall);
       setPlaybackBoard({
         ...clip.to,
         name: boardRef.current.name,
@@ -511,7 +551,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
         arrows: boardRef.current.arrows,
         shapes: boardRef.current.shapes,
         players,
-        ball: { x: fromBall.x + (toBall.x - fromBall.x) * eased, y: fromBall.y + (toBall.y - fromBall.y) * eased },
+        ball,
       });
       if (progress < 1) clipPreviewFrameRef.current = window.requestAnimationFrame(animateFrame);
       else {
@@ -606,6 +646,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       });
       const startBall = clip.from.ball || { x: 500, y: 320 };
       const endBall = clip.to.ball || { x: 500, y: 320 };
+      const ball = pointAlongPath(clip.ballPath, eased, startBall, endBall);
       const frameBoard = {
         ...clip.to,
         name: boardRef.current.name,
@@ -614,7 +655,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
         arrows: boardRef.current.arrows,
         shapes: boardRef.current.shapes,
         players,
-        ball: { x: startBall.x + (endBall.x - startBall.x) * eased, y: startBall.y + (endBall.y - startBall.y) * eased },
+        ball,
       };
       drawTacticalVideoFrame(canvas, frameBoard);
       setPlaybackBoard(frameBoard);
