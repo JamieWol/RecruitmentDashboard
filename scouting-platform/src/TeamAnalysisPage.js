@@ -1082,7 +1082,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
           {displayedBoard.players.map((player) => <g key={player.id} className={`sr-tactical-player ${player.side} ${!videoPlaying && selectedTokens.includes(player.id) ? "selected" : ""} ${draggingIds.includes(player.id) ? "dragging" : ""} ${videoPlaying ? "video-playing" : ""}`} transform={`translate(${player.x} ${player.y})`} onPointerDown={(event) => beginPlayerDrag(event, player)}>
             <circle r="27" className="sr-tactical-disc-shadow" />
             <circle r="24" className="sr-tactical-disc" />
-            <text y="1" transform="rotate(90)">{player.number}</text>
+            <text y="1" transform={pitchViewMode === "full" ? undefined : "rotate(90)"}>{player.number}</text>
           </g>)}
           </g>
         </svg>
