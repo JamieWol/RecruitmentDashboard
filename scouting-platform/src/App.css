@@ -233,7 +233,9 @@ header{z-index:1000!important}.sr-page{position:relative;z-index:1}.sr-pitch{z-i
 .sr-tactical-shape-controls button:disabled{opacity:.45;cursor:not-allowed}
 .sr-tactical-shape-controls small{color:#b9d8f1}
 .sr-tactical-video-status{margin:0;color:#bfeaff;font-size:14px}
-.sr-tactical-video-preview{display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:12px;border:1px solid #557fa7;border-radius:8px;background:#123761}
+.sr-tactical-video-preview{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:42px 12px 12px;border:1px solid #557fa7;border-radius:8px;background:#123761}
+.sr-tactical-video-close{position:absolute;top:7px;right:8px;width:30px;height:30px;display:grid;place-items:center;border:1px solid #8abbd1;border-radius:6px;background:#244f82;color:#fff;font-size:23px;line-height:1;cursor:pointer}
+.sr-tactical-video-close:hover{background:#0d668f;border-color:#62dcff}
 .sr-tactical-video-preview video{display:block;width:min(100%,720px);max-height:420px;border-radius:6px;background:#061d38}
 .sr-tactical-video-preview a{display:inline-flex;padding:8px 13px;border:1px solid #62dcff;border-radius:6px;background:#62dcff;color:#063d63;font-weight:700;text-decoration:none}
 .sr-tactical-video-canvas{position:fixed;left:-2000px;top:0;width:1280px;height:819px;pointer-events:none}

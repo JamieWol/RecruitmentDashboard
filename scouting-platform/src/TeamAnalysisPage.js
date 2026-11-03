@@ -545,12 +545,18 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     setVideoStatus(movements ? "Playing the movement on the tactical pad and recording it…" : "No positions changed. Preparing your video…");
     window.setTimeout(() => setPlaybackBoard(final), 450);
     if (playbackTimerRef.current) window.clearTimeout(playbackTimerRef.current);
-    playbackTimerRef.current = window.setTimeout(() => setVideoPlaying(false), 2400);
+    playbackTimerRef.current = window.setTimeout(() => {
+      setVideoPlaying(false);
+      // Drop the frozen playback snapshot so the editable board becomes live again.
+      setPlaybackBoard(null);
+    }, 2500);
     videoFinishTimerRef.current = window.setTimeout(() => {
       if (videoFrameRef.current) window.cancelAnimationFrame(videoFrameRef.current);
       videoFrameRef.current = null;
       setVideoRecording(false);
       setFinishingVideo(false);
+      setVideoPlaying(false);
+      setPlaybackBoard(null);
       if (recorder.state !== "inactive") recorder.stop();
     }, movements ? 3050 : 700);
   };
@@ -585,7 +591,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
         </div>
       </div>
       {videoStatus && <p className="sr-tactical-video-status" role="status">{videoStatus}</p>}
-      {recordedVideo && <div className="sr-tactical-video-preview"><video controls playsInline preload="metadata" src={recordedVideo.url}>Your browser cannot play this recording.</video><a href={recordedVideo.url} download={recordedVideo.filename}>Download video</a></div>}
+      {recordedVideo && <div className="sr-tactical-video-preview"><button type="button" className="sr-tactical-video-close" aria-label="Close video preview" title="Close video preview" onClick={() => { setRecordedVideo(null); setPlaybackBoard(null); setVideoPlaying(false); setVideoStatus(""); setMode("move"); setMultiSelectMode(false); }}>×</button><video controls playsInline preload="metadata" src={recordedVideo.url}>Your browser cannot play this recording.</video><a href={recordedVideo.url} download={recordedVideo.filename}>Download video</a></div>}
       <canvas ref={videoCanvasRef} width="1280" height="819" className="sr-tactical-video-canvas" aria-hidden="true" />
 
       <div className={`sr-tactical-pitch-wrap ${mode === "arrow" ? "drawing" : "moving"}`}>
