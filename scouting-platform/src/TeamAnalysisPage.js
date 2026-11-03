@@ -514,7 +514,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     const initial = videoBoardRef.current;
     const final = boardRef.current;
     const startedAt = performance.now() + 450;
-    const duration = 2000;
+    const duration = 3400;
     let movements = 0;
     videoTransitionsRef.current.clear();
     final.players.forEach((player) => {
@@ -549,7 +549,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       setVideoPlaying(false);
       // Drop the frozen playback snapshot so the editable board becomes live again.
       setPlaybackBoard(null);
-    }, 2500);
+    }, movements ? duration + 600 : 700);
     videoFinishTimerRef.current = window.setTimeout(() => {
       if (videoFrameRef.current) window.cancelAnimationFrame(videoFrameRef.current);
       videoFrameRef.current = null;
@@ -558,7 +558,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       setVideoPlaying(false);
       setPlaybackBoard(null);
       if (recorder.state !== "inactive") recorder.stop();
-    }, movements ? 3050 : 700);
+    }, movements ? duration + 1100 : 700);
   };
 
   return (
@@ -614,11 +614,11 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
           {arrowPreview && arrowStart && mode === "arrow" && <line x1={arrowStart.x} y1={arrowStart.y} x2={arrowPreview.x} y2={arrowPreview.y} className="sr-tactical-arrow sr-tactical-arrow-preview" stroke={newShapeColour} markerEnd="url(#sr-tactical-arrowhead-preview)" />}
           {arrowPreview && arrowStart && ["rectangle", "square"].includes(mode) && (() => { const shape = shapeForDrag(arrowStart, arrowPreview, mode); return <rect {...shape} fill={newShapeColour} fillOpacity={newShapeOpacity} stroke={newShapeColour} strokeOpacity={newShapeOpacity} strokeWidth={3} className="sr-tactical-shape-preview" />; })()}
           {board.arrows.map((arrow) => <line key={arrow.id} x1={arrow.from.x} y1={arrow.from.y} x2={arrow.to.x} y2={arrow.to.y} stroke={arrow.color || "#ffe36e"} strokeOpacity={arrow.opacity ?? 1} className={`sr-tactical-arrow ${selectedArrowId === arrow.id ? "selected" : ""}`} markerEnd={`url(#sr-tactical-arrowhead-${arrow.id})`} onPointerDown={(event) => { if (mode === "move") { event.stopPropagation(); setSelectedArrowId(arrow.id); setSelectedShapeId(null); } }} />)}
-          <g className={`sr-tactical-ball ${draggingBall ? "dragging" : ""} ${videoPlaying ? "video-playing" : ""}`} style={videoPlaying ? { transition: "transform 2s cubic-bezier(.22,.61,.36,1)" } : undefined} transform={`translate(${displayedBoard.ball?.x ?? 500} ${displayedBoard.ball?.y ?? 320})`} onPointerDown={beginBallDrag}>
+          <g className={`sr-tactical-ball ${draggingBall ? "dragging" : ""} ${videoPlaying ? "video-playing" : ""}`} style={videoPlaying ? { transition: "transform 3.4s cubic-bezier(.42,0,.58,1)" } : undefined} transform={`translate(${displayedBoard.ball?.x ?? 500} ${displayedBoard.ball?.y ?? 320})`} onPointerDown={beginBallDrag}>
             <circle r="13" className="sr-tactical-ball-shadow" /><circle r="10" className="sr-tactical-ball-shell" />
             <path d="M0 -5 L4 -2 L3 3 L-3 3 L-4 -2 Z" className="sr-tactical-ball-patch" />
           </g>
-          {displayedBoard.players.map((player) => <g key={player.id} className={`sr-tactical-player ${player.side} ${selectedTokens.includes(player.id) ? "selected" : ""} ${draggingIds.includes(player.id) ? "dragging" : ""} ${videoPlaying ? "video-playing" : ""}`} style={videoPlaying ? { transition: "transform 2s cubic-bezier(.22,.61,.36,1)" } : undefined} transform={`translate(${player.x} ${player.y})`} onPointerDown={(event) => beginPlayerDrag(event, player)}>
+          {displayedBoard.players.map((player) => <g key={player.id} className={`sr-tactical-player ${player.side} ${selectedTokens.includes(player.id) ? "selected" : ""} ${draggingIds.includes(player.id) ? "dragging" : ""} ${videoPlaying ? "video-playing" : ""}`} style={videoPlaying ? { transition: "transform 3.4s cubic-bezier(.42,0,.58,1)" } : undefined} transform={`translate(${player.x} ${player.y})`} onPointerDown={(event) => beginPlayerDrag(event, player)}>
             <circle r="27" className="sr-tactical-disc-shadow" />
             <circle r="24" className="sr-tactical-disc" />
             <text y="1">{player.number}</text>
