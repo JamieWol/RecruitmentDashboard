@@ -260,6 +260,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const videoChunksRef = useRef([]);
   const videoFrameRef = useRef(null);
   const videoFinishTimerRef = useRef(null);
+  const clipPreviewFrameRef = useRef(null);
 
   const markGraphicEntering = (id) => setEnteringGraphicIds((current) => [...current, id]);
   const finishGraphicEntering = (id) => setEnteringGraphicIds((current) => current.filter((item) => item !== id));
@@ -274,6 +275,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   }, [board, storageKey]);
   useEffect(() => () => {
     if (videoFrameRef.current) window.cancelAnimationFrame(videoFrameRef.current);
+    if (clipPreviewFrameRef.current) window.cancelAnimationFrame(clipPreviewFrameRef.current);
     if (videoFinishTimerRef.current) window.clearTimeout(videoFinishTimerRef.current);
     const recorder = videoRecorderRef.current;
     if (recorder && recorder.state !== "inactive") recorder.stop();
@@ -455,6 +457,45 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     setActiveClipStart(null);
     setVideoStatus("Movement clip cancelled.");
   };
+  const previewMovementClip = (clip, clipNumber) => {
+    if (finishingVideo || activeClipStartRef.current) return;
+    if (clipPreviewFrameRef.current) window.cancelAnimationFrame(clipPreviewFrameRef.current);
+    const startedAt = performance.now() + 50;
+    const duration = 3400;
+    setFinishingVideo(true);
+    setVideoPlaying(true);
+    setPlaybackBoard(clip.from);
+    setVideoStatus(`Previewing movement clip ${clipNumber} on the pitch…`);
+    const animateFrame = () => {
+      const progress = Math.min(1, Math.max(0, (performance.now() - startedAt) / duration));
+      const eased = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+      const players = clip.to.players.map((player) => {
+        const origin = clip.from.players.find((item) => item.id === player.id);
+        return origin ? { ...player, x: origin.x + (player.x - origin.x) * eased, y: origin.y + (player.y - origin.y) * eased } : player;
+      });
+      const fromBall = clip.from.ball || { x: 500, y: 320 };
+      const toBall = clip.to.ball || { x: 500, y: 320 };
+      setPlaybackBoard({
+        ...clip.to,
+        name: boardRef.current.name,
+        homeName: boardRef.current.homeName,
+        awayName: boardRef.current.awayName,
+        arrows: boardRef.current.arrows,
+        shapes: boardRef.current.shapes,
+        players,
+        ball: { x: fromBall.x + (toBall.x - fromBall.x) * eased, y: fromBall.y + (toBall.y - fromBall.y) * eased },
+      });
+      if (progress < 1) clipPreviewFrameRef.current = window.requestAnimationFrame(animateFrame);
+      else {
+        clipPreviewFrameRef.current = null;
+        setPlaybackBoard(null);
+        setVideoPlaying(false);
+        setFinishingVideo(false);
+        setVideoStatus(`Clip ${clipNumber} preview finished.`);
+      }
+    };
+    clipPreviewFrameRef.current = window.requestAnimationFrame(animateFrame);
+  };
   const playAllMovementClips = () => {
     const clips = JSON.parse(JSON.stringify(movementClips));
     if (!clips.length || finishingVideo) return;
@@ -620,7 +661,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
         </div>
         <small>{selectedShape ? "Adjusting selected shape" : selectedArrow ? "Adjusting selected arrow" : "Set colour and transparency for the next shape or arrow"}</small>
       </div>
-      {movementClips.length > 0 && <div className="sr-tactical-clip-list"><strong>Movement clips</strong><ol>{movementClips.map((clip, index) => <li key={clip.id}><span>Clip {index + 1}: {clip.movedCount} piece{clip.movedCount === 1 ? "" : "s"} moved</span><button type="button" onClick={() => setMovementClips((current) => current.filter((item) => item.id !== clip.id))} disabled={finishingVideo}>Remove</button></li>)}</ol><div className="sr-tactical-clip-list-actions"><button type="button" onClick={() => setMovementClips((current) => current.slice(0, -1))} disabled={finishingVideo}>Undo last clip</button><button type="button" onClick={() => setMovementClips([])} disabled={finishingVideo}>Clear clips</button></div></div>}
+      {movementClips.length > 0 && <div className="sr-tactical-clip-list"><strong>Movement clips — select one to preview</strong><ol>{movementClips.map((clip, index) => <li key={clip.id}><button type="button" className="sr-tactical-clip-preview-button" onClick={() => previewMovementClip(clip, index + 1)} disabled={finishingVideo || Boolean(activeClipStart)}>Clip {index + 1}: {clip.movedCount} piece{clip.movedCount === 1 ? "" : "s"} moved <span>Preview on pitch</span></button><button type="button" onClick={() => setMovementClips((current) => current.filter((item) => item.id !== clip.id))} disabled={finishingVideo}>Remove</button></li>)}</ol><div className="sr-tactical-clip-list-actions"><button type="button" onClick={() => setMovementClips((current) => current.slice(0, -1))} disabled={finishingVideo}>Undo last clip</button><button type="button" onClick={() => setMovementClips([])} disabled={finishingVideo}>Clear clips</button></div></div>}
       {recordedVideo && <div className="sr-tactical-video-preview"><button type="button" className="sr-tactical-video-close" aria-label="Close video preview" title="Close video preview" onClick={() => { setRecordedVideo(null); setPlaybackBoard(null); setVideoPlaying(false); setVideoStatus(""); setMode("move"); setMultiSelectMode(false); }}>×</button><video controls playsInline preload="metadata" src={recordedVideo.url}>Your browser cannot play this recording.</video><a href={recordedVideo.url} download={recordedVideo.filename}>Download video</a></div>}
       <div className="sr-tactical-legend"><span><i className="home" />{board.homeName}</span><span><i className="away" />{board.awayName}</span><span><i className="ball" />Ball</span><small>Start a movement clip, move players or the ball, and save it. Repeat for each movement, then play all clips as one video. The board saves automatically on this device.</small></div>
     </section>

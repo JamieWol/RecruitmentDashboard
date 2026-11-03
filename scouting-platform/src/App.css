@@ -245,6 +245,9 @@ header{z-index:1000!important}.sr-page{position:relative;z-index:1}.sr-pitch{z-i
 .sr-tactical-clip-list li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 9px;border:1px solid #416c99;border-radius:6px;background:#173f70}
 .sr-tactical-clip-list button{padding:6px 10px;border:1px solid #78b4d8;border-radius:6px;background:#244f82;color:#fff;font:inherit;font-size:13px;cursor:pointer}
 .sr-tactical-clip-list-actions{display:flex;flex-wrap:wrap;gap:8px}
+.sr-tactical-clip-list .sr-tactical-clip-preview-button{display:flex;flex:1;justify-content:space-between;align-items:center;gap:12px;text-align:left}
+.sr-tactical-clip-preview-button span{color:#b9d8f1;font-size:12px}
+@media(max-width:600px){.sr-tactical-clip-list li{align-items:stretch}.sr-tactical-clip-list .sr-tactical-clip-preview-button{align-items:flex-start;flex-direction:column}}
 
 .sr-tactical-video-status{margin:0;color:#bfeaff;font-size:14px}
 .sr-tactical-video-preview{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:42px 12px 12px;border:1px solid #557fa7;border-radius:8px;background:#123761}
