@@ -297,7 +297,8 @@ const drawTacticalVideoFrame = (canvas, board, viewMode = board.pitchMode || "fu
   context.clearRect(0, 0, width, height);
   if (portrait) {
     context.save();
-    context.scale(width / 750, height / 1000);
+    const viewHeight = viewMode === "half" ? HALF_PITCH_VIEW_HEIGHT : 1000;
+    context.scale(width / 750, height / viewHeight);
     context.fillStyle = "#24734e";
     context.fillRect(12, 12, 726, 976);
     for (let y = 12; y < 988; y += 80) {
@@ -324,15 +325,9 @@ const drawTacticalVideoFrame = (canvas, board, viewMode = board.pitchMode || "fu
       context.beginPath(); context.arc(375, 395, 96, Math.PI, 0); context.stroke();
       context.beginPath(); context.moveTo(316, 20); context.lineTo(434, 20); context.stroke();
     }
-    context.fillStyle = "#fff";
-    context.font = "bold 24px Arial, sans-serif";
-    context.textAlign = "left";
-    context.fillText(board.homeName || "Home Team", 28, 70, 300);
-    context.textAlign = "right";
-    context.fillText(board.awayName || "Opposition", 722, 70, 300);
     context.restore();
     context.save();
-    context.scale(width / 750, height / 1000);
+    context.scale(width / 750, height / viewHeight);
     context.scale(1.171875, 1);
     context.translate(0, 1000);
     context.rotate(-Math.PI / 2);
@@ -386,14 +381,6 @@ const drawTacticalVideoFrame = (canvas, board, viewMode = board.pitchMode || "fu
     }
   });
   context.globalAlpha = 1;
-  if (!portrait) {
-    context.fillStyle = "#fff";
-    context.font = "bold 24px Arial, sans-serif";
-    context.textAlign = "left";
-    context.fillText(board.homeName || "Home Team", 42, 76);
-    context.textAlign = "right";
-    context.fillText(board.awayName || "Opposition", 958, 76);
-  }
   (board.arrows || []).forEach((arrow) => {
     const angle = Math.atan2(arrow.to.y - arrow.from.y, arrow.to.x - arrow.from.x);
     context.setLineDash(arrow.lineStyle === "dashed" ? [14, 9] : arrow.lineStyle === "dotted" ? [2, 8] : []);
@@ -1054,7 +1041,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     }
     const exportPitchMode = pitchMode;
     canvas.width = exportPitchMode === "full" ? 1280 : 960;
-    canvas.height = exportPitchMode === "full" ? 819 : 1280;
+    canvas.height = exportPitchMode === "full" ? 819 : exportPitchMode === "half" ? 832 : 1280;
     drawTacticalVideoFrame(canvas, { ...clips[0].from, pitchMode: exportPitchMode }, exportPitchMode);
     const stream = canvas.captureStream(30);
     const formats = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm", "video/mp4"];
