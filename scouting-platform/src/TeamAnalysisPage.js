@@ -350,12 +350,36 @@ const drawTacticalVideoFrame = (canvas, board, viewMode = board.pitchMode || "fu
   }
   (board.shapes || []).forEach((shape) => {
     const opacity = Number(shape.opacity);
-    const baseOpacity = Math.max(0, Math.min(1, Number.isFinite(opacity) ? opacity : 0.35));
+    const defaultOpacity = shape.type === "text" ? 0.85 : 0.35;
+    const baseOpacity = Math.max(0, Math.min(1, Number.isFinite(opacity) ? opacity : defaultOpacity));
     context.globalAlpha = baseOpacity * (shape._playbackOpacity ?? 1);
     context.fillStyle = shape.type === "text" ? shape.backgroundColor || "#0c3769" : shape.color || "#62dcff";
     context.strokeStyle = shape.color || "#62dcff";
     context.lineWidth = Number(shape.strokeWidth) || 3;
-    if (shape.type === "line") {
+    if (shape.type === "text") {
+      context.font = `bold ${Number(shape.fontSize) || 22}px Arial, sans-serif`;
+      context.textAlign = "left";
+      context.textBaseline = "middle";
+      if (portrait) {
+        const centerX = shape.x + shape.width / 2;
+        const centerY = shape.y + shape.height / 2;
+        context.save();
+        context.translate(centerX, centerY);
+        context.rotate(Math.PI / 2);
+        context.fillRect(-shape.width / 2, -shape.height / 2, shape.width, shape.height);
+        context.strokeRect(-shape.width / 2, -shape.height / 2, shape.width, shape.height);
+        context.globalAlpha = shape._playbackOpacity ?? 1;
+        context.fillStyle = shape.textColor || "#fff";
+        context.fillText(shape.text || "Text", -shape.width / 2 + 10, 0, Math.max(20, shape.width - 20));
+        context.restore();
+      } else {
+        context.fillRect(shape.x, shape.y, shape.width, shape.height);
+        context.strokeRect(shape.x, shape.y, shape.width, shape.height);
+        context.globalAlpha = shape._playbackOpacity ?? 1;
+        context.fillStyle = shape.textColor || "#fff";
+        context.fillText(shape.text || "Text", shape.x + 10, shape.y + shape.height / 2, Math.max(20, shape.width - 20));
+      }
+    } else if (shape.type === "line") {
       context.beginPath(); context.moveTo(shape.x, shape.y); context.lineTo(shape.x + shape.width, shape.y + shape.height); context.stroke();
     } else if (shape.type === "circle") {
       context.beginPath(); context.ellipse(shape.x + shape.width / 2, shape.y + shape.height / 2, shape.width / 2, shape.height / 2, 0, 0, Math.PI * 2); context.fill(); context.stroke();
@@ -364,20 +388,6 @@ const drawTacticalVideoFrame = (canvas, board, viewMode = board.pitchMode || "fu
     } else {
       context.fillRect(shape.x, shape.y, shape.width, shape.height);
       context.strokeRect(shape.x, shape.y, shape.width, shape.height);
-      if (shape.type === "text") {
-        context.globalAlpha = shape._playbackOpacity ?? 1;
-        context.fillStyle = shape.textColor || "#fff";
-        context.font = `bold ${Number(shape.fontSize) || 22}px Arial, sans-serif`;
-        context.textAlign = portrait ? "center" : "left";
-        context.textBaseline = "middle";
-        if (portrait) {
-          context.save();
-          context.translate(shape.x + shape.width / 2, shape.y + shape.height / 2);
-          context.rotate(Math.PI / 2);
-          context.fillText(shape.text || "Text", 0, 0, Math.max(20, shape.width - 20));
-          context.restore();
-        } else context.fillText(shape.text || "Text", shape.x + 10, shape.y + shape.height / 2, Math.max(20, shape.width - 20));
-      }
     }
   });
   context.globalAlpha = 1;
