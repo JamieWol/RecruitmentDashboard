@@ -133,6 +133,7 @@ const DEFAULT_TACTICAL_HOME = [
   [420, 170], [420, 320], [420, 470], [610, 145], [610, 320], [610, 495],
 ].map(([x, y], index) => ({ id: `home-${index + 1}`, side: "home", number: index + 1, x, y }));
 const HALF_PITCH_VIEW_HEIGHT = 650;
+const BOX_PITCH_VIEW = { x: 75, y: 0, width: 600, height: 800 };
 const DEFAULT_TACTICAL_AWAY = [
   [910, 320], [755, 90], [755, 245], [755, 395], [755, 550],
   [580, 170], [580, 320], [580, 470], [390, 145], [390, 320], [390, 495],
@@ -296,7 +297,7 @@ const drawTacticalVideoFrame = (canvas, board, viewMode = board.pitchMode || "fu
   const portrait = viewMode !== "full";
   // Keep 18-yard-box exports focused on the attacking end instead of
   // including the unused length of pitch down to the distant goalkeeper.
-  const boxVideoCrop = viewMode === "box" ? { left: 42, width: 666, height: 888 } : null;
+  const boxVideoCrop = viewMode === "box" ? { left: BOX_PITCH_VIEW.x, width: BOX_PITCH_VIEW.width, height: BOX_PITCH_VIEW.height } : null;
   const portraitCropWidth = boxVideoCrop?.width || 750;
   const portraitCropLeft = boxVideoCrop?.left || 0;
   context.clearRect(0, 0, width, height);
@@ -559,8 +560,9 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     const rect = pitchRef.current?.getBoundingClientRect();
     if (!rect) return { x: 500, y: 320 };
     const activePitchMode = videoPlaying ? (playbackBoard?.pitchMode || pitchMode) : pitchMode;
-    const viewX = ((event.clientX - rect.left) / rect.width) * (activePitchMode === "full" ? 1000 : 750);
-    const viewY = ((event.clientY - rect.top) / rect.height) * (activePitchMode === "full" ? 640 : activePitchMode === "half" ? HALF_PITCH_VIEW_HEIGHT : 1000);
+    const crop = activePitchMode === "box" ? BOX_PITCH_VIEW : { x: 0, y: 0, width: 750, height: activePitchMode === "half" ? HALF_PITCH_VIEW_HEIGHT : 1000 };
+    const viewX = activePitchMode === "full" ? ((event.clientX - rect.left) / rect.width) * 1000 : crop.x + ((event.clientX - rect.left) / rect.width) * crop.width;
+    const viewY = activePitchMode === "full" ? ((event.clientY - rect.top) / rect.height) * 640 : crop.y + ((event.clientY - rect.top) / rect.height) * crop.height;
     return activePitchMode === "full"
       ? { x: Math.max(24, Math.min(976, viewX)), y: Math.max(24, Math.min(616, viewY)) }
       : { x: Math.max(24, Math.min(976, 1000 - viewY)), y: Math.max(24, Math.min(616, viewX * (640 / 750))) };
@@ -1171,7 +1173,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       <canvas ref={videoCanvasRef} width="1280" height="819" className="sr-tactical-video-canvas" aria-hidden="true" />
 
       <div className={`sr-tactical-pitch-wrap ${mode === "arrow" ? "drawing" : "moving"} ${pitchViewMode !== "full" ? "portrait" : "landscape"}`}>
-        <svg ref={pitchRef} className="sr-tactical-pitch" preserveAspectRatio="xMidYMid meet" style={{ width: pitchViewMode === "full" ? undefined : "auto", height: pitchViewMode === "full" ? undefined : pitchViewMode === "half" ? "min(56vh, 580px)" : "min(50vh, 520px)", minHeight: pitchViewMode === "full" ? undefined : 0, maxWidth: pitchViewMode === "full" ? undefined : "100%", maxHeight: pitchViewMode === "full" ? undefined : pitchViewMode === "half" ? "min(56vh, 580px)" : "min(50vh, 520px)", aspectRatio: pitchViewMode === "full" ? "25 / 16" : pitchViewMode === "half" ? `750 / ${HALF_PITCH_VIEW_HEIGHT}` : "3 / 4" }} viewBox={pitchViewMode === "full" ? "0 0 1000 640" : pitchViewMode === "half" ? `0 0 750 ${HALF_PITCH_VIEW_HEIGHT}` : "0 0 750 1000"} role="img" aria-label={`${pitchViewMode === "full" ? "Full" : pitchViewMode === "half" ? "Half pitch plus a little beyond halfway" : "18-yard box"} tactical football pitch. Drag the discs to position players.`} onPointerDown={handlePitchPointerDown} onPointerMove={handlePitchPointerMove} onPointerUp={handlePitchPointerUp} onPointerCancel={handlePitchPointerUp}>
+        <svg ref={pitchRef} className="sr-tactical-pitch" preserveAspectRatio="xMidYMid meet" style={{ width: pitchViewMode === "full" ? undefined : "auto", height: pitchViewMode === "full" ? undefined : pitchViewMode === "half" ? "min(56vh, 580px)" : "min(50vh, 520px)", minHeight: pitchViewMode === "full" ? undefined : 0, maxWidth: pitchViewMode === "full" ? undefined : "100%", maxHeight: pitchViewMode === "full" ? undefined : pitchViewMode === "half" ? "min(56vh, 580px)" : "min(50vh, 520px)", aspectRatio: pitchViewMode === "full" ? "25 / 16" : pitchViewMode === "half" ? `750 / ${HALF_PITCH_VIEW_HEIGHT}` : `${BOX_PITCH_VIEW.width} / ${BOX_PITCH_VIEW.height}` }} viewBox={pitchViewMode === "full" ? "0 0 1000 640" : pitchViewMode === "half" ? `0 0 750 ${HALF_PITCH_VIEW_HEIGHT}` : `${BOX_PITCH_VIEW.x} ${BOX_PITCH_VIEW.y} ${BOX_PITCH_VIEW.width} ${BOX_PITCH_VIEW.height}`} role="img" aria-label={`${pitchViewMode === "full" ? "Full" : pitchViewMode === "half" ? "Half pitch plus a little beyond halfway" : "18-yard box focused portrait"} tactical football pitch. Drag the discs to position players.`} onPointerDown={handlePitchPointerDown} onPointerMove={handlePitchPointerMove} onPointerUp={handlePitchPointerUp} onPointerCancel={handlePitchPointerUp}>
           <defs><pattern id="sr-tactical-grass-stripes" width="80" height="80" patternUnits="userSpaceOnUse"><rect width="80" height="80" fill="#24734e" /><rect width="80" height="40" fill="#3a8b59" opacity="0.38" /></pattern>{(displayedBoard.arrows || []).map((arrow) => { const headSize = Number(arrow.headSize) || 20; const headStyle = arrow.headStyle || "filled"; return <marker key={`head-${arrow.id}`} id={`sr-tactical-arrowhead-${arrow.id}`} markerWidth={headSize} markerHeight={headSize} refX={headSize} refY={headSize / 2} orient="auto" markerUnits="userSpaceOnUse"><path d={`M0,0 L${headSize},${headSize / 2} L0,${headSize}`} fill={headStyle === "open" ? "none" : arrow.color || "#ffe36e"} stroke={arrow.color || "#ffe36e"} strokeWidth={Math.max(1, headSize / 8)} strokeLinejoin="round" fillOpacity={arrow.opacity ?? 1} strokeOpacity={arrow.opacity ?? 1} /></marker>; })}<marker id="sr-tactical-arrowhead-preview" markerWidth={newArrowHeadSize} markerHeight={newArrowHeadSize} refX={newArrowHeadSize} refY={newArrowHeadSize / 2} orient="auto" markerUnits="userSpaceOnUse"><path d={`M0,0 L${newArrowHeadSize},${newArrowHeadSize / 2} L0,${newArrowHeadSize}`} fill={newArrowHeadStyle === "open" ? "none" : newShapeColour} stroke={newShapeColour} strokeWidth={Math.max(1, newArrowHeadSize / 8)} strokeLinejoin="round" /></marker></defs>
           {pitchViewMode === "full" ? <>
             <rect x="12" y="12" width="976" height="616" rx="7" className="sr-tactical-grass" />
