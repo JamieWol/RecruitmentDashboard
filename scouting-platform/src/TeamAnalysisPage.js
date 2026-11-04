@@ -133,7 +133,7 @@ const DEFAULT_TACTICAL_HOME = [
   [420, 170], [420, 320], [420, 470], [610, 145], [610, 320], [610, 495],
 ].map(([x, y], index) => ({ id: `home-${index + 1}`, side: "home", number: index + 1, x, y }));
 const HALF_PITCH_VIEW_HEIGHT = 650;
-const BOX_PITCH_VIEW = { x: 75, y: 0, width: 600, height: 800 };
+const BOX_PITCH_VIEW = { x: 15, y: 0, width: 720, height: 800 };
 const DEFAULT_TACTICAL_AWAY = [
   [910, 320], [755, 90], [755, 245], [755, 395], [755, 550],
   [580, 170], [580, 320], [580, 470], [390, 145], [390, 320], [390, 495],
@@ -1059,7 +1059,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       return;
     }
     const exportPitchMode = pitchMode;
-    canvas.width = exportPitchMode === "full" ? 1280 : 960;
+    canvas.width = exportPitchMode === "full" ? 1280 : exportPitchMode === "box" ? 1152 : 960;
     canvas.height = exportPitchMode === "full" ? 819 : exportPitchMode === "half" ? 832 : 1280;
     drawTacticalVideoFrame(canvas, { ...clips[0].from, pitchMode: exportPitchMode }, exportPitchMode);
     const stream = canvas.captureStream(30);
