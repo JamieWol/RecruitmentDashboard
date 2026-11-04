@@ -133,7 +133,7 @@ const DEFAULT_TACTICAL_HOME = [
   [420, 170], [420, 320], [420, 470], [610, 145], [610, 320], [610, 495],
 ].map(([x, y], index) => ({ id: `home-${index + 1}`, side: "home", number: index + 1, x, y }));
 const HALF_PITCH_VIEW_HEIGHT = 650;
-const BOX_PITCH_VIEW = { x: 15, y: 0, width: 720, height: 800 };
+const BOX_PITCH_VIEW = { x: -5, y: 0, width: 760, height: 800 };
 const DEFAULT_TACTICAL_AWAY = [
   [910, 320], [755, 90], [755, 245], [755, 395], [755, 550],
   [580, 170], [580, 320], [580, 470], [390, 145], [390, 320], [390, 495],
@@ -319,6 +319,10 @@ const drawTacticalVideoFrame = (canvas, board, viewMode = board.pitchMode || "fu
     context.strokeStyle = "#e8f4e9";
     context.lineWidth = 3;
     context.strokeRect(41, 35, 668, 930);
+    if (viewMode === "box") {
+      context.beginPath(); context.arc(61, 55, 20, Math.PI, Math.PI * 1.5); context.stroke();
+      context.beginPath(); context.arc(689, 55, 20, -Math.PI / 2, 0); context.stroke();
+    }
     if (viewMode === "half") {
       context.beginPath(); context.moveTo(41, 470); context.lineTo(709, 470); context.stroke();
       context.beginPath(); context.arc(375, 470, 83, 0, Math.PI * 2); context.stroke();
@@ -1059,7 +1063,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       return;
     }
     const exportPitchMode = pitchMode;
-    canvas.width = exportPitchMode === "full" ? 1280 : exportPitchMode === "box" ? 1152 : 960;
+    canvas.width = exportPitchMode === "full" ? 1280 : exportPitchMode === "box" ? Math.round(1280 * BOX_PITCH_VIEW.width / BOX_PITCH_VIEW.height) : 960;
     canvas.height = exportPitchMode === "full" ? 819 : exportPitchMode === "half" ? 832 : 1280;
     drawTacticalVideoFrame(canvas, { ...clips[0].from, pitchMode: exportPitchMode }, exportPitchMode);
     const stream = canvas.captureStream(30);
@@ -1195,6 +1199,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
             <rect x="12" y="12" width="616" height="976" rx="7" fill="url(#sr-tactical-grass-stripes)" pointerEvents="none" />
               {pitchViewMode === "half" ? <>
               <rect x="35" y="35" width="570" height="930" className="sr-tactical-line" />
+              <path d="M35 55 A20 20 0 0 0 55 35 M585 35 A20 20 0 0 0 605 55" className="sr-tactical-line" />
               <line x1="35" y1="470" x2="605" y2="470" className="sr-tactical-line" />
               <circle cx="320" cy="470" r="83" className="sr-tactical-line" />
               <circle cx="320" cy="470" r="4" className="sr-tactical-mark" />
