@@ -1,6 +1,6 @@
 import { ClubBadge } from "./ClubBadge";
 import { useAuth } from "./AuthContext";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import html2canvas from "html2canvas";
@@ -149,7 +149,10 @@ const freshTacticalBoard = (homeName = "Home Team", awayName = "Opposition") => 
 });
 
 const pathLength = (points = []) => points.slice(1).reduce((total, point, index) => total + Math.hypot(point.x - points[index].x, point.y - points[index].y), 0);
-const tacticalClipDuration = (clip) => Math.max(3400, Math.min(9000, (pathLength(clip.ballPath || []) / 0.18) || 3400));
+const tacticalClipDuration = (clip) => {
+  if (Number(clip.durationMs)) return Math.max(2000, Math.min(12000, Number(clip.durationMs)));
+  return Math.max(3400, Math.min(9000, (pathLength(clip.ballPath || []) / 0.18) || 3400));
+};
 const pointAlongPath = (points, progress, start, end) => {
   const path = points?.length > 1 ? points : [start, end];
   const lengths = path.slice(1).map((point, index) => Math.hypot(point.x - path[index].x, point.y - path[index].y));
@@ -217,6 +220,7 @@ const interpolateTacticalArrows = (fromArrows = [], toArrows = [], progress = 0)
         to: { x: from.to.x + (to.to.x - from.to.x) * progress, y: from.to.y + (to.to.y - from.to.y) * progress },
         opacity: (from.opacity ?? 1) + ((to.opacity ?? 1) - (from.opacity ?? 1)) * progress,
         strokeWidth: (from.strokeWidth || 6) + ((to.strokeWidth || 6) - (from.strokeWidth || 6)) * progress,
+        headSize: (from.headSize || 20) + ((to.headSize || 20) - (from.headSize || 20)) * progress,
       };
     }
     const arrow = to || from;
@@ -283,28 +287,72 @@ function TacticalToolIcon({ type }) {
   </svg>;
 }
 
-const drawTacticalVideoFrame = (canvas, board) => {
+const drawTacticalVideoFrame = (canvas, board, viewMode = board.pitchMode || "full") => {
   if (!canvas) return;
   const width = canvas.width;
   const height = canvas.height;
   const context = canvas.getContext("2d");
   if (!context) return;
+  const portrait = viewMode !== "full";
   context.clearRect(0, 0, width, height);
-  context.save();
-  context.scale(width / 1000, height / 640);
-  context.fillStyle = "#24734e";
-  context.fillRect(12, 12, 976, 616);
-  context.strokeStyle = "#e8f4e9";
-  context.lineWidth = 3;
-  context.strokeRect(35, 35, 930, 570);
-  context.beginPath(); context.moveTo(500, 35); context.lineTo(500, 605); context.stroke();
-  context.beginPath(); context.arc(500, 320, 83, 0, Math.PI * 2); context.stroke();
-  context.fillStyle = "#e8f4e9";
-  [[500, 320], [145, 320], [855, 320]].forEach(([x, y]) => { context.beginPath(); context.arc(x, y, 4, 0, Math.PI * 2); context.fill(); });
-  context.strokeRect(35, 180, 150, 280); context.strokeRect(35, 245, 58, 150);
-  context.strokeRect(815, 180, 150, 280); context.strokeRect(907, 245, 58, 150);
-  context.beginPath(); context.arc(145, 320, 82, -0.83, 0.83); context.stroke();
-  context.beginPath(); context.arc(855, 320, 82, Math.PI - 0.83, Math.PI + 0.83); context.stroke();
+  if (portrait) {
+    context.save();
+    context.scale(width / 750, height / 1000);
+    context.fillStyle = "#24734e";
+    context.fillRect(12, 12, 726, 976);
+    for (let y = 12; y < 988; y += 80) {
+      if (Math.floor((y - 12) / 80) % 2 === 0) {
+        context.fillStyle = "#3a8b59";
+        context.globalAlpha = 0.38;
+        context.fillRect(12, y, 726, 40);
+      }
+    }
+    context.globalAlpha = 1;
+    context.strokeStyle = "#e8f4e9";
+    context.lineWidth = 3;
+    context.strokeRect(41, 35, 668, 930);
+    if (viewMode === "half") {
+      context.beginPath(); context.moveTo(41, 470); context.lineTo(709, 470); context.stroke();
+      context.beginPath(); context.arc(375, 470, 83, 0, Math.PI * 2); context.stroke();
+      context.strokeRect(216, 35, 318, 150);
+      context.strokeRect(292, 35, 166, 58);
+      context.beginPath(); context.arc(375, 145, 4, 0, Math.PI * 2); context.fillStyle = "#e8f4e9"; context.fill();
+    } else {
+      context.strokeRect(146, 35, 458, 360);
+      context.strokeRect(258, 35, 234, 150);
+      context.beginPath(); context.arc(375, 260, 4, 0, Math.PI * 2); context.fillStyle = "#e8f4e9"; context.fill();
+      context.beginPath(); context.arc(375, 395, 96, Math.PI, 0); context.stroke();
+      context.beginPath(); context.moveTo(316, 20); context.lineTo(434, 20); context.stroke();
+    }
+    context.fillStyle = "#fff";
+    context.font = "bold 24px Arial, sans-serif";
+    context.textAlign = "left";
+    context.fillText(board.homeName || "Home Team", 28, 70, 300);
+    context.textAlign = "right";
+    context.fillText(board.awayName || "Opposition", 722, 70, 300);
+    context.restore();
+    context.save();
+    context.scale(width / 750, height / 1000);
+    context.scale(1.171875, 1);
+    context.translate(0, 1000);
+    context.rotate(-Math.PI / 2);
+  } else {
+    context.save();
+    context.scale(width / 1000, height / 640);
+    context.fillStyle = "#24734e";
+    context.fillRect(12, 12, 976, 616);
+    context.strokeStyle = "#e8f4e9";
+    context.lineWidth = 3;
+    context.strokeRect(35, 35, 930, 570);
+    context.beginPath(); context.moveTo(500, 35); context.lineTo(500, 605); context.stroke();
+    context.beginPath(); context.arc(500, 320, 83, 0, Math.PI * 2); context.stroke();
+    context.fillStyle = "#e8f4e9";
+    [[500, 320], [145, 320], [855, 320]].forEach(([x, y]) => { context.beginPath(); context.arc(x, y, 4, 0, Math.PI * 2); context.fill(); });
+    context.strokeRect(35, 180, 150, 280); context.strokeRect(35, 245, 58, 150);
+    context.strokeRect(815, 180, 150, 280); context.strokeRect(907, 245, 58, 150);
+    context.beginPath(); context.arc(145, 320, 82, -0.83, 0.83); context.stroke();
+    context.beginPath(); context.arc(855, 320, 82, Math.PI - 0.83, Math.PI + 0.83); context.stroke();
+  }
   (board.shapes || []).forEach((shape) => {
     const opacity = Number(shape.opacity);
     const baseOpacity = Math.max(0, Math.min(1, Number.isFinite(opacity) ? opacity : 0.35));
@@ -325,29 +373,44 @@ const drawTacticalVideoFrame = (canvas, board) => {
         context.globalAlpha = shape._playbackOpacity ?? 1;
         context.fillStyle = shape.textColor || "#fff";
         context.font = `bold ${Number(shape.fontSize) || 22}px Arial, sans-serif`;
-        context.textAlign = "left";
+        context.textAlign = portrait ? "center" : "left";
         context.textBaseline = "middle";
-        context.fillText(shape.text || "Text", shape.x + 10, shape.y + shape.height / 2, Math.max(20, shape.width - 20));
+        if (portrait) {
+          context.save();
+          context.translate(shape.x + shape.width / 2, shape.y + shape.height / 2);
+          context.rotate(Math.PI / 2);
+          context.fillText(shape.text || "Text", 0, 0, Math.max(20, shape.width - 20));
+          context.restore();
+        } else context.fillText(shape.text || "Text", shape.x + 10, shape.y + shape.height / 2, Math.max(20, shape.width - 20));
       }
     }
   });
   context.globalAlpha = 1;
-  context.fillStyle = "#fff";
-  context.font = "bold 24px Arial, sans-serif";
-  context.textAlign = "left";
-  context.fillText(board.homeName || "Home Team", 42, 76);
-  context.textAlign = "right";
-  context.fillText(board.awayName || "Opposition", 958, 76);
+  if (!portrait) {
+    context.fillStyle = "#fff";
+    context.font = "bold 24px Arial, sans-serif";
+    context.textAlign = "left";
+    context.fillText(board.homeName || "Home Team", 42, 76);
+    context.textAlign = "right";
+    context.fillText(board.awayName || "Opposition", 958, 76);
+  }
   (board.arrows || []).forEach((arrow) => {
     const angle = Math.atan2(arrow.to.y - arrow.from.y, arrow.to.x - arrow.from.x);
     context.setLineDash(arrow.lineStyle === "dashed" ? [14, 9] : arrow.lineStyle === "dotted" ? [2, 8] : []);
     context.globalAlpha = arrow.opacity ?? 1;
     context.strokeStyle = arrow.color || "#ffe36e"; context.fillStyle = arrow.color || "#ffe36e"; context.lineWidth = Number(arrow.strokeWidth) || 6; context.lineCap = "round";
     context.beginPath(); context.moveTo(arrow.from.x, arrow.from.y); context.lineTo(arrow.to.x, arrow.to.y); context.stroke();
-    context.beginPath(); context.moveTo(arrow.to.x, arrow.to.y);
-    context.lineTo(arrow.to.x - 20 * Math.cos(angle - Math.PI / 6), arrow.to.y - 20 * Math.sin(angle - Math.PI / 6));
-    context.lineTo(arrow.to.x - 20 * Math.cos(angle + Math.PI / 6), arrow.to.y - 20 * Math.sin(angle + Math.PI / 6));
-    context.closePath(); context.fill();
+    if (arrow.headStyle !== "none") {
+      const headSize = Number(arrow.headSize) || 20;
+      context.beginPath(); context.moveTo(arrow.to.x, arrow.to.y);
+      context.lineTo(arrow.to.x - headSize * Math.cos(angle - Math.PI / 6), arrow.to.y - headSize * Math.sin(angle - Math.PI / 6));
+      context.lineTo(arrow.to.x - headSize * Math.cos(angle + Math.PI / 6), arrow.to.y - headSize * Math.sin(angle + Math.PI / 6));
+      if (arrow.headStyle === "open") {
+        context.strokeStyle = arrow.color || "#ffe36e";
+        context.lineWidth = Math.max(2, Number(arrow.strokeWidth) || 6);
+        context.stroke();
+      } else { context.closePath(); context.fill(); }
+    }
     context.globalAlpha = 1;
   });
   context.setLineDash([]);
@@ -357,7 +420,9 @@ const drawTacticalVideoFrame = (canvas, board) => {
     context.shadowColor = player.moving ? "#ffe36e" : "transparent"; context.shadowBlur = player.moving ? 22 : 0; context.fill(); context.shadowBlur = 0;
     context.strokeStyle = player.moving ? "#ffe36e" : "#f3f8ff"; context.lineWidth = player.moving ? 5 : 3; context.stroke();
     context.fillStyle = "#fff"; context.font = "bold 17px Arial, sans-serif"; context.textAlign = "center"; context.textBaseline = "middle";
-    context.fillText(String(player.number), player.x, player.y + 1);
+    if (portrait) {
+      context.save(); context.translate(player.x, player.y + 1); context.rotate(Math.PI / 2); context.fillText(String(player.number), 0, 0); context.restore();
+    } else context.fillText(String(player.number), player.x, player.y + 1);
   });
   const ball = board.ball || { x: 500, y: 320 };
   context.beginPath(); context.arc(ball.x, ball.y + 2, 11, 0, Math.PI * 2); context.fillStyle = "#05223f70"; context.fill();
@@ -388,13 +453,16 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const [selectedTokens, setSelectedTokens] = useState([]);
   const [selectedShapeId, setSelectedShapeId] = useState(null);
   const [editingTextId, setEditingTextId] = useState(null);
-  const [copiedTextBox, setCopiedTextBox] = useState(null);
+  const [copiedGraphic, setCopiedGraphic] = useState(null);
+  const [graphicClipboardStatus, setGraphicClipboardStatus] = useState("");
   const [selectedArrowId, setSelectedArrowId] = useState(null);
   const [enteringGraphicIds, setEnteringGraphicIds] = useState([]);
   const [newShapeOpacity, setNewShapeOpacity] = useState(0.35);
   const [newShapeColour, setNewShapeColour] = useState("#62dcff");
   const [newShapeStrokeWidth, setNewShapeStrokeWidth] = useState(4);
   const [newArrowLineStyle, setNewArrowLineStyle] = useState("solid");
+  const [newArrowHeadStyle, setNewArrowHeadStyle] = useState("filled");
+  const [newArrowHeadSize, setNewArrowHeadSize] = useState(20);
   const [newTextColor, setNewTextColor] = useState("#ffffff");
   const [newTextBoxColor, setNewTextBoxColor] = useState("#0c3769");
   const [dockPanel, setDockPanel] = useState("shapes");
@@ -407,6 +475,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const movementClipsRef = useRef(movementClips);
   const [pitchMode, setPitchMode] = useState(() => board.pitchMode || "full");
   const [activeClipStart, setActiveClipStart] = useState(null);
+  const [editingClipId, setEditingClipId] = useState(null);
   const [videoRecording, setVideoRecording] = useState(false);
   const [finishingVideo, setFinishingVideo] = useState(false);
   const [videoStatus, setVideoStatus] = useState("");
@@ -702,7 +771,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       const end = pointFromEvent(event);
       const distance = Math.hypot(end.x - arrowStart.x, end.y - arrowStart.y);
       if (distance > 12 && mode === "arrow") {
-        const newArrow = { id: `arrow-${Date.now()}`, from: arrowStart, to: end, color: newShapeColour, opacity: newShapeOpacity, strokeWidth: newShapeStrokeWidth, lineStyle: newArrowLineStyle };
+        const newArrow = { id: `arrow-${Date.now()}`, from: arrowStart, to: end, color: newShapeColour, opacity: newShapeOpacity, strokeWidth: newShapeStrokeWidth, lineStyle: newArrowLineStyle, headStyle: newArrowHeadStyle, headSize: newArrowHeadSize };
         setBoard((current) => ({ ...current, arrows: [...current.arrows, newArrow] }));
         markGraphicEntering(newArrow.id);
         setSelectedArrowId(newArrow.id);
@@ -765,11 +834,59 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const selectedShape = (board.shapes || []).find((shape) => shape.id === selectedShapeId);
   const selectedArrow = (board.arrows || []).find((arrow) => arrow.id === selectedArrowId);
   const selectedGraphic = selectedShape || selectedArrow;
+  const copySelectedGraphic = useCallback(() => {
+    if (!selectedGraphic) return;
+    const kind = selectedShape ? "shape" : "arrow";
+    setCopiedGraphic({ kind, item: JSON.parse(JSON.stringify(selectedGraphic)) });
+    setGraphicClipboardStatus(`${kind === "arrow" ? "Arrow" : "Shape"} copied. Paste to make a duplicate.`);
+  }, [selectedGraphic, selectedShape]);
+  const pasteCopiedGraphic = useCallback(() => {
+    if (!copiedGraphic) return;
+    const newId = `${copiedGraphic.kind}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    if (copiedGraphic.kind === "shape") {
+      const source = copiedGraphic.item;
+      const width = Math.max(1, Number(source.width) || 220);
+      const height = Math.max(1, Number(source.height) || 48);
+      const pasted = {
+        ...source,
+        id: newId,
+        x: Math.max(0, Math.min(1000 - width, Number(source.x) + 24)),
+        y: Math.max(0, Math.min(640 - height, Number(source.y) + 24)),
+      };
+      setBoard((current) => ({ ...current, shapes: [...(current.shapes || []), pasted] }));
+      setSelectedShapeId(pasted.id);
+      setSelectedArrowId(null);
+    } else {
+      const source = copiedGraphic.item;
+      const minX = Math.min(source.from.x, source.to.x);
+      const maxX = Math.max(source.from.x, source.to.x);
+      const minY = Math.min(source.from.y, source.to.y);
+      const maxY = Math.max(source.from.y, source.to.y);
+      let dx = Math.min(24, 1000 - maxX);
+      let dy = Math.min(24, 640 - maxY);
+      if (dx === 0) dx = -Math.min(24, minX);
+      if (dy === 0) dy = -Math.min(24, minY);
+      const pasted = {
+        ...source,
+        id: newId,
+        from: { x: source.from.x + dx, y: source.from.y + dy },
+        to: { x: source.to.x + dx, y: source.to.y + dy },
+      };
+      setBoard((current) => ({ ...current, arrows: [...(current.arrows || []), pasted] }));
+      setSelectedArrowId(pasted.id);
+      setSelectedShapeId(null);
+    }
+    setEnteringGraphicIds((current) => [...current, newId]);
+    setEditingTextId(null);
+    setMode("move");
+    setGraphicClipboardStatus("Duplicate pasted. You can paste again to make another copy.");
+  }, [copiedGraphic]);
   useEffect(() => {
-    const handleTextBoxShortcuts = (event) => {
+    const handleGraphicShortcuts = (event) => {
       const key = event.key.toLowerCase();
       const targetTag = event.target?.tagName?.toLowerCase();
-      if (["delete", "backspace"].includes(key) && !["input", "textarea"].includes(targetTag) && !event.target?.isContentEditable) {
+      const isTextField = ["input", "textarea"].includes(targetTag) || event.target?.isContentEditable;
+      if (["delete", "backspace"].includes(key) && !isTextField) {
         if (selectedShape) {
           event.preventDefault();
           setBoard((current) => ({ ...current, shapes: (current.shapes || []).filter((shape) => shape.id !== selectedShape.id) }));
@@ -783,31 +900,18 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
         return;
       }
       if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
-      if (key === "c" && selectedShape?.type === "text") {
+      if (isTextField) return;
+      if (key === "c" && selectedGraphic) {
         event.preventDefault();
-        setCopiedTextBox({ ...selectedShape });
-      } else if (key === "v" && copiedTextBox) {
+        copySelectedGraphic();
+      } else if (key === "v" && copiedGraphic) {
         event.preventDefault();
-        const base = selectedShape?.type === "text" ? selectedShape : copiedTextBox;
-        const width = copiedTextBox.width || 220;
-        const height = copiedTextBox.height || 48;
-        const pasted = {
-          ...copiedTextBox,
-          id: `text-${Date.now()}`,
-          x: Math.max(0, Math.min(1000 - width, base.x + 24)),
-          y: Math.max(0, Math.min(640 - height, base.y + 24)),
-        };
-        setBoard((current) => ({ ...current, shapes: [...(current.shapes || []), pasted] }));
-        setEnteringGraphicIds((current) => [...current, pasted.id]);
-        setSelectedShapeId(pasted.id);
-        setSelectedArrowId(null);
-        setEditingTextId(null);
-        setMode("move");
+        pasteCopiedGraphic();
       }
     };
-    window.addEventListener("keydown", handleTextBoxShortcuts);
-    return () => window.removeEventListener("keydown", handleTextBoxShortcuts);
-  }, [selectedShape, selectedArrow, copiedTextBox]);
+    document.addEventListener("keydown", handleGraphicShortcuts, true);
+    return () => document.removeEventListener("keydown", handleGraphicShortcuts, true);
+  }, [selectedShape, selectedArrow, selectedGraphic, copiedGraphic, copySelectedGraphic, pasteCopiedGraphic]);
   const updateSelectedShape = (changes) => {
     if (!selectedShapeId) return;
     setBoard((current) => ({ ...current, shapes: (current.shapes || []).map((shape) => shape.id === selectedShapeId ? { ...shape, ...changes } : shape) }));
@@ -839,7 +943,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       const origin = fromShapes.find((item) => item.id === shape.id);
       const destination = toShapes.find((item) => item.id === shape.id);
       if (!origin || !destination) return true;
-      return Math.max(Math.abs(destination.x - origin.x), Math.abs(destination.y - origin.y), Math.abs(destination.width - origin.width), Math.abs(destination.height - origin.height)) > 2;
+      return JSON.stringify(destination) !== JSON.stringify(origin);
     })).size;
     const fromArrows = from.arrows || [];
     const toArrows = to.arrows || [];
@@ -847,7 +951,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       const origin = fromArrows.find((item) => item.id === arrow.id);
       const destination = toArrows.find((item) => item.id === arrow.id);
       if (!origin || !destination) return true;
-      return Math.max(Math.abs(destination.from.x - origin.from.x), Math.abs(destination.from.y - origin.from.y), Math.abs(destination.to.x - origin.to.x), Math.abs(destination.to.y - origin.to.y), Math.abs((destination.strokeWidth || 6) - (origin.strokeWidth || 6))) > 2 || destination.lineStyle !== origin.lineStyle || destination.color !== origin.color;
+      return JSON.stringify(destination) !== JSON.stringify(origin);
     })).size;
     const fromBall = from.ball || { x: 500, y: 320 };
     const toBall = to.ball || { x: 500, y: 320 };
@@ -860,18 +964,43 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       setVideoStatus("No movement recorded yet. Move at least one disc or the ball, then save this clip.");
       return;
     }
-    const clip = { id: `movement-${Date.now()}`, from, to, ballPath, movedCount };
-    persistMovementClips((current) => [...current, clip]);
+    const existingClip = editingClipId ? movementClipsRef.current.find((item) => item.id === editingClipId) : null;
+    const clip = { id: editingClipId || `movement-${Date.now()}`, from, to, ballPath, movedCount, durationMs: existingClip?.durationMs || tacticalClipDuration({ ballPath }) };
+    if (editingClipId) persistMovementClips((current) => current.map((item) => item.id === editingClipId ? clip : item));
+    else persistMovementClips((current) => [...current, clip]);
+    const savedClipNumber = editingClipId ? movementClipsRef.current.findIndex((item) => item.id === editingClipId) + 1 : movementClipsRef.current.length;
     activeClipStartRef.current = null;
     activeClipBallPathRef.current = [];
     setActiveClipStart(null);
-    setVideoStatus(`Movement clip ${movementClips.length + 1} saved. Add another clip or play all clips.`);
+    setEditingClipId(null);
+    setVideoStatus(editingClipId ? `Movement clip ${savedClipNumber} updated.` : `Movement clip ${movementClipsRef.current.length} saved. Add another clip or play all clips.`);
   };
   const cancelMovementClip = () => {
+    if (editingClipId) {
+      const originalClip = movementClipsRef.current.find((clip) => clip.id === editingClipId);
+      if (originalClip) setBoard(originalClip.to);
+    }
     activeClipStartRef.current = null;
     activeClipBallPathRef.current = [];
     setActiveClipStart(null);
-    setVideoStatus("Movement clip cancelled.");
+    setEditingClipId(null);
+    setVideoStatus(editingClipId ? "Clip edits cancelled." : "Movement clip cancelled.");
+  };
+  const editMovementClip = (clip, clipNumber) => {
+    if (finishingVideo || activeClipStartRef.current) return;
+    const from = JSON.parse(JSON.stringify(clip.from));
+    const to = JSON.parse(JSON.stringify(clip.to));
+    setBoard(to);
+    setPitchMode(to.pitchMode || pitchMode);
+    activeClipStartRef.current = from;
+    activeClipBallPathRef.current = JSON.parse(JSON.stringify(clip.ballPath || []));
+    setActiveClipStart(from);
+    setEditingClipId(clip.id);
+    setDockPanel("animation");
+    setSelectedTokens([]);
+    setSelectedShapeId(null);
+    setSelectedArrowId(null);
+    setVideoStatus(`Editing clip ${clipNumber}. Change the final positions or drawings, then save this clip.`);
   };
   const previewMovementClip = (clip, clipNumber) => {
     if (finishingVideo || activeClipStartRef.current) return;
@@ -923,7 +1052,10 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       setVideoStatus("Video recording is not supported by this browser. Try Chrome, Edge, or Safari.");
       return;
     }
-    drawTacticalVideoFrame(canvas, clips[0].from);
+    const exportPitchMode = pitchMode;
+    canvas.width = exportPitchMode === "full" ? 1280 : 960;
+    canvas.height = exportPitchMode === "full" ? 819 : 1280;
+    drawTacticalVideoFrame(canvas, { ...clips[0].from, pitchMode: exportPitchMode }, exportPitchMode);
     const stream = canvas.captureStream(30);
     const formats = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm", "video/mp4"];
     const mimeType = formats.find((format) => MediaRecorder.isTypeSupported?.(format));
@@ -976,7 +1108,8 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       if (elapsed >= timelineDuration) {
         const lastBoard = clips[clips.length - 1].to;
         const finalFrame = { ...lastBoard, name: boardRef.current.name, homeName: boardRef.current.homeName, awayName: boardRef.current.awayName, arrows: lastBoard.arrows || [], shapes: lastBoard.shapes || [] };
-        drawTacticalVideoFrame(canvas, finalFrame);
+        const orientedFinalFrame = { ...finalFrame, pitchMode: exportPitchMode };
+        drawTacticalVideoFrame(canvas, orientedFinalFrame, exportPitchMode);
         setPlaybackBoard(null);
         setVideoPlaying(false);
         setBoard((current) => ({ ...current, players: finalFrame.players, ball: finalFrame.ball }));
@@ -1006,6 +1139,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       const arrows = interpolateTacticalArrows(clip.from.arrows || [], clip.to.arrows || [], eased);
       const frameBoard = {
         ...clip.to,
+        pitchMode: exportPitchMode,
         name: boardRef.current.name,
         homeName: boardRef.current.homeName,
         awayName: boardRef.current.awayName,
@@ -1014,7 +1148,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
         players,
         ball,
       };
-      drawTacticalVideoFrame(canvas, frameBoard);
+      drawTacticalVideoFrame(canvas, frameBoard, exportPitchMode);
       setPlaybackBoard(frameBoard);
       videoFrameRef.current = window.requestAnimationFrame(drawFrame);
     };
@@ -1034,7 +1168,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
 
       <div className={`sr-tactical-pitch-wrap ${mode === "arrow" ? "drawing" : "moving"} ${pitchViewMode !== "full" ? "portrait" : "landscape"}`}>
         <svg ref={pitchRef} className="sr-tactical-pitch" preserveAspectRatio="xMidYMid meet" style={{ width: pitchViewMode === "full" ? undefined : "auto", height: pitchViewMode === "full" ? undefined : pitchViewMode === "half" ? "min(56vh, 580px)" : "min(50vh, 520px)", minHeight: pitchViewMode === "full" ? undefined : 0, maxWidth: pitchViewMode === "full" ? undefined : "100%", maxHeight: pitchViewMode === "full" ? undefined : pitchViewMode === "half" ? "min(56vh, 580px)" : "min(50vh, 520px)", aspectRatio: pitchViewMode === "full" ? "25 / 16" : pitchViewMode === "half" ? `750 / ${HALF_PITCH_VIEW_HEIGHT}` : "3 / 4" }} viewBox={pitchViewMode === "full" ? "0 0 1000 640" : pitchViewMode === "half" ? `0 0 750 ${HALF_PITCH_VIEW_HEIGHT}` : "0 0 750 1000"} role="img" aria-label={`${pitchViewMode === "full" ? "Full" : pitchViewMode === "half" ? "Half pitch plus a little beyond halfway" : "18-yard box"} tactical football pitch. Drag the discs to position players.`} onPointerDown={handlePitchPointerDown} onPointerMove={handlePitchPointerMove} onPointerUp={handlePitchPointerUp} onPointerCancel={handlePitchPointerUp}>
-          <defs><pattern id="sr-tactical-grass-stripes" width="80" height="80" patternUnits="userSpaceOnUse"><rect width="80" height="80" fill="#24734e" /><rect width="80" height="40" fill="#3a8b59" opacity="0.38" /></pattern>{(displayedBoard.arrows || []).map((arrow) => <marker key={`head-${arrow.id}`} id={`sr-tactical-arrowhead-${arrow.id}`} markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill={arrow.color || "#ffe36e"} fillOpacity={arrow.opacity ?? 1} /></marker>)}<marker id="sr-tactical-arrowhead-preview" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill={newShapeColour} /></marker></defs>
+          <defs><pattern id="sr-tactical-grass-stripes" width="80" height="80" patternUnits="userSpaceOnUse"><rect width="80" height="80" fill="#24734e" /><rect width="80" height="40" fill="#3a8b59" opacity="0.38" /></pattern>{(displayedBoard.arrows || []).map((arrow) => { const headSize = Number(arrow.headSize) || 20; const headStyle = arrow.headStyle || "filled"; return <marker key={`head-${arrow.id}`} id={`sr-tactical-arrowhead-${arrow.id}`} markerWidth={headSize} markerHeight={headSize} refX={headSize} refY={headSize / 2} orient="auto" markerUnits="userSpaceOnUse"><path d={`M0,0 L${headSize},${headSize / 2} L0,${headSize}`} fill={headStyle === "open" ? "none" : arrow.color || "#ffe36e"} stroke={arrow.color || "#ffe36e"} strokeWidth={Math.max(1, headSize / 8)} strokeLinejoin="round" fillOpacity={arrow.opacity ?? 1} strokeOpacity={arrow.opacity ?? 1} /></marker>; })}<marker id="sr-tactical-arrowhead-preview" markerWidth={newArrowHeadSize} markerHeight={newArrowHeadSize} refX={newArrowHeadSize} refY={newArrowHeadSize / 2} orient="auto" markerUnits="userSpaceOnUse"><path d={`M0,0 L${newArrowHeadSize},${newArrowHeadSize / 2} L0,${newArrowHeadSize}`} fill={newArrowHeadStyle === "open" ? "none" : newShapeColour} stroke={newShapeColour} strokeWidth={Math.max(1, newArrowHeadSize / 8)} strokeLinejoin="round" /></marker></defs>
           {pitchViewMode === "full" ? <>
             <rect x="12" y="12" width="976" height="616" rx="7" className="sr-tactical-grass" />
             <rect x="12" y="12" width="976" height="616" rx="7" fill="url(#sr-tactical-grass-stripes)" pointerEvents="none" />
@@ -1097,7 +1231,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
             const counterRotation = keepTextReadable ? `rotate(90 ${shape.x + shape.width / 2} ${shape.y + shape.height / 2})` : undefined;
             return <g key={`${shape.id}-${pitchViewMode}`} {...graphicEvents}><g transform={counterRotation}>{shapeBody}{handles.map(([corner, x, y]) => <circle key={corner} className="sr-tactical-resize-handle" style={{ cursor: corner === "nw" || corner === "se" ? "nwse-resize" : "nesw-resize" }} cx={x} cy={y} r="7" onPointerDown={(event) => beginShapeResize(event, shape, corner)} />)}</g></g>;
           })}
-          {arrowPreview && arrowStart && mode === "arrow" && <line x1={arrowStart.x} y1={arrowStart.y} x2={arrowPreview.x} y2={arrowPreview.y} className="sr-tactical-arrow sr-tactical-arrow-preview" stroke={newShapeColour} markerEnd="url(#sr-tactical-arrowhead-preview)" />}
+          {arrowPreview && arrowStart && mode === "arrow" && <line x1={arrowStart.x} y1={arrowStart.y} x2={arrowPreview.x} y2={arrowPreview.y} className="sr-tactical-arrow sr-tactical-arrow-preview" stroke={newShapeColour} strokeDasharray={newArrowLineStyle === "dashed" ? "14 9" : newArrowLineStyle === "dotted" ? "2 8" : undefined} markerEnd={newArrowHeadStyle === "none" ? undefined : "url(#sr-tactical-arrowhead-preview)"} />}
           {arrowPreview && arrowStart && ["rectangle", "square", "circle", "triangle", "line", "text"].includes(mode) && (() => {
             const shape = mode === "text" ? textBoxForDrag(arrowStart, arrowPreview) : shapeForDrag(arrowStart, arrowPreview, mode);
             if (mode === "text") return <g transform={pitchViewMode === "full" ? undefined : `rotate(90 ${shape.x + shape.width / 2} ${shape.y + shape.height / 2})`}><rect {...shape} rx="5" fill={newTextBoxColor} fillOpacity="0.85" stroke={newShapeColour} strokeWidth={2} className="sr-tactical-shape-preview" /></g>;
@@ -1111,7 +1245,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
             const strokeWidth = Number(arrow.strokeWidth) || 6;
             const dashPattern = arrow.lineStyle === "dashed" ? "14 9" : arrow.lineStyle === "dotted" ? "2 8" : undefined;
             return <g key={arrow.id}>
-              <line x1={arrow.from.x} y1={arrow.from.y} x2={arrow.to.x} y2={arrow.to.y} stroke={arrow.color || "#ffe36e"} strokeOpacity={arrow.opacity ?? 1} strokeWidth={selected ? strokeWidth + 2 : strokeWidth} strokeDasharray={dashPattern} strokeLinecap="round" className={`sr-tactical-arrow ${selected ? "selected" : ""} ${draggingArrowId === arrow.id ? "dragging" : ""} ${enteringGraphicIds.includes(arrow.id) ? "entering" : ""}`} markerEnd={`url(#sr-tactical-arrowhead-${arrow.id})`} onAnimationEnd={() => finishGraphicEntering(arrow.id)} onPointerDown={(event) => beginArrowDrag(event, arrow)} />
+              <line x1={arrow.from.x} y1={arrow.from.y} x2={arrow.to.x} y2={arrow.to.y} stroke={arrow.color || "#ffe36e"} strokeOpacity={arrow.opacity ?? 1} strokeWidth={selected ? strokeWidth + 2 : strokeWidth} strokeDasharray={dashPattern} strokeLinecap="round" className={`sr-tactical-arrow ${selected ? "selected" : ""} ${draggingArrowId === arrow.id ? "dragging" : ""} ${enteringGraphicIds.includes(arrow.id) ? "entering" : ""}`} markerEnd={arrow.headStyle === "none" ? undefined : `url(#sr-tactical-arrowhead-${arrow.id})`} onAnimationEnd={() => finishGraphicEntering(arrow.id)} onPointerDown={(event) => beginArrowDrag(event, arrow)} />
               {selected && [["from", arrow.from], ["to", arrow.to]].map(([endpoint, point]) => <circle key={endpoint} className="sr-tactical-arrow-resize-handle" cx={point.x} cy={point.y} r="7" onPointerDown={(event) => beginArrowEndResize(event, arrow, endpoint)} />)}
             </g>;
           })}
@@ -1135,13 +1269,13 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
           <button type="button" role="tab" aria-selected={dockPanel === "tools"} className={dockPanel === "tools" ? "active" : ""} onClick={() => setDockPanel("tools")}>⚙ Tools</button>
         </div>
         {dockPanel === "animation" && <div className="sr-tactical-dock-panel" role="tabpanel">
-          <div className="sr-tactical-tools" role="toolbar" aria-label="Movement clip tools">
-            <button type="button" className={activeClipStart ? "sr-tactical-recording" : "sr-tactical-video"} onClick={beginOrSaveMovementClip} disabled={finishingVideo}>{activeClipStart ? "Save movement clip" : "Start movement clip"}</button>
+        <div className="sr-tactical-tools" role="toolbar" aria-label="Movement clip tools">
+            <button type="button" className={activeClipStart ? "sr-tactical-recording" : "sr-tactical-video"} onClick={beginOrSaveMovementClip} disabled={finishingVideo}>{activeClipStart ? editingClipId ? "Save clip edits" : "Save movement clip" : "Start movement clip"}</button>
             {activeClipStart && <button type="button" onClick={cancelMovementClip} disabled={finishingVideo}>Cancel clip</button>}
             <button type="button" className={videoRecording ? "sr-tactical-recording" : "sr-tactical-video"} onClick={playAllMovementClips} disabled={!movementClips.length || finishingVideo || Boolean(activeClipStart)}>{finishingVideo ? "Playing clips…" : `Play all clips${movementClips.length ? ` (${movementClips.length})` : ""}`}</button>
             <small>Start a clip, move the discs or ball, then save it. Repeat to build a sequence.</small>
           </div>
-          {movementClips.length > 0 && <div className="sr-tactical-clip-list"><strong>Movement clips — select one to preview</strong><ol>{movementClips.map((clip, index) => <li key={clip.id}><button type="button" className="sr-tactical-clip-preview-button" onClick={() => previewMovementClip(clip, index + 1)} disabled={finishingVideo || Boolean(activeClipStart)}>Clip {index + 1}: {clip.movedCount} piece{clip.movedCount === 1 ? "" : "s"} moved <span>Preview on pitch</span></button><button type="button" onClick={() => persistMovementClips((current) => current.filter((item) => item.id !== clip.id))} disabled={finishingVideo}>Remove</button></li>)}</ol><div className="sr-tactical-clip-list-actions"><button type="button" onClick={() => persistMovementClips((current) => current.slice(0, -1))} disabled={finishingVideo}>Undo last clip</button><button type="button" onClick={() => persistMovementClips([])} disabled={finishingVideo}>Clear clips</button></div></div>}
+          {movementClips.length > 0 && <div className="sr-tactical-clip-list"><strong>Movement clips — preview, edit, and adjust timing</strong><ol>{movementClips.map((clip, index) => <li key={clip.id}><button type="button" className="sr-tactical-clip-preview-button" onClick={() => previewMovementClip(clip, index + 1)} disabled={finishingVideo || Boolean(activeClipStart)}>Clip {index + 1}: {clip.movedCount} piece{clip.movedCount === 1 ? "" : "s"} moved <span>Preview</span></button><button type="button" onClick={() => editMovementClip(clip, index + 1)} disabled={finishingVideo || Boolean(activeClipStart)}>Edit</button><button type="button" onClick={() => persistMovementClips((current) => current.filter((item) => item.id !== clip.id))} disabled={finishingVideo || Boolean(activeClipStart)}>Remove</button><label className="sr-tactical-clip-duration"><span>Duration</span><input aria-label={`Clip ${index + 1} duration`} type="range" min="2000" max="12000" step="500" value={tacticalClipDuration(clip)} disabled={finishingVideo || Boolean(activeClipStart && editingClipId !== clip.id)} onChange={(event) => persistMovementClips((current) => current.map((item) => item.id === clip.id ? { ...item, durationMs: Number(event.target.value) } : item))} /><output>{(tacticalClipDuration(clip) / 1000).toFixed(1)}s</output></label></li>)}</ol><div className="sr-tactical-clip-list-actions"><button type="button" onClick={() => persistMovementClips((current) => current.slice(0, -1))} disabled={finishingVideo || Boolean(activeClipStart)}>Undo last clip</button><button type="button" onClick={() => persistMovementClips([])} disabled={finishingVideo || Boolean(activeClipStart)}>Clear clips</button></div></div>}
         </div>}
         {dockPanel === "shapes" && <div className="sr-tactical-dock-panel" role="tabpanel">
           <div className="sr-tactical-tools sr-tactical-shape-palette" role="toolbar" aria-label="Shape and drawing tools">
@@ -1152,11 +1286,12 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
             <label className="sr-tactical-color-control"><span>Colour</span><input type="color" value={selectedGraphic?.color || newShapeColour} onChange={(event) => { setNewShapeColour(event.target.value); updateSelectedGraphic({ color: event.target.value }); }} /></label>
             <label className="sr-tactical-opacity-control"><span>Transparency</span><input aria-label="Shape transparency" type="range" min="0" max="95" step="5" value={100 - Math.round((selectedGraphic?.opacity ?? newShapeOpacity) * 100)} onChange={(event) => { const opacity = 1 - Number(event.target.value) / 100; if (selectedGraphic) updateSelectedGraphic({ opacity }); else setNewShapeOpacity(opacity); }} /><output>{100 - Math.round((selectedGraphic?.opacity ?? newShapeOpacity) * 100)}%</output></label>
             <label className="sr-tactical-stroke-width-control"><span>Line width</span><input aria-label="Line width" type="range" min="1" max="16" step="1" value={selectedGraphic?.strokeWidth || newShapeStrokeWidth} onChange={(event) => { const strokeWidth = Number(event.target.value); setNewShapeStrokeWidth(strokeWidth); updateSelectedGraphic({ strokeWidth }); }} /><output>{selectedGraphic?.strokeWidth || newShapeStrokeWidth}px</output></label>
-            {selectedArrow && <label className="sr-tactical-line-style-control"><span>Arrow line</span><select aria-label="Arrow line style" value={selectedArrow.lineStyle || "solid"} onChange={(event) => { setNewArrowLineStyle(event.target.value); updateSelectedGraphic({ lineStyle: event.target.value }); }}><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select></label>}
+            {(selectedArrow || mode === "arrow") && <><label className="sr-tactical-line-style-control arrow-style-line"><span>Arrow line</span><select aria-label="Arrow line style" value={selectedArrow?.lineStyle || newArrowLineStyle} onChange={(event) => { setNewArrowLineStyle(event.target.value); if (selectedArrow) updateSelectedGraphic({ lineStyle: event.target.value }); }}><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select></label><label className="sr-tactical-line-style-control arrow-style-head"><span>Arrow head</span><select aria-label="Arrow head style" value={selectedArrow?.headStyle || newArrowHeadStyle} onChange={(event) => { setNewArrowHeadStyle(event.target.value); if (selectedArrow) updateSelectedGraphic({ headStyle: event.target.value }); }}><option value="filled">Filled</option><option value="open">Open</option><option value="none">None</option></select></label><label className="sr-tactical-line-style-control arrow-style-size"><span>Head size</span><input aria-label="Arrowhead size" type="range" min="8" max="36" step="2" value={selectedArrow?.headSize || newArrowHeadSize} onChange={(event) => { const headSize = Number(event.target.value); setNewArrowHeadSize(headSize); if (selectedArrow) updateSelectedGraphic({ headSize }); }} /><output>{selectedArrow?.headSize || newArrowHeadSize}px</output></label></>}
             <button type="button" onClick={() => { if (selectedShape) setBoard((current) => ({ ...current, shapes: (current.shapes || []).filter((shape) => shape.id !== selectedShapeId) })); else if (selectedArrowId) setBoard((current) => ({ ...current, arrows: (current.arrows || []).filter((arrow) => arrow.id !== selectedArrowId) })); setSelectedShapeId(null); setSelectedArrowId(null); }} disabled={!selectedGraphic}>Delete selected</button>
             <button type="button" onClick={() => { setBoard((current) => ({ ...current, shapes: [], arrows: [] })); setSelectedShapeId(null); setSelectedArrowId(null); }} disabled={!(board.shapes || []).length && !board.arrows.length}>Clear shapes</button>
           </div>
-          <small>{selectedArrow ? "Drag either endpoint to resize the arrow. Change its colour or line width above, or press Delete to remove it." : selectedShape ? "Drag a corner handle to resize. Change colour or line width above, or press Delete to remove it." : "Choose a tool, then draw directly on the pitch. Select a drawn item to edit it."}</small>
+          <div className="sr-tactical-copy-actions"><button type="button" onClick={copySelectedGraphic} disabled={!selectedGraphic}>Copy selected</button><button type="button" onClick={pasteCopiedGraphic} disabled={!copiedGraphic}>Paste copy</button><small>{graphicClipboardStatus || "Select any shape, line, text box, or arrow. Copy/Paste also works with Cmd/Ctrl+C and Cmd/Ctrl+V."}</small></div>
+          <small>{selectedArrow ? "Drag either endpoint to resize. Adjust its line and head above. Use Cmd/Ctrl+C to copy, Cmd/Ctrl+V to paste, or Delete to remove it." : selectedShape ? "Drag a corner handle to resize. Change its style above. Use Cmd/Ctrl+C to copy, Cmd/Ctrl+V to paste, or Delete to remove it." : "Choose a tool, then draw on the pitch. Select any shape, line, or arrow to edit, copy, paste, or delete it."}</small>
         </div>}
         {dockPanel === "text" && <div className="sr-tactical-dock-panel sr-tactical-text-panel" role="tabpanel">
           <button type="button" className={`sr-tactical-icon-tool ${mode === "text" ? "selected" : ""}`} onClick={() => { setMode("text"); setSelectedShapeId(null); setSelectedArrowId(null); setEditingTextId(null); }}><TacticalToolIcon type="text" /><span>Draw text box</span></button>
@@ -1171,7 +1306,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
             <button type="button" onClick={() => addPlayer("away")}>+ Opponent disc</button>
             <button type="button" onClick={removeSelectedPlayer} disabled={!selectedTokens.length}>Remove selected player</button>
             <button type="button" onClick={() => { setBoard((current) => ({ ...current, arrows: [] })); setSelectedArrowId(null); }} disabled={!board.arrows.length}>Clear arrows</button>
-            <button type="button" onClick={() => { setBoard({ ...freshTacticalBoard(homeTeamName, oppositionName), pitchMode }); setSelectedTokens([]); setSelectedShapeId(null); setSelectedArrowId(null); activeClipStartRef.current = null; setActiveClipStart(null); }}>Reset pitch</button>
+            <button type="button" onClick={() => { setBoard({ ...freshTacticalBoard(homeTeamName, oppositionName), pitchMode }); setSelectedTokens([]); setSelectedShapeId(null); setSelectedArrowId(null); activeClipStartRef.current = null; activeClipBallPathRef.current = []; setActiveClipStart(null); setEditingClipId(null); }}>Reset pitch</button>
           </div>
         </div>}
       </div>

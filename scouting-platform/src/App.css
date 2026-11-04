@@ -242,12 +242,15 @@ header{z-index:1000!important}.sr-page{position:relative;z-index:1}.sr-pitch{z-i
 .sr-tactical-drawing-toolbar small{color:#b9d8f1}
 .sr-tactical-clip-list{display:grid;gap:9px;margin-top:12px;padding:12px;border:1px solid #557fa7;border-radius:8px;background:#123761;color:#d2e5fa}
 .sr-tactical-clip-list ol{display:grid;gap:6px;margin:0;padding:0;list-style:none}
-.sr-tactical-clip-list li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 9px;border:1px solid #416c99;border-radius:6px;background:#173f70}
+.sr-tactical-clip-list li{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:8px 10px;padding:7px 9px;border:1px solid #416c99;border-radius:6px;background:#173f70}
 .sr-tactical-clip-list button{padding:6px 10px;border:1px solid #78b4d8;border-radius:6px;background:#244f82;color:#fff;font:inherit;font-size:13px;cursor:pointer}
 .sr-tactical-clip-list-actions{display:flex;flex-wrap:wrap;gap:8px}
 .sr-tactical-clip-list .sr-tactical-clip-preview-button{display:flex;flex:1;justify-content:space-between;align-items:center;gap:12px;text-align:left}
 .sr-tactical-clip-preview-button span{color:#b9d8f1;font-size:12px}
-@media(max-width:600px){.sr-tactical-clip-list li{align-items:stretch}.sr-tactical-clip-list .sr-tactical-clip-preview-button{align-items:flex-start;flex-direction:column}}
+.sr-tactical-clip-duration{grid-column:1/-1;display:flex;align-items:center;gap:10px;color:#d2e5fa;font-size:12px;font-weight:700}
+.sr-tactical-clip-duration input{flex:1;min-width:80px;accent-color:#62dcff}
+.sr-tactical-clip-duration output{min-width:42px;color:#fff;font-variant-numeric:tabular-nums}
+@media(max-width:600px){.sr-tactical-clip-list li{align-items:stretch;grid-template-columns:minmax(0,1fr) auto auto}.sr-tactical-clip-list .sr-tactical-clip-preview-button{align-items:flex-start;flex-direction:column}.sr-tactical-clip-duration{flex-wrap:wrap}.sr-tactical-clip-duration input{flex-basis:100%}}
 
 .sr-tactical-video-status{margin:0;color:#bfeaff;font-size:14px}
 .sr-tactical-video-preview{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:42px 12px 12px;border:1px solid #557fa7;border-radius:8px;background:#123761}
@@ -323,11 +326,20 @@ header{z-index:1000!important}.sr-page{position:relative;z-index:1}.sr-pitch{z-i
 .sr-tactical-shape-palette>button:nth-of-type(10){grid-row:3;grid-column:7/9}
 .sr-tactical-shape-palette button.sr-tactical-icon-tool.selected,.sr-tactical-shape-palette button.sr-tactical-icon-tool:hover{background:#0d668f;border-color:#62dcff}
 .sr-tactical-shape-palette .sr-tactical-icon-tool svg{width:24px;height:24px}
+.sr-tactical-copy-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:2px}
+.sr-tactical-copy-actions button{padding:7px 11px;border:1px solid #78b4d8;border-radius:6px;background:#244f82;color:#fff;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.sr-tactical-copy-actions button:hover:not(:disabled){border-color:#62dcff;background:#0d668f}
+.sr-tactical-copy-actions button:disabled{opacity:.45;cursor:not-allowed}
+.sr-tactical-copy-actions small{color:#b9d8f1}
 .sr-tactical-stroke-width-control{display:flex;align-items:center;gap:8px;color:#d2e5fa;font-size:13px;font-weight:700}
 .sr-tactical-stroke-width-control input{width:100%;min-width:40px;accent-color:#62dcff}
 .sr-tactical-stroke-width-control output{min-width:38px;color:#fff;font-variant-numeric:tabular-nums}
-.sr-tactical-line-style-control{grid-row:4;grid-column:1/5;display:flex;align-items:center;gap:8px;color:#d2e5fa;font-size:13px;font-weight:700}
+.sr-tactical-line-style-control{grid-row:4;display:flex;align-items:center;gap:8px;color:#d2e5fa;font-size:13px;font-weight:700}
+.sr-tactical-shape-palette>.arrow-style-line{grid-column:1/3}
+.sr-tactical-shape-palette>.arrow-style-head{grid-column:3/6}
+.sr-tactical-shape-palette>.arrow-style-size{grid-column:6/9}
 .sr-tactical-line-style-control select{min-width:120px;padding:7px 9px;border:1px solid #78b4d8;border-radius:6px;background:#0c3769;color:#fff;font:inherit}
+.sr-tactical-line-style-control input{width:110px;accent-color:#62dcff}
 .sr-tactical-text-panel{grid-template-columns:minmax(120px,auto) minmax(220px,1fr);align-items:center}
 .sr-tactical-text-panel>label{display:grid;gap:5px;color:#d2e5fa;font-size:13px;font-weight:700}
 .sr-tactical-text-panel input{min-width:0;padding:9px 11px;border:1px solid #78b4d8;border-radius:6px;background:#0c3769;color:#fff;font:inherit}
