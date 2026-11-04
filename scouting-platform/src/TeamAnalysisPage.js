@@ -132,7 +132,7 @@ const DEFAULT_TACTICAL_HOME = [
   [90, 320], [245, 90], [245, 245], [245, 395], [245, 550],
   [420, 170], [420, 320], [420, 470], [610, 145], [610, 320], [610, 495],
 ].map(([x, y], index) => ({ id: `home-${index + 1}`, side: "home", number: index + 1, x, y }));
-const HALF_PITCH_VIEW_HEIGHT = 580;
+const HALF_PITCH_VIEW_HEIGHT = 650;
 const DEFAULT_TACTICAL_AWAY = [
   [910, 320], [755, 90], [755, 245], [755, 395], [755, 550],
   [580, 170], [580, 320], [580, 470], [390, 145], [390, 320], [390, 495],
@@ -1033,7 +1033,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       <canvas ref={videoCanvasRef} width="1280" height="819" className="sr-tactical-video-canvas" aria-hidden="true" />
 
       <div className={`sr-tactical-pitch-wrap ${mode === "arrow" ? "drawing" : "moving"} ${pitchViewMode !== "full" ? "portrait" : "landscape"}`}>
-        <svg ref={pitchRef} className="sr-tactical-pitch" preserveAspectRatio="none" style={{ width: pitchViewMode === "full" ? undefined : pitchViewMode === "half" ? "92%" : "auto", height: pitchViewMode === "full" ? undefined : pitchViewMode === "half" ? "min(44vh, 460px)" : "min(45vh, 480px)", minHeight: pitchViewMode === "full" ? undefined : 0, maxWidth: pitchViewMode === "full" ? undefined : "100%", maxHeight: pitchViewMode === "full" ? undefined : pitchViewMode === "half" ? "min(44vh, 460px)" : "min(45vh, 480px)", aspectRatio: pitchViewMode === "full" ? "25 / 16" : pitchViewMode === "half" ? `750 / ${HALF_PITCH_VIEW_HEIGHT}` : "3 / 4", transform: pitchViewMode === "half" ? "perspective(1400px) rotateX(8deg) rotateZ(-1.5deg)" : undefined, transformOrigin: "center center" }} viewBox={pitchViewMode === "full" ? "0 0 1000 640" : pitchViewMode === "half" ? `0 0 750 ${HALF_PITCH_VIEW_HEIGHT}` : "0 0 750 1000"} role="img" aria-label={`${pitchViewMode === "full" ? "Full" : pitchViewMode === "half" ? "Half pitch plus a little beyond halfway" : "18-yard box"} tactical football pitch. Drag the discs to position players.`} onPointerDown={handlePitchPointerDown} onPointerMove={handlePitchPointerMove} onPointerUp={handlePitchPointerUp} onPointerCancel={handlePitchPointerUp}>
+        <svg ref={pitchRef} className="sr-tactical-pitch" preserveAspectRatio="xMidYMid meet" style={{ width: pitchViewMode === "full" ? undefined : "auto", height: pitchViewMode === "full" ? undefined : pitchViewMode === "half" ? "min(46vh, 500px)" : "min(45vh, 480px)", minHeight: pitchViewMode === "full" ? undefined : 0, maxWidth: pitchViewMode === "full" ? undefined : "100%", maxHeight: pitchViewMode === "full" ? undefined : pitchViewMode === "half" ? "min(46vh, 500px)" : "min(45vh, 480px)", aspectRatio: pitchViewMode === "full" ? "25 / 16" : pitchViewMode === "half" ? `750 / ${HALF_PITCH_VIEW_HEIGHT}` : "3 / 4" }} viewBox={pitchViewMode === "full" ? "0 0 1000 640" : pitchViewMode === "half" ? `0 0 750 ${HALF_PITCH_VIEW_HEIGHT}` : "0 0 750 1000"} role="img" aria-label={`${pitchViewMode === "full" ? "Full" : pitchViewMode === "half" ? "Half pitch plus a little beyond halfway" : "18-yard box"} tactical football pitch. Drag the discs to position players.`} onPointerDown={handlePitchPointerDown} onPointerMove={handlePitchPointerMove} onPointerUp={handlePitchPointerUp} onPointerCancel={handlePitchPointerUp}>
           <defs><pattern id="sr-tactical-grass-stripes" width="80" height="80" patternUnits="userSpaceOnUse"><rect width="80" height="80" fill="#24734e" /><rect width="80" height="40" fill="#3a8b59" opacity="0.38" /></pattern>{(displayedBoard.arrows || []).map((arrow) => <marker key={`head-${arrow.id}`} id={`sr-tactical-arrowhead-${arrow.id}`} markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill={arrow.color || "#ffe36e"} fillOpacity={arrow.opacity ?? 1} /></marker>)}<marker id="sr-tactical-arrowhead-preview" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill={newShapeColour} /></marker></defs>
           {pitchViewMode === "full" ? <>
             <rect x="12" y="12" width="976" height="616" rx="7" className="sr-tactical-grass" />
@@ -1116,13 +1116,13 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
             </g>;
           })}
           <g className={`sr-tactical-ball ${draggingBall ? "dragging" : ""} ${videoPlaying ? "video-playing" : ""}`} transform={`translate(${displayedBoard.ball?.x ?? 500} ${displayedBoard.ball?.y ?? 320})`} onPointerDown={beginBallDrag}>
-            <circle r="13" className="sr-tactical-ball-shadow" /><circle r="10" className="sr-tactical-ball-shell" />
-            <path d="M0 -5 L4 -2 L3 3 L-3 3 L-4 -2 Z" className="sr-tactical-ball-patch" />
+            <circle r={pitchViewMode === "full" ? 13 : 11} className="sr-tactical-ball-shadow" /><circle r={pitchViewMode === "full" ? 10 : 8} className="sr-tactical-ball-shell" />
+            <path d={pitchViewMode === "full" ? "M0 -5 L4 -2 L3 3 L-3 3 L-4 -2 Z" : "M0 -4 L3 -2 L2 2 L-2 2 L-3 -2 Z"} className="sr-tactical-ball-patch" />
           </g>
           {displayedBoard.players.map((player) => <g key={player.id} className={`sr-tactical-player ${player.side} ${!videoPlaying && selectedTokens.includes(player.id) ? "selected" : ""} ${draggingIds.includes(player.id) ? "dragging" : ""} ${videoPlaying ? "video-playing" : ""}`} transform={`translate(${player.x} ${player.y})`} onPointerDown={(event) => beginPlayerDrag(event, player)}>
-            <circle r="27" className="sr-tactical-disc-shadow" />
-            <circle r="24" className="sr-tactical-disc" />
-            <text y="1" transform={pitchViewMode === "full" ? undefined : "rotate(90)"}>{player.number}</text>
+            <circle r={pitchViewMode === "full" ? 27 : 22} className="sr-tactical-disc-shadow" />
+            <circle r={pitchViewMode === "full" ? 24 : 19} className="sr-tactical-disc" />
+            <text y="1" style={{ fontSize: pitchViewMode === "full" ? undefined : "14px" }} transform={pitchViewMode === "full" ? undefined : "rotate(90)"}>{player.number}</text>
           </g>)}
           </g>
         </svg>
