@@ -294,11 +294,17 @@ const drawTacticalVideoFrame = (canvas, board, viewMode = board.pitchMode || "fu
   const context = canvas.getContext("2d");
   if (!context) return;
   const portrait = viewMode !== "full";
+  // Keep 18-yard-box exports focused on the attacking end instead of
+  // including the unused length of pitch down to the distant goalkeeper.
+  const boxVideoCrop = viewMode === "box" ? { left: 42, width: 666, height: 888 } : null;
+  const portraitCropWidth = boxVideoCrop?.width || 750;
+  const portraitCropLeft = boxVideoCrop?.left || 0;
   context.clearRect(0, 0, width, height);
   if (portrait) {
     context.save();
-    const viewHeight = viewMode === "half" ? HALF_PITCH_VIEW_HEIGHT : 1000;
-    context.scale(width / 750, height / viewHeight);
+    const viewHeight = viewMode === "half" ? HALF_PITCH_VIEW_HEIGHT : boxVideoCrop?.height || 1000;
+    context.scale(width / portraitCropWidth, height / viewHeight);
+    context.translate(-portraitCropLeft, 0);
     context.fillStyle = "#24734e";
     context.fillRect(12, 12, 726, 976);
     for (let y = 12; y < 988; y += 80) {
@@ -327,7 +333,8 @@ const drawTacticalVideoFrame = (canvas, board, viewMode = board.pitchMode || "fu
     }
     context.restore();
     context.save();
-    context.scale(width / 750, height / viewHeight);
+    context.scale(width / portraitCropWidth, height / viewHeight);
+    context.translate(-portraitCropLeft, 0);
     context.scale(1.171875, 1);
     context.translate(0, 1000);
     context.rotate(-Math.PI / 2);
