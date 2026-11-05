@@ -259,6 +259,15 @@ header{z-index:1000!important}.sr-page{position:relative;z-index:1}.sr-pitch{z-i
 .sr-tactical-video-preview video{display:block;width:min(100%,720px);max-height:420px;border-radius:6px;background:#061d38}
 .sr-tactical-video-preview a{display:inline-flex;padding:8px 13px;border:1px solid #62dcff;border-radius:6px;background:#62dcff;color:#063d63;font-weight:700;text-decoration:none}
 .sr-tactical-video-canvas{position:fixed;left:-2000px;top:0;width:1280px;height:819px;pointer-events:none}
+.sr-tactical-still-slides{margin:10px 0;padding:12px;border:1px solid #345879;border-radius:8px;background:#0b1b2c;color:#d2e5fa}
+.sr-tactical-still-slides-heading{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.sr-tactical-still-slides-heading strong{font-size:14px}
+.sr-tactical-still-slides-heading small{color:#b7cee5;font-size:12px}
+.sr-tactical-still-slides ol{display:grid;gap:7px;margin:10px 0 0;padding:0;list-style:none}
+.sr-tactical-still-slides li{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px;border:1px solid #345879;border-radius:6px;background:#102b46}
+.sr-tactical-still-slide-number{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#244f82;color:#fff;font-size:12px;font-weight:700}
+.sr-tactical-still-slides li label{display:flex;align-items:center;gap:7px;color:#c6dbef;font-size:12px;font-weight:700}
+.sr-tactical-still-slides li label input{width:min(260px,34vw);padding:7px 8px;border:1px solid #78b4d8;border-radius:5px;background:#0c3769;color:#fff;font:inherit}
 .sr-tactical-pitch-wrap{display:flex;justify-content:center;width:100%;overflow:hidden;border:1px solid #83bdd5;border-radius:10px;background:#185f48;touch-action:none}
 .sr-tactical-pitch{display:block;width:auto;height:min(64vh,calc(100vh - 250px));max-width:100%;max-height:min(64vh,calc(100vh - 250px));aspect-ratio:25/16;touch-action:none;user-select:none}
 .sr-tactical-pitch-wrap.portrait{display:flex;width:fit-content;max-width:100%;margin-inline:auto;padding:8px;box-sizing:border-box}
