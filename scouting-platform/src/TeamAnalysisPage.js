@@ -133,7 +133,7 @@ const DEFAULT_TACTICAL_HOME = [
   [420, 170], [420, 320], [420, 470], [610, 145], [610, 320], [610, 495],
 ].map(([x, y], index) => ({ id: `home-${index + 1}`, side: "home", number: index + 1, x, y }));
 const HALF_PITCH_VIEW_HEIGHT = 650;
-const BOX_PITCH_VIEW = { x: -5, y: 0, width: 760, height: 800 };
+const BOX_PITCH_VIEW = { x: -15, y: 0, width: 780, height: 800 };
 const DEFAULT_TACTICAL_AWAY = [
   [910, 320], [755, 90], [755, 245], [755, 395], [755, 550],
   [580, 170], [580, 320], [580, 470], [390, 145], [390, 320], [390, 495],
@@ -320,8 +320,8 @@ const drawTacticalVideoFrame = (canvas, board, viewMode = board.pitchMode || "fu
     context.lineWidth = 3;
     context.strokeRect(41, 35, 668, 930);
     if (viewMode === "box") {
-      context.beginPath(); context.arc(61, 55, 20, Math.PI, Math.PI * 1.5); context.stroke();
-      context.beginPath(); context.arc(689, 55, 20, -Math.PI / 2, 0); context.stroke();
+      context.beginPath(); context.ellipse(64.4375, 55, 23.4375, 20, 0, Math.PI, Math.PI * 1.5); context.stroke();
+      context.beginPath(); context.ellipse(685.5625, 55, 23.4375, 20, 0, -Math.PI / 2, 0); context.stroke();
     }
     if (viewMode === "half") {
       context.beginPath(); context.moveTo(41, 470); context.lineTo(709, 470); context.stroke();
@@ -1199,7 +1199,6 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
             <rect x="12" y="12" width="616" height="976" rx="7" fill="url(#sr-tactical-grass-stripes)" pointerEvents="none" />
               {pitchViewMode === "half" ? <>
               <rect x="35" y="35" width="570" height="930" className="sr-tactical-line" />
-              <path d="M35 55 A20 20 0 0 0 55 35 M585 35 A20 20 0 0 0 605 55" className="sr-tactical-line" />
               <line x1="35" y1="470" x2="605" y2="470" className="sr-tactical-line" />
               <circle cx="320" cy="470" r="83" className="sr-tactical-line" />
               <circle cx="320" cy="470" r="4" className="sr-tactical-mark" />
@@ -1209,6 +1208,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
               <circle cx="320" cy="145" r="4" className="sr-tactical-mark" />
             </> : <>
               <rect x="35" y="35" width="570" height="930" className="sr-tactical-line" />
+              <path d="M35 55 A20 20 0 0 0 55 35 M585 35 A20 20 0 0 0 605 55" className="sr-tactical-line" />
               <rect x="125" y="35" width="390" height="360" className="sr-tactical-line" />
               <rect x="220" y="35" width="200" height="150" className="sr-tactical-line" />
               <path d="M240 395 A82 82 0 0 0 400 395" className="sr-tactical-line" />
