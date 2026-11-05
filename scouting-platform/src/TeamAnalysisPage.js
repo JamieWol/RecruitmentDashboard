@@ -133,7 +133,7 @@ const DEFAULT_TACTICAL_HOME = [
   [420, 170], [420, 320], [420, 470], [610, 145], [610, 320], [610, 495],
 ].map(([x, y], index) => ({ id: `home-${index + 1}`, side: "home", number: index + 1, x, y }));
 const HALF_PITCH_VIEW_HEIGHT = 650;
-const BOX_PITCH_VIEW = { x: -15, y: 0, width: 780, height: 650 };
+const BOX_PITCH_VIEW = { x: -75, y: 0, width: 900, height: 520 };
 const DEFAULT_TACTICAL_AWAY = [
   [910, 320], [755, 90], [755, 245], [755, 395], [755, 550],
   [580, 170], [580, 320], [580, 470], [390, 145], [390, 320], [390, 495],
@@ -666,6 +666,13 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     setSelectedArrowId(null);
     setEditingTextId(null);
     setVideoStatus("Started a new tactic. Your previous tactic and clips are saved.");
+  };
+  const deleteSavedTactic = () => {
+    const tactic = savedTactics.find((item) => item.id === selectedSavedTacticId);
+    if (!tactic) return;
+    setSavedTactics((current) => current.filter((item) => item.id !== tactic.id));
+    setSelectedSavedTacticId("");
+    setVideoStatus(`Deleted saved tactic “${tactic.name}”. The open board is unchanged.`);
   };
 
   const pointFromEvent = (event) => {
@@ -1272,6 +1279,46 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     };
     videoFrameRef.current = window.requestAnimationFrame(drawFrame);
   };
+  const downloadClipStillsPdf = () => {
+    if (finishingVideo || activeClipStart) return;
+    const exportPitchMode = pitchMode;
+    const canvas = videoCanvasRef.current;
+    if (!canvas) {
+      setVideoStatus("Could not prepare the pitch images for the PDF.");
+      return;
+    }
+    canvas.width = exportPitchMode === "full" ? 1280 : exportPitchMode === "box" ? Math.round(1280 * BOX_PITCH_VIEW.width / BOX_PITCH_VIEW.height) : 960;
+    canvas.height = exportPitchMode === "full" ? 819 : exportPitchMode === "half" ? 832 : 1280;
+    const frames = [{ label: "Current tactic", board: { ...boardRef.current, pitchMode: exportPitchMode } }];
+    movementClips.forEach((clip, index) => {
+      frames.push({ label: `Clip ${index + 1} · Start`, board: { ...clip.from, pitchMode: exportPitchMode } });
+      frames.push({ label: `Clip ${index + 1} · Finish`, board: { ...clip.to, pitchMode: exportPitchMode } });
+    });
+    const orientation = exportPitchMode === "half" ? "portrait" : "landscape";
+    const pdf = new jsPDF(orientation, "mm", "a4");
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const imageMaxWidth = pageWidth - 24;
+    const imageMaxHeight = pageHeight - 42;
+    frames.forEach((frame, index) => {
+      if (index > 0) pdf.addPage("a4", orientation);
+      drawTacticalVideoFrame(canvas, frame.board, exportPitchMode);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(16);
+      pdf.text(`${boardRef.current.name || "Tactic"} — ${frame.label}`, 12, 15);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(9);
+      pdf.text(`${boardRef.current.homeName || homeTeamName} vs ${boardRef.current.awayName || oppositionName}`, 12, 22);
+      const image = canvas.toDataURL("image/png");
+      const scale = Math.min(imageMaxWidth / canvas.width, imageMaxHeight / canvas.height);
+      const imageWidth = canvas.width * scale;
+      const imageHeight = canvas.height * scale;
+      pdf.addImage(image, "PNG", (pageWidth - imageWidth) / 2, 29 + Math.max(0, (imageMaxHeight - imageHeight) / 2), imageWidth, imageHeight);
+    });
+    const filename = (boardRef.current.name || "tactical-clips").trim().replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "tactical-clips";
+    pdf.save(`${filename}-stills.pdf`);
+    setVideoStatus(`PDF ready with the current tactic and ${movementClips.length} clip${movementClips.length === 1 ? "" : "s"} as still images.`);
+  };
   return (
     <section className="sr-tactical-pad">
       <div className="sr-tactical-toolbar">
@@ -1392,6 +1439,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
             <button type="button" className={activeClipStart ? "sr-tactical-recording" : "sr-tactical-video"} onClick={beginOrSaveMovementClip} disabled={finishingVideo}>{activeClipStart ? editingClipId ? "Save clip edits" : "Save movement clip" : "Start movement clip"}</button>
             {activeClipStart && <button type="button" onClick={cancelMovementClip} disabled={finishingVideo}>Cancel clip</button>}
             <button type="button" className={videoRecording ? "sr-tactical-recording" : "sr-tactical-video"} onClick={playAllMovementClips} disabled={!movementClips.length || finishingVideo || Boolean(activeClipStart)}>{finishingVideo ? "Playing clips…" : `Play all clips${movementClips.length ? ` (${movementClips.length})` : ""}`}</button>
+            <button type="button" onClick={downloadClipStillsPdf} disabled={finishingVideo || Boolean(activeClipStart)}>Download stills PDF</button>
             <small>Start a clip, move the discs or ball, then save it. Repeat to build a sequence.</small>
           </div>
           {movementClips.length > 0 && <div className="sr-tactical-clip-list"><strong>Movement clips — preview, edit, and adjust timing</strong><ol>{movementClips.map((clip, index) => <li key={clip.id}><button type="button" className="sr-tactical-clip-preview-button" onClick={() => previewMovementClip(clip, index + 1)} disabled={finishingVideo || Boolean(activeClipStart)}>Clip {index + 1}: {clip.movedCount} piece{clip.movedCount === 1 ? "" : "s"} moved <span>Preview</span></button><button type="button" onClick={() => editMovementClip(clip, index + 1)} disabled={finishingVideo || Boolean(activeClipStart)}>Edit</button><button type="button" onClick={() => persistMovementClips((current) => current.filter((item) => item.id !== clip.id))} disabled={finishingVideo || Boolean(activeClipStart)}>Remove</button><label className="sr-tactical-clip-duration"><span>Duration</span><input aria-label={`Clip ${index + 1} duration`} type="range" min="2000" max="12000" step="500" value={tacticalClipDuration(clip)} disabled={finishingVideo || Boolean(activeClipStart && editingClipId !== clip.id)} onChange={(event) => persistMovementClips((current) => current.map((item) => item.id === clip.id ? { ...item, durationMs: Number(event.target.value) } : item))} /><output>{(tacticalClipDuration(clip) / 1000).toFixed(1)}s</output></label></li>)}</ol><div className="sr-tactical-clip-list-actions"><button type="button" onClick={() => persistMovementClips((current) => current.slice(0, -1))} disabled={finishingVideo || Boolean(activeClipStart)}>Undo last clip</button><button type="button" onClick={() => persistMovementClips([])} disabled={finishingVideo || Boolean(activeClipStart)}>Clear clips</button></div></div>}
@@ -1431,6 +1479,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
             <button type="button" className="sr-tactical-video" onClick={() => saveCurrentTactic()} disabled={finishingVideo || Boolean(activeClipStart)}>Save tactic and clips</button>
             <label className="sr-tactical-saved-tactic-select"><span>Saved tactics</span><select aria-label="Saved tactics" value={selectedSavedTacticId} onChange={(event) => setSelectedSavedTacticId(event.target.value)}><option value="">Choose a saved tactic</option>{savedTactics.map((tactic) => <option key={tactic.id} value={tactic.id}>{tactic.name} · {tactic.pitchMode === "full" ? "Full pitch" : tactic.pitchMode === "half" ? "Half pitch" : "18-yard box"} · {tactic.movementClips?.length || 0} clips</option>)}</select></label>
             <button type="button" onClick={loadSavedTactic} disabled={!selectedSavedTacticId || finishingVideo || Boolean(activeClipStart)}>Open saved tactic</button>
+            <button type="button" onClick={deleteSavedTactic} disabled={!selectedSavedTacticId || finishingVideo || Boolean(activeClipStart)}>Delete saved tactic</button>
             <button type="button" onClick={startNewTactic} disabled={finishingVideo || Boolean(activeClipStart)}>Save and start new tactic</button>
           </div>
         </div>}
