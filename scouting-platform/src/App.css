@@ -265,6 +265,8 @@ header{z-index:1000!important}.sr-page{position:relative;z-index:1}.sr-pitch{z-i
 .sr-tactical-pitch-wrap.portrait .sr-tactical-pitch{display:block;width:auto;height:min(30vh,calc(100vh - 540px));min-height:180px;max-width:100%;max-height:calc(100vh - 540px);aspect-ratio:3/4;flex:0 1 auto;box-sizing:border-box}
 .sr-tactical-pitch-mode{display:flex;align-items:center;gap:8px;color:#d2e5fa;font-size:13px;font-weight:700}
 .sr-tactical-pitch-mode select{min-width:210px;padding:9px 10px;border:1px solid #78b4d8;border-radius:6px;background:#0c3769;color:#fff;font:inherit}
+.sr-tactical-saved-tactic-select{display:flex;align-items:center;gap:8px;color:#d2e5fa;font-size:13px;font-weight:700}
+.sr-tactical-saved-tactic-select select{min-width:240px;max-width:min(42vw,460px);padding:9px 10px;border:1px solid #78b4d8;border-radius:6px;background:#0c3769;color:#fff;font:inherit}
 .sr-tactical-grass{fill:#24734e}
 .sr-tactical-line{fill:none;stroke:#e8f4e9;stroke-width:3;opacity:.9}
 .sr-tactical-mark{fill:#e8f4e9}

@@ -133,7 +133,7 @@ const DEFAULT_TACTICAL_HOME = [
   [420, 170], [420, 320], [420, 470], [610, 145], [610, 320], [610, 495],
 ].map(([x, y], index) => ({ id: `home-${index + 1}`, side: "home", number: index + 1, x, y }));
 const HALF_PITCH_VIEW_HEIGHT = 650;
-const BOX_PITCH_VIEW = { x: -15, y: 0, width: 780, height: 800 };
+const BOX_PITCH_VIEW = { x: -15, y: 0, width: 780, height: 650 };
 const DEFAULT_TACTICAL_AWAY = [
   [910, 320], [755, 90], [755, 245], [755, 395], [755, 550],
   [580, 170], [580, 320], [580, 470], [390, 145], [390, 320], [390, 495],
@@ -443,9 +443,15 @@ const drawTacticalVideoFrame = (canvas, board, viewMode = board.pitchMode || "fu
 
 function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const clipStorageKey = `${storageKey}:movement-clips`;
+  const pitchBoardsStorageKey = `${storageKey}:pitch-boards`;
+  const savedTacticsStorageKey = `${storageKey}:saved-tactics`;
+  const clipStorageKeyForMode = (viewMode) => `${clipStorageKey}:${viewMode}`;
   const [board, setBoard] = useState(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem(storageKey) || "null");
+      const byMode = JSON.parse(localStorage.getItem(pitchBoardsStorageKey) || "{}");
+      const legacy = JSON.parse(localStorage.getItem(storageKey) || "null");
+      const savedMode = legacy?.pitchMode || "full";
+      const saved = byMode?.[savedMode] || legacy;
       return saved?.players?.length ? { ...freshTacticalBoard(homeTeamName, oppositionName), ...saved } : freshTacticalBoard(homeTeamName, oppositionName);
     } catch { return freshTacticalBoard(homeTeamName, oppositionName); }
   });
@@ -475,14 +481,19 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const [newTextColor, setNewTextColor] = useState("#ffffff");
   const [newTextBoxColor, setNewTextBoxColor] = useState("#0c3769");
   const [dockPanel, setDockPanel] = useState("shapes");
+  const [pitchMode, setPitchMode] = useState(() => board.pitchMode || "full");
   const [movementClips, setMovementClips] = useState(() => {
     try {
-      const savedClips = JSON.parse(localStorage.getItem(clipStorageKey) || "[]");
+      const savedClips = JSON.parse(localStorage.getItem(clipStorageKeyForMode(board.pitchMode || "full")) || localStorage.getItem(clipStorageKey) || "[]");
       return Array.isArray(savedClips) ? savedClips : [];
     } catch { return []; }
   });
   const movementClipsRef = useRef(movementClips);
-  const [pitchMode, setPitchMode] = useState(() => board.pitchMode || "full");
+  const activeClipStorageKey = clipStorageKeyForMode(pitchMode);
+  const [savedTactics, setSavedTactics] = useState(() => {
+    try { const saved = JSON.parse(localStorage.getItem(savedTacticsStorageKey) || "[]"); return Array.isArray(saved) ? saved : []; } catch { return []; }
+  });
+  const [selectedSavedTacticId, setSelectedSavedTacticId] = useState("");
   const [activeClipStart, setActiveClipStart] = useState(null);
   const [editingClipId, setEditingClipId] = useState(null);
   const [videoRecording, setVideoRecording] = useState(false);
@@ -504,14 +515,15 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const videoFrameRef = useRef(null);
   const videoFinishTimerRef = useRef(null);
   const clipPreviewFrameRef = useRef(null);
-  const loadedClipStorageKeyRef = useRef(clipStorageKey);
+  const loadedClipStorageKeyRef = useRef(activeClipStorageKey);
+  const activeClipStorageKeyRef = useRef(activeClipStorageKey);
 
   const persistMovementClips = (nextOrUpdater) => {
     const next = typeof nextOrUpdater === "function" ? nextOrUpdater(movementClipsRef.current) : nextOrUpdater;
     movementClipsRef.current = next;
     setMovementClips(next);
-    try { localStorage.setItem(clipStorageKey, JSON.stringify(next)); } catch {}
-    writeTeamAnalysisUpload(clipStorageKey, next).catch(() => {});
+    try { localStorage.setItem(activeClipStorageKeyRef.current, JSON.stringify(next)); } catch {}
+    writeTeamAnalysisUpload(activeClipStorageKeyRef.current, next).catch(() => {});
   };
 
   const markGraphicEntering = (id) => setEnteringGraphicIds((current) => [...current, id]);
@@ -521,36 +533,40 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
 
   useEffect(() => {
     const saveTimer = window.setTimeout(() => {
-      try { localStorage.setItem(storageKey, JSON.stringify(board)); } catch {}
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(board));
+        const byMode = JSON.parse(localStorage.getItem(pitchBoardsStorageKey) || "{}");
+        localStorage.setItem(pitchBoardsStorageKey, JSON.stringify({ ...byMode, [pitchMode]: board }));
+      } catch {}
     }, 250);
     return () => window.clearTimeout(saveTimer);
-  }, [board, storageKey]);
+  }, [board, storageKey, pitchMode, pitchBoardsStorageKey]);
   useEffect(() => {
-    try { localStorage.setItem(clipStorageKey, JSON.stringify(movementClips)); } catch {}
-  }, [movementClips, clipStorageKey]);
+    activeClipStorageKeyRef.current = activeClipStorageKey;
+    try { localStorage.setItem(activeClipStorageKey, JSON.stringify(movementClips)); } catch {}
+  }, [movementClips, activeClipStorageKey]);
   useEffect(() => {
     let cancelled = false;
-    if (loadedClipStorageKeyRef.current !== clipStorageKey) {
-      loadedClipStorageKeyRef.current = clipStorageKey;
+    if (loadedClipStorageKeyRef.current !== activeClipStorageKey) {
+      loadedClipStorageKeyRef.current = activeClipStorageKey;
       let clipsForThisUser = [];
       try {
-        const stored = JSON.parse(localStorage.getItem(clipStorageKey) || "[]");
+        const stored = JSON.parse(localStorage.getItem(activeClipStorageKey) || (pitchMode === "full" ? localStorage.getItem(clipStorageKey) : "[]") || "[]");
         if (Array.isArray(stored)) clipsForThisUser = stored;
       } catch {}
       movementClipsRef.current = clipsForThisUser;
       setMovementClips(clipsForThisUser);
     }
-    readTeamAnalysisUpload(clipStorageKey).then((savedClips) => {
+    readTeamAnalysisUpload(activeClipStorageKey).then((savedClips) => {
       if (cancelled || movementClipsRef.current.length || !Array.isArray(savedClips) || !savedClips.length) return;
       movementClipsRef.current = savedClips;
       setMovementClips(savedClips);
     }).catch(() => {});
-    const flushClips = () => {
-      try { localStorage.setItem(clipStorageKey, JSON.stringify(movementClipsRef.current)); } catch {}
-    };
-    window.addEventListener("pagehide", flushClips);
-    return () => { cancelled = true; flushClips(); window.removeEventListener("pagehide", flushClips); };
-  }, [clipStorageKey]);
+    return () => { cancelled = true; };
+  }, [activeClipStorageKey, pitchMode, clipStorageKey]);
+  useEffect(() => {
+    try { localStorage.setItem(savedTacticsStorageKey, JSON.stringify(savedTactics)); } catch {}
+  }, [savedTactics, savedTacticsStorageKey]);
   useEffect(() => () => {
     if (videoFrameRef.current) window.cancelAnimationFrame(videoFrameRef.current);
     if (clipPreviewFrameRef.current) window.cancelAnimationFrame(clipPreviewFrameRef.current);
@@ -559,6 +575,98 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     if (recorder && recorder.state !== "inactive") recorder.stop();
   }, []);
   useEffect(() => () => { if (recordedVideo?.url) URL.revokeObjectURL(recordedVideo.url); }, [recordedVideo]);
+
+  const writePitchModeDraft = (viewMode, snapshot) => {
+    try {
+      const byMode = JSON.parse(localStorage.getItem(pitchBoardsStorageKey) || "{}");
+      localStorage.setItem(pitchBoardsStorageKey, JSON.stringify({ ...byMode, [viewMode]: snapshot }));
+      localStorage.setItem(storageKey, JSON.stringify(snapshot));
+    } catch {}
+  };
+  const changePitchMode = (nextMode) => {
+    if (!nextMode || nextMode === pitchMode || activeClipStart || finishingVideo) return;
+    const currentBoard = { ...boardRef.current, pitchMode };
+    writePitchModeDraft(pitchMode, currentBoard);
+    let byMode = {};
+    try { byMode = JSON.parse(localStorage.getItem(pitchBoardsStorageKey) || "{}"); } catch {}
+    const nextBoard = byMode?.[nextMode]?.players?.length
+      ? { ...freshTacticalBoard(homeTeamName, oppositionName), ...byMode[nextMode], pitchMode: nextMode }
+      : { ...freshTacticalBoard(homeTeamName, oppositionName), pitchMode: nextMode };
+    setPitchMode(nextMode);
+    setBoard(nextBoard);
+    boardRef.current = nextBoard;
+    const nextClipKey = clipStorageKeyForMode(nextMode);
+    let nextClips = [];
+    try {
+      const stored = JSON.parse(localStorage.getItem(nextClipKey) || "[]");
+      if (Array.isArray(stored)) nextClips = stored;
+    } catch {}
+    movementClipsRef.current = nextClips;
+    loadedClipStorageKeyRef.current = nextClipKey;
+    activeClipStorageKeyRef.current = nextClipKey;
+    setMovementClips(nextClips);
+    setSelectedTokens([]);
+    setSelectedShapeId(null);
+    setSelectedArrowId(null);
+    setEditingTextId(null);
+  };
+  const saveCurrentTactic = (quiet = false) => {
+    const name = (board.name || "").trim() || "Untitled tactic";
+    const existing = savedTactics.find((item) => String(item.name || "").toLowerCase() === name.toLowerCase() && item.pitchMode === pitchMode);
+    const tactic = {
+      id: existing?.id || `tactic-${Date.now()}`,
+      name,
+      pitchMode,
+      board: { ...board, name, pitchMode },
+      movementClips: JSON.parse(JSON.stringify(movementClips)),
+      savedAt: new Date().toISOString(),
+    };
+    setSavedTactics((current) => existing
+      ? current.map((item) => item.id === existing.id ? tactic : item)
+      : [...current, tactic]);
+    setSelectedSavedTacticId(tactic.id);
+    if (!quiet) setVideoStatus(`Saved “${name}” with ${movementClips.length} movement clip${movementClips.length === 1 ? "" : "s"}.`);
+    return tactic;
+  };
+  const loadSavedTactic = () => {
+    const tactic = savedTactics.find((item) => item.id === selectedSavedTacticId);
+    if (!tactic?.board) return;
+    writePitchModeDraft(pitchMode, { ...boardRef.current, pitchMode });
+    const nextMode = tactic.pitchMode || tactic.board.pitchMode || "full";
+    const nextBoard = { ...freshTacticalBoard(homeTeamName, oppositionName), ...tactic.board, pitchMode: nextMode };
+    const nextClips = Array.isArray(tactic.movementClips) ? JSON.parse(JSON.stringify(tactic.movementClips)) : [];
+    setPitchMode(nextMode);
+    setBoard(nextBoard);
+    boardRef.current = nextBoard;
+    setMovementClips(nextClips);
+    movementClipsRef.current = nextClips;
+    const nextClipKey = clipStorageKeyForMode(nextMode);
+    loadedClipStorageKeyRef.current = nextClipKey;
+    activeClipStorageKeyRef.current = nextClipKey;
+    try { localStorage.setItem(nextClipKey, JSON.stringify(nextClips)); } catch {}
+    setSelectedTokens([]);
+    setSelectedShapeId(null);
+    setSelectedArrowId(null);
+    setEditingTextId(null);
+    setActiveClipStart(null);
+    setEditingClipId(null);
+    setVideoStatus(`Loaded “${tactic.name}”.`);
+  };
+  const startNewTactic = () => {
+    saveCurrentTactic(true);
+    const blankBoard = { ...freshTacticalBoard(homeTeamName, oppositionName), pitchMode };
+    setBoard(blankBoard);
+    boardRef.current = blankBoard;
+    setMovementClips([]);
+    movementClipsRef.current = [];
+    setActiveClipStart(null);
+    setEditingClipId(null);
+    setSelectedTokens([]);
+    setSelectedShapeId(null);
+    setSelectedArrowId(null);
+    setEditingTextId(null);
+    setVideoStatus("Started a new tactic. Your previous tactic and clips are saved.");
+  };
 
   const pointFromEvent = (event) => {
     const rect = pitchRef.current?.getBoundingClientRect();
@@ -1177,7 +1285,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       <canvas ref={videoCanvasRef} width="1280" height="819" className="sr-tactical-video-canvas" aria-hidden="true" />
 
       <div className={`sr-tactical-pitch-wrap ${mode === "arrow" ? "drawing" : "moving"} ${pitchViewMode !== "full" ? "portrait" : "landscape"}`}>
-        <svg ref={pitchRef} className="sr-tactical-pitch" preserveAspectRatio="xMidYMid meet" style={{ width: pitchViewMode === "full" ? undefined : "auto", height: pitchViewMode === "full" ? undefined : pitchViewMode === "half" ? "min(56vh, 580px)" : "min(50vh, 520px)", minHeight: pitchViewMode === "full" ? undefined : 0, maxWidth: pitchViewMode === "full" ? undefined : "100%", maxHeight: pitchViewMode === "full" ? undefined : pitchViewMode === "half" ? "min(56vh, 580px)" : "min(50vh, 520px)", aspectRatio: pitchViewMode === "full" ? "25 / 16" : pitchViewMode === "half" ? `750 / ${HALF_PITCH_VIEW_HEIGHT}` : `${BOX_PITCH_VIEW.width} / ${BOX_PITCH_VIEW.height}` }} viewBox={pitchViewMode === "full" ? "0 0 1000 640" : pitchViewMode === "half" ? `0 0 750 ${HALF_PITCH_VIEW_HEIGHT}` : `${BOX_PITCH_VIEW.x} ${BOX_PITCH_VIEW.y} ${BOX_PITCH_VIEW.width} ${BOX_PITCH_VIEW.height}`} role="img" aria-label={`${pitchViewMode === "full" ? "Full" : pitchViewMode === "half" ? "Half pitch plus a little beyond halfway" : "18-yard box focused portrait"} tactical football pitch. Drag the discs to position players.`} onPointerDown={handlePitchPointerDown} onPointerMove={handlePitchPointerMove} onPointerUp={handlePitchPointerUp} onPointerCancel={handlePitchPointerUp}>
+        <svg ref={pitchRef} className="sr-tactical-pitch" preserveAspectRatio="xMidYMid meet" style={{ width: pitchViewMode === "full" ? undefined : "auto", height: pitchViewMode === "full" ? undefined : pitchViewMode === "half" ? "min(56vh, 580px)" : "min(50vh, 520px)", minHeight: pitchViewMode === "full" ? undefined : 0, maxWidth: pitchViewMode === "full" ? undefined : "100%", maxHeight: pitchViewMode === "full" ? undefined : pitchViewMode === "half" ? "min(56vh, 580px)" : "min(50vh, 520px)", aspectRatio: pitchViewMode === "full" ? "25 / 16" : pitchViewMode === "half" ? `750 / ${HALF_PITCH_VIEW_HEIGHT}` : `${BOX_PITCH_VIEW.width} / ${BOX_PITCH_VIEW.height}` }} viewBox={pitchViewMode === "full" ? "0 0 1000 640" : pitchViewMode === "half" ? `0 0 750 ${HALF_PITCH_VIEW_HEIGHT}` : `${BOX_PITCH_VIEW.x} ${BOX_PITCH_VIEW.y} ${BOX_PITCH_VIEW.width} ${BOX_PITCH_VIEW.height}`} role="img" aria-label={`${pitchViewMode === "full" ? "Full" : pitchViewMode === "half" ? "Half pitch plus a little beyond halfway" : "18-yard box set-piece"} tactical football pitch. Drag the discs to position players.`} onPointerDown={handlePitchPointerDown} onPointerMove={handlePitchPointerMove} onPointerUp={handlePitchPointerUp} onPointerCancel={handlePitchPointerUp}>
           <defs><pattern id="sr-tactical-grass-stripes" width="80" height="80" patternUnits="userSpaceOnUse"><rect width="80" height="80" fill="#24734e" /><rect width="80" height="40" fill="#3a8b59" opacity="0.38" /></pattern>{(displayedBoard.arrows || []).map((arrow) => { const headSize = Number(arrow.headSize) || 20; const headStyle = arrow.headStyle || "filled"; return <marker key={`head-${arrow.id}`} id={`sr-tactical-arrowhead-${arrow.id}`} markerWidth={headSize} markerHeight={headSize} refX={headSize} refY={headSize / 2} orient="auto" markerUnits="userSpaceOnUse"><path d={`M0,0 L${headSize},${headSize / 2} L0,${headSize}`} fill={headStyle === "open" ? "none" : arrow.color || "#ffe36e"} stroke={arrow.color || "#ffe36e"} strokeWidth={Math.max(1, headSize / 8)} strokeLinejoin="round" fillOpacity={arrow.opacity ?? 1} strokeOpacity={arrow.opacity ?? 1} /></marker>; })}<marker id="sr-tactical-arrowhead-preview" markerWidth={newArrowHeadSize} markerHeight={newArrowHeadSize} refX={newArrowHeadSize} refY={newArrowHeadSize / 2} orient="auto" markerUnits="userSpaceOnUse"><path d={`M0,0 L${newArrowHeadSize},${newArrowHeadSize / 2} L0,${newArrowHeadSize}`} fill={newArrowHeadStyle === "open" ? "none" : newShapeColour} stroke={newShapeColour} strokeWidth={Math.max(1, newArrowHeadSize / 8)} strokeLinejoin="round" /></marker></defs>
           {pitchViewMode === "full" ? <>
             <rect x="12" y="12" width="976" height="616" rx="7" className="sr-tactical-grass" />
@@ -1312,12 +1420,18 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
         </div>}
         {dockPanel === "tools" && <div className="sr-tactical-dock-panel" role="tabpanel">
           <div className="sr-tactical-tools" role="toolbar" aria-label="Player and pitch tools">
-            <label className="sr-tactical-pitch-mode"><span>Pitch view</span><select aria-label="Pitch view" value={pitchMode} onChange={(event) => { const nextMode = event.target.value; setPitchMode(nextMode); setBoard((current) => ({ ...current, pitchMode: nextMode })); }}><option value="full">Full pitch · landscape</option><option value="half">Half pitch · portrait</option><option value="box">18-yard box · set-pieces</option></select></label>
+            <label className="sr-tactical-pitch-mode"><span>Pitch view</span><select aria-label="Pitch view" value={pitchMode} onChange={(event) => changePitchMode(event.target.value)} disabled={Boolean(activeClipStart) || finishingVideo}><option value="full">Full pitch · landscape</option><option value="half">Half pitch · portrait</option><option value="box">18-yard box · set-pieces</option></select></label>
             <button type="button" onClick={() => addPlayer("home")}>+ Home disc</button>
             <button type="button" onClick={() => addPlayer("away")}>+ Opponent disc</button>
             <button type="button" onClick={removeSelectedPlayer} disabled={!selectedTokens.length}>Remove selected player</button>
             <button type="button" onClick={() => { setBoard((current) => ({ ...current, arrows: [] })); setSelectedArrowId(null); }} disabled={!board.arrows.length}>Clear arrows</button>
             <button type="button" onClick={() => { setBoard({ ...freshTacticalBoard(homeTeamName, oppositionName), pitchMode }); setSelectedTokens([]); setSelectedShapeId(null); setSelectedArrowId(null); activeClipStartRef.current = null; activeClipBallPathRef.current = []; setActiveClipStart(null); setEditingClipId(null); }}>Reset pitch</button>
+          </div>
+          <div className="sr-tactical-tools sr-tactical-saved-tactics" role="toolbar" aria-label="Save and open tactics">
+            <button type="button" className="sr-tactical-video" onClick={() => saveCurrentTactic()} disabled={finishingVideo || Boolean(activeClipStart)}>Save tactic and clips</button>
+            <label className="sr-tactical-saved-tactic-select"><span>Saved tactics</span><select aria-label="Saved tactics" value={selectedSavedTacticId} onChange={(event) => setSelectedSavedTacticId(event.target.value)}><option value="">Choose a saved tactic</option>{savedTactics.map((tactic) => <option key={tactic.id} value={tactic.id}>{tactic.name} · {tactic.pitchMode === "full" ? "Full pitch" : tactic.pitchMode === "half" ? "Half pitch" : "18-yard box"} · {tactic.movementClips?.length || 0} clips</option>)}</select></label>
+            <button type="button" onClick={loadSavedTactic} disabled={!selectedSavedTacticId || finishingVideo || Boolean(activeClipStart)}>Open saved tactic</button>
+            <button type="button" onClick={startNewTactic} disabled={finishingVideo || Boolean(activeClipStart)}>Save and start new tactic</button>
           </div>
         </div>}
       </div>
