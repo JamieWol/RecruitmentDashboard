@@ -148,6 +148,7 @@ const freshTacticalBoard = (homeName = "Home Team", awayName = "Opposition") => 
   shapes: [],
   pitchMode: "full",
 });
+const SET_PIECE_BLUE_TWO_FIX_VERSION = 1;
 
 const pathLength = (points = []) => points.slice(1).reduce((total, point, index) => total + Math.hypot(point.x - points[index].x, point.y - points[index].y), 0);
 const tacticalClipDuration = (clip) => {
@@ -426,7 +427,7 @@ const drawTacticalVideoFrame = (canvas, board, viewMode = board.pitchMode || "fu
   context.setLineDash([]);
   board.players.forEach((player) => {
     context.beginPath(); context.arc(player.x, player.y + 3, 27, 0, Math.PI * 2); context.fillStyle = "#05223f70"; context.fill();
-    context.beginPath(); context.arc(player.x, player.y, 24, 0, Math.PI * 2); context.fillStyle = player.side === "home" ? "#1485dd" : "#e64b50";
+    context.beginPath(); context.arc(player.x, player.y, 24, 0, Math.PI * 2); context.fillStyle = player.color || (player.side === "home" ? "#1485dd" : "#e64b50");
     context.shadowColor = player.moving ? "#ffe36e" : "transparent"; context.shadowBlur = player.moving ? 22 : 0; context.fill(); context.shadowBlur = 0;
     context.strokeStyle = player.moving ? "#ffe36e" : "#f3f8ff"; context.lineWidth = player.moving ? 5 : 3; context.stroke();
     context.fillStyle = "#fff"; context.font = "bold 17px Arial, sans-serif"; context.textAlign = "center"; context.textBaseline = "middle";
@@ -467,6 +468,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const [arrowStart, setArrowStart] = useState(null);
   const [arrowPreview, setArrowPreview] = useState(null);
   const [selectedTokens, setSelectedTokens] = useState([]);
+  const [copiedPlayers, setCopiedPlayers] = useState(null);
   const [selectedShapeId, setSelectedShapeId] = useState(null);
   const [editingTextId, setEditingTextId] = useState(null);
   const [copiedGraphic, setCopiedGraphic] = useState(null);
@@ -531,6 +533,18 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const finishGraphicEntering = (id) => setEnteringGraphicIds((current) => current.filter((item) => item !== id));
 
   useEffect(() => { boardRef.current = board; }, [board]);
+
+  useEffect(() => {
+    if (pitchMode !== "box") return;
+    setBoard((current) => {
+      if ((current.setPieceBlueTwoFixVersion || 0) >= SET_PIECE_BLUE_TWO_FIX_VERSION) return current;
+      const players = [...(current.players || [])];
+      const blueTwoIndex = players.findIndex((player) => player.side === "home" && Number(player.number) === 2);
+      if (blueTwoIndex >= 0) players[blueTwoIndex] = { ...players[blueTwoIndex], x: 860, y: 160 };
+      else players.push({ id: `home-2-recovered-${Date.now()}`, side: "home", number: 2, x: 860, y: 160 });
+      return { ...current, players, setPieceBlueTwoFixVersion: SET_PIECE_BLUE_TWO_FIX_VERSION };
+    });
+  }, [pitchMode, board]);
 
   useEffect(() => {
     const saveTimer = window.setTimeout(() => {
@@ -709,9 +723,14 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     if (mode !== "move" || finishingVideo) return;
     event.stopPropagation();
     if (multiSelectMode) {
+      setSelectedShapeId(null);
+      setSelectedArrowId(null);
       setSelectedTokens((current) => current.includes(player.id) ? current.filter((id) => id !== player.id) : [...current, player.id]);
       return;
     }
+    setSelectedShapeId(null);
+    setSelectedArrowId(null);
+    setEditingTextId(null);
     pitchRef.current?.setPointerCapture?.(event.pointerId);
     const moving = selectedTokens.includes(player.id) && selectedTokens.length > 1 ? selectedTokens : [player.id];
     setSelectedTokens(moving);
@@ -739,6 +758,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     setEditingTextId(null);
     setSelectedShapeId(shape.id);
     setSelectedArrowId(null);
+    setSelectedTokens([]);
   };
   const beginShapeResize = (event, shape, corner) => {
     if (mode !== "move" || finishingVideo) return;
@@ -760,6 +780,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     setResizingArrowEnd({ id: arrow.id, endpoint });
     setSelectedArrowId(arrow.id);
     setSelectedShapeId(null);
+    setSelectedTokens([]);
   };
   const beginArrowDrag = (event, arrow) => {
     if (mode !== "move" || finishingVideo) return;
@@ -770,6 +791,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     setDraggingArrowId(arrow.id);
     setSelectedArrowId(arrow.id);
     setSelectedShapeId(null);
+    setSelectedTokens([]);
   };
   const handlePitchPointerDown = (event) => {
     if (!(["arrow", "rectangle", "square", "circle", "triangle", "line", "text"].includes(mode)) || finishingVideo) return;
@@ -952,11 +974,42 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       return { ...current, players: [...current.players, player] };
     });
   };
-  const removeSelectedPlayer = () => {
+  const removeSelectedPlayer = useCallback(() => {
     if (!selectedTokens.length) return;
     setBoard((current) => ({ ...current, players: current.players.filter((player) => !selectedTokens.includes(player.id)) }));
     setSelectedTokens([]);
+  }, [selectedTokens]);
+  const selectedPlayers = board.players.filter((player) => selectedTokens.includes(player.id));
+  const updateSelectedPlayers = (changes) => {
+    if (!selectedTokens.length) return;
+    setBoard((current) => ({ ...current, players: current.players.map((player) => selectedTokens.includes(player.id) ? { ...player, ...changes } : player) }));
   };
+  const copySelectedPlayers = useCallback(() => {
+    const chosenPlayers = boardRef.current.players.filter((player) => selectedTokens.includes(player.id));
+    if (!chosenPlayers.length) return;
+    setCopiedPlayers(JSON.parse(JSON.stringify(chosenPlayers)));
+    setCopiedGraphic(null);
+    setGraphicClipboardStatus(`${chosenPlayers.length === 1 ? "Disc" : `${chosenPlayers.length} discs`} copied. Paste to duplicate ${chosenPlayers.length === 1 ? "it" : "them"}.`);
+  }, [selectedTokens]);
+  const pasteCopiedPlayers = useCallback(() => {
+    if (!copiedPlayers?.length) return;
+    const selectedXs = copiedPlayers.map((player) => player.x);
+    const selectedYs = copiedPlayers.map((player) => player.y);
+    const dx = Math.max(...selectedXs) + 24 <= 976 ? 24 : -24;
+    const dy = Math.max(...selectedYs) + 24 <= 616 ? 24 : -24;
+    const duplicates = copiedPlayers.map((player, index) => ({
+      ...player,
+      id: `${player.side}-copy-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 6)}`,
+      x: Math.max(24, Math.min(976, player.x + dx)),
+      y: Math.max(24, Math.min(616, player.y + dy)),
+    }));
+    setBoard((current) => ({ ...current, players: [...current.players, ...duplicates] }));
+    setSelectedTokens(duplicates.map((player) => player.id));
+    setSelectedShapeId(null);
+    setSelectedArrowId(null);
+    setMode("move");
+    setGraphicClipboardStatus(`${duplicates.length === 1 ? "Disc" : `${duplicates.length} discs`} pasted. You can paste again to make another copy.`);
+  }, [copiedPlayers]);
   const selectedShape = (board.shapes || []).find((shape) => shape.id === selectedShapeId);
   const selectedArrow = (board.arrows || []).find((arrow) => arrow.id === selectedArrowId);
   const selectedGraphic = selectedShape || selectedArrow;
@@ -964,6 +1017,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     if (!selectedGraphic) return;
     const kind = selectedShape ? "shape" : "arrow";
     setCopiedGraphic({ kind, item: JSON.parse(JSON.stringify(selectedGraphic)) });
+    setCopiedPlayers(null);
     setGraphicClipboardStatus(`${kind === "arrow" ? "Arrow" : "Shape"} copied. Paste to make a duplicate.`);
   }, [selectedGraphic, selectedShape]);
   const pasteCopiedGraphic = useCallback(() => {
@@ -1009,11 +1063,15 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   }, [copiedGraphic]);
   useEffect(() => {
     const handleGraphicShortcuts = (event) => {
+      if (finishingVideo) return;
       const key = event.key.toLowerCase();
       const targetTag = event.target?.tagName?.toLowerCase();
       const isTextField = ["input", "textarea"].includes(targetTag) || event.target?.isContentEditable;
       if (["delete", "backspace"].includes(key) && !isTextField) {
-        if (selectedShape) {
+        if (selectedTokens.length) {
+          event.preventDefault();
+          removeSelectedPlayer();
+        } else if (selectedShape) {
           event.preventDefault();
           setBoard((current) => ({ ...current, shapes: (current.shapes || []).filter((shape) => shape.id !== selectedShape.id) }));
           setSelectedShapeId(null);
@@ -1027,9 +1085,15 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       }
       if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
       if (isTextField) return;
-      if (key === "c" && selectedGraphic) {
+      if (key === "c" && selectedTokens.length) {
+        event.preventDefault();
+        copySelectedPlayers();
+      } else if (key === "c" && selectedGraphic) {
         event.preventDefault();
         copySelectedGraphic();
+      } else if (key === "v" && copiedPlayers?.length) {
+        event.preventDefault();
+        pasteCopiedPlayers();
       } else if (key === "v" && copiedGraphic) {
         event.preventDefault();
         pasteCopiedGraphic();
@@ -1037,7 +1101,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     };
     document.addEventListener("keydown", handleGraphicShortcuts, true);
     return () => document.removeEventListener("keydown", handleGraphicShortcuts, true);
-  }, [selectedShape, selectedArrow, selectedGraphic, copiedGraphic, copySelectedGraphic, pasteCopiedGraphic]);
+  }, [finishingVideo, selectedShape, selectedArrow, selectedGraphic, selectedTokens, copiedPlayers, copiedGraphic, copySelectedPlayers, pasteCopiedPlayers, copySelectedGraphic, pasteCopiedGraphic, removeSelectedPlayer]);
   const updateSelectedShape = (changes) => {
     if (!selectedShapeId) return;
     setBoard((current) => ({ ...current, shapes: (current.shapes || []).map((shape) => shape.id === selectedShapeId ? { ...shape, ...changes } : shape) }));
@@ -1422,7 +1486,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
           </g>
           {displayedBoard.players.map((player) => <g key={player.id} className={`sr-tactical-player ${player.side} ${!videoPlaying && selectedTokens.includes(player.id) ? "selected" : ""} ${draggingIds.includes(player.id) ? "dragging" : ""} ${videoPlaying ? "video-playing" : ""}`} transform={`translate(${player.x} ${player.y})`} onPointerDown={(event) => beginPlayerDrag(event, player)}>
             <circle r={pitchViewMode === "full" ? 27 : 22} className="sr-tactical-disc-shadow" />
-            <circle r={pitchViewMode === "full" ? 24 : 19} className="sr-tactical-disc" />
+            <circle r={pitchViewMode === "full" ? 24 : 19} className="sr-tactical-disc" style={player.color ? { fill: player.color } : undefined} />
             <text y="1" style={{ fontSize: pitchViewMode === "full" ? undefined : "14px" }} transform={pitchViewMode === "full" ? undefined : "rotate(90)"}>{player.number}</text>
           </g>)}
           </g>
@@ -1475,6 +1539,11 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
             <button type="button" onClick={removeSelectedPlayer} disabled={!selectedTokens.length}>Remove selected player</button>
             <button type="button" onClick={() => { setBoard((current) => ({ ...current, arrows: [] })); setSelectedArrowId(null); }} disabled={!board.arrows.length}>Clear arrows</button>
             <button type="button" onClick={() => { setBoard({ ...freshTacticalBoard(homeTeamName, oppositionName), pitchMode }); setSelectedTokens([]); setSelectedShapeId(null); setSelectedArrowId(null); activeClipStartRef.current = null; activeClipBallPathRef.current = []; setActiveClipStart(null); setEditingClipId(null); }}>Reset pitch</button>
+          </div>
+          <div className="sr-tactical-disc-edit-controls" aria-label="Selected disc settings">
+            <label><span>Disc colour</span><input aria-label="Selected disc colour" type="color" value={selectedPlayers[0]?.color || (selectedPlayers[0]?.side === "away" ? "#e64b50" : "#1485dd")} disabled={!selectedPlayers.length} onChange={(event) => updateSelectedPlayers({ color: event.target.value })} /></label>
+            <label><span>Disc number</span><input aria-label="Selected disc number" type="number" min="1" max="99" step="1" value={selectedPlayers.length === 1 ? selectedPlayers[0].number : ""} disabled={selectedPlayers.length !== 1} onChange={(event) => { const nextNumber = Number(event.target.value); if (nextNumber >= 1 && nextNumber <= 99) updateSelectedPlayers({ number: nextNumber }); }} /></label>
+            <small>{selectedPlayers.length > 1 ? "Select one disc to change its number. " : ""}Select discs and use Cmd/Ctrl+C, Cmd/Ctrl+V, or Delete/Backspace to copy, paste, and remove them.</small>
           </div>
           <div className="sr-tactical-tools sr-tactical-saved-tactics" role="toolbar" aria-label="Save and open tactics">
             <button type="button" className="sr-tactical-video" onClick={() => saveCurrentTactic()} disabled={finishingVideo || Boolean(activeClipStart)}>Save tactic and clips</button>
