@@ -326,14 +326,15 @@ const drawTacticalVideoFrame = (canvas, board, viewMode = board.pitchMode || "fu
     if (viewMode === "half") {
       context.beginPath(); context.moveTo(41, 470); context.lineTo(709, 470); context.stroke();
       context.beginPath(); context.arc(375, 470, 83, 0, Math.PI * 2); context.stroke();
-      context.strokeRect(216, 35, 318, 150);
-      context.strokeRect(292, 35, 166, 58);
+      context.strokeRect(182, 35, 387, 120);
+      context.strokeRect(275, 35, 199, 50);
+      context.beginPath(); context.arc(375, 155, 96, Math.PI, 0, true); context.stroke();
       context.beginPath(); context.arc(375, 145, 4, 0, Math.PI * 2); context.fillStyle = "#e8f4e9"; context.fill();
     } else {
-      context.strokeRect(146, 35, 458, 360);
-      context.strokeRect(258, 35, 234, 150);
-      context.beginPath(); context.arc(375, 260, 4, 0, Math.PI * 2); context.fillStyle = "#e8f4e9"; context.fill();
-      context.beginPath(); context.arc(375, 395, 96, Math.PI, 0); context.stroke();
+      context.strokeRect(146, 35, 458, 160);
+      context.strokeRect(258, 35, 234, 60);
+      context.beginPath(); context.arc(375, 145, 4, 0, Math.PI * 2); context.fillStyle = "#e8f4e9"; context.fill();
+      context.beginPath(); context.arc(375, 195, 96, Math.PI, 0, true); context.stroke();
       context.beginPath(); context.moveTo(316, 20); context.lineTo(434, 20); context.stroke();
     }
     context.restore();
@@ -1357,17 +1358,17 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
               <line x1="35" y1="470" x2="605" y2="470" className="sr-tactical-line" />
               <circle cx="320" cy="470" r="83" className="sr-tactical-line" />
               <circle cx="320" cy="470" r="4" className="sr-tactical-mark" />
-              <rect x="180" y="35" width="280" height="150" className="sr-tactical-line" />
-              <rect x="245" y="35" width="150" height="58" className="sr-tactical-line" />
-              <path d="M250 185 A82 82 0 0 0 390 185" className="sr-tactical-line" />
+              <rect x="155" y="35" width="330" height="120" className="sr-tactical-line" />
+              <rect x="235" y="35" width="170" height="50" className="sr-tactical-line" />
+              <path d="M238 155 A82 82 0 0 0 402 155" className="sr-tactical-line" />
               <circle cx="320" cy="145" r="4" className="sr-tactical-mark" />
             </> : <>
               <rect x="35" y="35" width="570" height="930" className="sr-tactical-line" />
               <path d="M35 55 A20 20 0 0 0 55 35 M585 35 A20 20 0 0 0 605 55" className="sr-tactical-line" />
-              <rect x="125" y="35" width="390" height="360" className="sr-tactical-line" />
-              <rect x="220" y="35" width="200" height="150" className="sr-tactical-line" />
-              <path d="M240 395 A82 82 0 0 0 400 395" className="sr-tactical-line" />
-              <circle cx="320" cy="260" r="4" className="sr-tactical-mark" />
+              <rect x="125" y="35" width="390" height="160" className="sr-tactical-line" />
+              <rect x="220" y="35" width="200" height="60" className="sr-tactical-line" />
+              <path d="M240 195 A82 82 0 0 0 400 195" className="sr-tactical-line" />
+              <circle cx="320" cy="145" r="4" className="sr-tactical-mark" />
               <line x1="270" y1="20" x2="370" y2="20" className="sr-tactical-line" />
             </>}
           </g>}
