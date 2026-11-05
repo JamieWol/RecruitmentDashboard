@@ -555,6 +555,13 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const [playbackBoard, setPlaybackBoard] = useState(null);
   const [videoPlaying, setVideoPlaying] = useState(false);
   const [recordedVideo, setRecordedVideo] = useState(null);
+  const pdfBannerStorageKey = `${storageKey}:pdf-banner`;
+  const [pdfBanner, setPdfBanner] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(pdfBannerStorageKey) || "{}");
+      return { title: "", fill: "#0f2d4e", text: "#ffffff", border: "#62dcff", style: "rounded", ...saved };
+    } catch { return { title: "", fill: "#0f2d4e", text: "#ffffff", border: "#62dcff", style: "rounded" }; }
+  });
   const pitchRef = useRef(null);
   const textEditorRef = useRef(null);
   const inlineTextRef = useRef(null);
@@ -637,6 +644,9 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   useEffect(() => {
     try { localStorage.setItem(savedTacticsStorageKey, JSON.stringify(savedTactics)); } catch {}
   }, [savedTactics, savedTacticsStorageKey]);
+  useEffect(() => {
+    try { localStorage.setItem(pdfBannerStorageKey, JSON.stringify(pdfBanner)); } catch {}
+  }, [pdfBanner, pdfBannerStorageKey]);
   useEffect(() => () => {
     if (videoFrameRef.current) window.cancelAnimationFrame(videoFrameRef.current);
     if (clipPreviewFrameRef.current) window.cancelAnimationFrame(clipPreviewFrameRef.current);
@@ -1490,31 +1500,38 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     const pageHeight = pdf.internal.pageSize.getHeight();
     const imageMaxWidth = pageWidth - 24;
     const imageMaxHeight = pageHeight - 48;
+    const toRgb = (colour, fallback) => {
+      const value = /^#[\da-f]{6}$/i.test(colour || "") ? colour : fallback;
+      return [1, 3, 5].map((index) => parseInt(value.slice(index, index + 2), 16));
+    };
     frames.forEach((frame, index) => {
       if (index > 0) pdf.addPage("a4", orientation);
       drawTacticalVideoFrame(canvas, frame.board, exportPitchMode, { playerScale: 0.9 });
       const bannerX = 12;
-      const bannerY = 8;
+      const bannerY = 20;
       const bannerWidth = pageWidth - 24;
-      const bannerHeight = 15;
-      pdf.setFillColor(15, 45, 78);
-      pdf.roundedRect(bannerX, bannerY, bannerWidth, bannerHeight, 2, 2, "F");
-      pdf.setFont("helvetica", "bold");
-      const tacticTitle = boardRef.current.name || "Tactic";
-      pdf.setFontSize(Math.max(11, Math.min(16, 16 - Math.max(0, tacticTitle.length - 28) * 0.18)));
-      pdf.setTextColor(255, 255, 255);
-      pdf.text(tacticTitle, pageWidth / 2, 18, { align: "center", maxWidth: bannerWidth - 12 });
-      pdf.setTextColor(35, 55, 75);
-      pdf.setFontSize(10);
-      pdf.text(frame.label, pageWidth / 2, 28, { align: "center", maxWidth: pageWidth - 24 });
+      const bannerHeight = 16;
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(8);
-      pdf.text(`${boardRef.current.homeName || homeTeamName} vs ${boardRef.current.awayName || oppositionName}`, pageWidth / 2, 33, { align: "center", maxWidth: pageWidth - 24 });
+      pdf.setTextColor(35, 55, 75);
+      pdf.text(`${boardRef.current.homeName || homeTeamName} vs ${boardRef.current.awayName || oppositionName}`, pageWidth / 2, 9, { align: "center", maxWidth: pageWidth - 24 });
+      pdf.setFontSize(9);
+      pdf.text(frame.label, pageWidth / 2, 15, { align: "center", maxWidth: pageWidth - 24 });
+      pdf.setFillColor(...toRgb(pdfBanner.fill, "#0f2d4e"));
+      pdf.setDrawColor(...toRgb(pdfBanner.border, "#62dcff"));
+      pdf.setLineWidth(0.7);
+      if (pdfBanner.style === "square") pdf.rect(bannerX, bannerY, bannerWidth, bannerHeight, "FD");
+      else pdf.roundedRect(bannerX, bannerY, bannerWidth, bannerHeight, 2, 2, "FD");
+      pdf.setFont("helvetica", "bold");
+      const tacticTitle = pdfBanner.title.trim() || boardRef.current.name || "Tactic";
+      pdf.setFontSize(Math.max(11, Math.min(16, 16 - Math.max(0, tacticTitle.length - 28) * 0.18)));
+      pdf.setTextColor(...toRgb(pdfBanner.text, "#ffffff"));
+      pdf.text(tacticTitle, pageWidth / 2, 30, { align: "center", maxWidth: bannerWidth - 12 });
       const image = canvas.toDataURL("image/png");
       const scale = Math.min(imageMaxWidth / canvas.width, imageMaxHeight / canvas.height);
       const imageWidth = canvas.width * scale;
       const imageHeight = canvas.height * scale;
-      pdf.addImage(image, "PNG", (pageWidth - imageWidth) / 2, 38 + Math.max(0, (imageMaxHeight - imageHeight) / 2), imageWidth, imageHeight);
+      pdf.addImage(image, "PNG", (pageWidth - imageWidth) / 2, 39 + Math.max(0, (imageMaxHeight - imageHeight) / 2), imageWidth, imageHeight);
     });
     const filename = (boardRef.current.name || "tactical-clips").trim().replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "tactical-clips";
     pdf.save(`${filename}-stills.pdf`);
@@ -1645,6 +1662,14 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
             <button type="button" className={videoRecording ? "sr-tactical-recording" : "sr-tactical-video"} onClick={playAllMovementClips} disabled={!movementClips.length || finishingVideo || Boolean(activeClipStart)}>{finishingVideo ? "Playing clips…" : `Play all clips${movementClips.length ? ` (${movementClips.length})` : ""}`}</button>
             <button type="button" onClick={downloadClipStillsPdf} disabled={finishingVideo || Boolean(activeClipStart)}>Download stills PDF</button>
             <small>Start a clip, move the discs or ball, then save it. Repeat to build a sequence.</small>
+          </div>
+          <div className="sr-tactical-pdf-banner-controls" aria-label="PDF banner settings">
+            <strong>PDF banner</strong>
+            <label><span>Banner title</span><input aria-label="PDF banner title" type="text" value={pdfBanner.title} placeholder={board.name || "Use tactic name"} onChange={(event) => setPdfBanner((current) => ({ ...current, title: event.target.value }))} /></label>
+            <label><span>Background</span><input aria-label="PDF banner background colour" type="color" value={pdfBanner.fill} onChange={(event) => setPdfBanner((current) => ({ ...current, fill: event.target.value }))} /></label>
+            <label><span>Text</span><input aria-label="PDF banner text colour" type="color" value={pdfBanner.text} onChange={(event) => setPdfBanner((current) => ({ ...current, text: event.target.value }))} /></label>
+            <label><span>Border</span><input aria-label="PDF banner border colour" type="color" value={pdfBanner.border} onChange={(event) => setPdfBanner((current) => ({ ...current, border: event.target.value }))} /></label>
+            <label><span>Style</span><select aria-label="PDF banner style" value={pdfBanner.style} onChange={(event) => setPdfBanner((current) => ({ ...current, style: event.target.value }))}><option value="rounded">Rounded</option><option value="square">Square</option></select></label>
           </div>
           <div className="sr-tactical-still-slides">
             <div className="sr-tactical-still-slides-heading"><strong>Still slides</strong><button type="button" onClick={addStillSlide} disabled={finishingVideo || Boolean(activeClipStart)}>Add current setup as slide</button><small>Capture the pitch as it is now. You can add another slide without recording a movement.</small></div>
