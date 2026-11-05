@@ -363,6 +363,12 @@ header{z-index:1000!important}.sr-page{position:relative;z-index:1}.sr-pitch{z-i
 .sr-tactical-text-panel .sr-tactical-text-editor-control{grid-column:1/-1;display:grid;gap:6px;max-width:760px}
 .sr-tactical-text-panel .sr-tactical-text-editor-control textarea{width:100%;min-height:108px;resize:vertical;white-space:pre-wrap;line-height:1.35}
 .sr-tactical-text-panel>button{justify-self:start}
+.sr-tactical-text-format-toolbar{grid-column:1/-1;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.sr-tactical-text-format-toolbar button{min-width:38px;padding:7px 10px;border:1px solid #456987;border-radius:5px;background:#20394f;color:#fff;font:inherit;cursor:pointer}
+.sr-tactical-text-format-toolbar button.active{border-color:#62dcff;background:#285372;box-shadow:inset 0 -2px #62dcff}
+.sr-tactical-text-format-toolbar button:hover{border-color:#62dcff}
+.sr-tactical-text-format-toolbar>span{height:22px;margin:0 4px;border-left:1px solid #567189}
+.sr-tactical-text-render:focus{outline:2px solid #ffe36e;outline-offset:-2px}
 .sr-tactical-text-colours{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:16px}
 .sr-tactical-text-colours label{display:flex;align-items:center;gap:8px;color:#d2e5fa;font-size:13px;font-weight:700}
 .sr-tactical-text-colours input[type=color]{width:42px;height:32px;padding:2px;border:1px solid #8abbd1;border-radius:5px;background:#fff;cursor:pointer}

@@ -396,12 +396,23 @@ const drawTacticalVideoFrame = (canvas, board, viewMode = board.pitchMode || "fu
     if (shape.type === "text") {
       const fontSize = Number(shape.fontSize) || 22;
       const lineHeight = fontSize * 1.2;
-      context.font = `bold ${fontSize}px Arial, sans-serif`;
+      context.font = `${shape.italic ? "italic " : ""}${shape.bold === false ? "normal" : "bold"} ${fontSize}px Arial, sans-serif`;
       context.textAlign = "left";
       context.textBaseline = "middle";
       const textLines = wrapTacticalCanvasText(context, shape.text, Math.max(20, shape.width - 20))
         .slice(0, Math.max(1, Math.floor((shape.height - 8) / lineHeight)));
       const firstLineY = -((textLines.length - 1) * lineHeight) / 2;
+      const textAlign = ["left", "center", "right"].includes(shape.textAlign) ? shape.textAlign : "left";
+      context.textAlign = textAlign;
+      const textXFor = (left, center, right) => textAlign === "center" ? center : textAlign === "right" ? right : left;
+      const drawTextLine = (line, x, y, maxWidth) => {
+        context.fillText(line, x, y, maxWidth);
+        if (shape.underline) {
+          const lineWidth = Math.min(maxWidth, context.measureText(line).width);
+          const lineLeft = textAlign === "center" ? x - lineWidth / 2 : textAlign === "right" ? x - lineWidth : x;
+          context.beginPath(); context.moveTo(lineLeft, y + fontSize * 0.38); context.lineTo(lineLeft + lineWidth, y + fontSize * 0.38); context.strokeStyle = shape.textColor || "#fff"; context.lineWidth = Math.max(1, fontSize / 16); context.stroke();
+        }
+      };
       if (portrait) {
         const centerX = shape.x + shape.width / 2;
         const centerY = shape.y + shape.height / 2;
@@ -412,14 +423,14 @@ const drawTacticalVideoFrame = (canvas, board, viewMode = board.pitchMode || "fu
         context.strokeRect(-shape.width / 2, -shape.height / 2, shape.width, shape.height);
         context.globalAlpha = shape._playbackOpacity ?? 1;
         context.fillStyle = shape.textColor || "#fff";
-        textLines.forEach((line, index) => context.fillText(line, -shape.width / 2 + 10, firstLineY + index * lineHeight, Math.max(20, shape.width - 20)));
+        textLines.forEach((line, index) => drawTextLine(line, textXFor(-shape.width / 2 + 10, 0, shape.width / 2 - 10), firstLineY + index * lineHeight, Math.max(20, shape.width - 20)));
         context.restore();
       } else {
         context.fillRect(shape.x, shape.y, shape.width, shape.height);
         context.strokeRect(shape.x, shape.y, shape.width, shape.height);
         context.globalAlpha = shape._playbackOpacity ?? 1;
         context.fillStyle = shape.textColor || "#fff";
-        textLines.forEach((line, index) => context.fillText(line, shape.x + 10, shape.y + shape.height / 2 + firstLineY + index * lineHeight, Math.max(20, shape.width - 20)));
+        textLines.forEach((line, index) => drawTextLine(line, textXFor(shape.x + 10, shape.x + shape.width / 2, shape.x + shape.width - 10), shape.y + shape.height / 2 + firstLineY + index * lineHeight, Math.max(20, shape.width - 20)));
       }
     } else if (shape.type === "line") {
       context.beginPath(); context.moveTo(shape.x, shape.y); context.lineTo(shape.x + shape.width, shape.y + shape.height); context.stroke();
@@ -543,6 +554,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const [recordedVideo, setRecordedVideo] = useState(null);
   const pitchRef = useRef(null);
   const textEditorRef = useRef(null);
+  const inlineTextRef = useRef(null);
   const videoCanvasRef = useRef(null);
   const boardRef = useRef(board);
   const activeClipStartRef = useRef(null);
@@ -1117,7 +1129,8 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       if (finishingVideo) return;
       const key = event.key.toLowerCase();
       const targetTag = event.target?.tagName?.toLowerCase();
-      const isTextField = ["input", "textarea"].includes(targetTag) || event.target?.isContentEditable;
+      const isTextEntry = ["input", "textarea"].includes(targetTag) || event.target?.isContentEditable;
+      const isTextField = isTextEntry || event.target?.getAttribute?.("data-tactical-text-input") === "true";
       if (["delete", "backspace"].includes(key) && !isTextField) {
         if (selectedTokens.length) {
           event.preventDefault();
@@ -1135,7 +1148,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
         return;
       }
       if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
-      if (isTextField) return;
+      if (isTextEntry) return;
       if (key === "c" && selectedTokens.length) {
         event.preventDefault();
         copySelectedPlayers();
@@ -1156,6 +1169,20 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const updateSelectedShape = (changes) => {
     if (!selectedShapeId) return;
     setBoard((current) => ({ ...current, shapes: (current.shapes || []).map((shape) => shape.id === selectedShapeId ? { ...shape, ...changes } : shape) }));
+  };
+  const startInlineTextEdit = (shape, replacementText = null) => {
+    setSelectedShapeId(shape.id);
+    setSelectedArrowId(null);
+    setDockPanel("text");
+    if (replacementText !== null) {
+      setBoard((current) => ({ ...current, shapes: (current.shapes || []).map((item) => item.id === shape.id ? { ...item, text: replacementText } : item) }));
+    }
+    setEditingTextId(shape.id);
+    const nextText = replacementText ?? shape.text ?? "";
+    window.requestAnimationFrame(() => {
+      inlineTextRef.current?.focus();
+      inlineTextRef.current?.setSelectionRange(nextText.length, nextText.length);
+    });
   };
   const insertBulletIntoSelectedText = () => {
     if (selectedShape?.type !== "text") return;
@@ -1545,9 +1572,11 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
             const fill = shape.color || "#62dcff";
             const opacity = shape.opacity ?? 0.35;
             const strokeWidth = Number(shape.strokeWidth) || 3;
+            const textAlign = ["left", "center", "right"].includes(shape.textAlign) ? shape.textAlign : "left";
+            const textStyle = { fontSize: `${shape.fontSize || 22}px`, color: shape.textColor || "#fff", backgroundColor: shape.backgroundColor || "#0c3769", fontWeight: shape.bold === false ? 400 : 700, fontStyle: shape.italic ? "italic" : "normal", textDecoration: shape.underline ? "underline" : "none", textAlign };
             let shapeBody;
             if (shape.type === "text") {
-              shapeBody = <><rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="5" fill={shape.backgroundColor || "#0c3769"} fillOpacity={shape.opacity ?? 0.85} stroke={selected ? "#ffe36e" : fill} strokeOpacity={1} strokeWidth={selected ? strokeWidth + 2 : strokeWidth} />{editingTextId === shape.id && !videoPlaying ? <foreignObject x={shape.x + 5} y={shape.y + 4} width={Math.max(20, shape.width - 10)} height={Math.max(24, shape.height - 8)}><textarea xmlns="http://www.w3.org/1999/xhtml" className="sr-tactical-inline-text" style={{ fontSize: `${shape.fontSize || 22}px`, color: shape.textColor || "#fff", backgroundColor: shape.backgroundColor || "#0c3769" }} autoFocus aria-label="Edit text on pitch" value={shape.text || ""} onPointerDown={(event) => event.stopPropagation()} onChange={(event) => setBoard((current) => ({ ...current, shapes: (current.shapes || []).map((item) => item.id === shape.id ? { ...item, text: event.target.value } : item) }))} onBlur={() => setEditingTextId(null)} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); setEditingTextId(null); event.currentTarget.blur(); } }} /></foreignObject> : <foreignObject x={shape.x + 5} y={shape.y + 4} width={Math.max(20, shape.width - 10)} height={Math.max(24, shape.height - 8)}><div xmlns="http://www.w3.org/1999/xhtml" className="sr-tactical-text-render" style={{ fontSize: `${shape.fontSize || 22}px`, color: shape.textColor || "#fff" }} onDoubleClick={(event) => { event.stopPropagation(); setSelectedShapeId(shape.id); setEditingTextId(shape.id); }}>{shape.text || "Text"}</div></foreignObject>}</>;
+              shapeBody = <><rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx="5" fill={shape.backgroundColor || "#0c3769"} fillOpacity={shape.opacity ?? 0.85} stroke={selected ? "#ffe36e" : fill} strokeOpacity={1} strokeWidth={selected ? strokeWidth + 2 : strokeWidth} />{editingTextId === shape.id && !videoPlaying ? <foreignObject x={shape.x + 5} y={shape.y + 4} width={Math.max(20, shape.width - 10)} height={Math.max(24, shape.height - 8)}><textarea xmlns="http://www.w3.org/1999/xhtml" ref={inlineTextRef} className="sr-tactical-inline-text" style={textStyle} autoFocus aria-label="Edit text on pitch" value={shape.text || ""} onPointerDown={(event) => event.stopPropagation()} onChange={(event) => setBoard((current) => ({ ...current, shapes: (current.shapes || []).map((item) => item.id === shape.id ? { ...item, text: event.target.value } : item) }))} onBlur={() => setEditingTextId(null)} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); setEditingTextId(null); event.currentTarget.blur(); } }} /></foreignObject> : <foreignObject x={shape.x + 5} y={shape.y + 4} width={Math.max(20, shape.width - 10)} height={Math.max(24, shape.height - 8)}><div xmlns="http://www.w3.org/1999/xhtml" className="sr-tactical-text-render" style={{ ...textStyle, backgroundColor: "transparent", justifyContent: textAlign === "center" ? "center" : textAlign === "right" ? "flex-end" : "flex-start" }} tabIndex={0} role="textbox" aria-multiline="true" aria-label="Tactical text box. Click and type to edit." data-tactical-text-input="true" onClick={(event) => { event.stopPropagation(); setSelectedShapeId(shape.id); }} onKeyDown={(event) => { if (event.metaKey || event.ctrlKey || event.altKey) return; if (event.key === "Enter") { event.preventDefault(); startInlineTextEdit(shape); } else if (event.key === "Backspace") { event.preventDefault(); startInlineTextEdit(shape, (shape.text || "").slice(0, -1)); } else if (event.key.length === 1) { event.preventDefault(); startInlineTextEdit(shape, event.key); } }} onDoubleClick={(event) => { event.stopPropagation(); startInlineTextEdit(shape); }}>{shape.text || "Text"}</div></foreignObject>}</>;
             } else if (shape.type === "line") shapeBody = <line x1={shape.x} y1={shape.y} x2={shape.x + shape.width} y2={shape.y + shape.height} stroke={selected ? "#ffe36e" : fill} strokeOpacity={opacity} strokeWidth={selected ? strokeWidth + 2 : strokeWidth} pointerEvents="stroke" />;
             else if (shape.type === "circle") shapeBody = <ellipse cx={shape.x + shape.width / 2} cy={shape.y + shape.height / 2} rx={shape.width / 2} ry={shape.height / 2} fill={fill} fillOpacity={opacity} stroke={selected ? "#ffe36e" : fill} strokeOpacity={selected ? 1 : opacity} strokeWidth={selected ? strokeWidth + 2 : strokeWidth} />;
             else if (shape.type === "triangle") shapeBody = <polygon points={`${shape.x + shape.width / 2},${shape.y} ${shape.x + shape.width},${shape.y + shape.height} ${shape.x},${shape.y + shape.height}`} fill={fill} fillOpacity={opacity} stroke={selected ? "#ffe36e" : fill} strokeOpacity={selected ? 1 : opacity} strokeWidth={selected ? strokeWidth + 2 : strokeWidth} />;
@@ -1632,9 +1661,20 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
         </div>}
         {dockPanel === "text" && <div className="sr-tactical-dock-panel sr-tactical-text-panel" role="tabpanel">
           <button type="button" className={`sr-tactical-icon-tool ${mode === "text" ? "selected" : ""}`} onClick={() => { setMode("text"); setSelectedShapeId(null); setSelectedArrowId(null); setEditingTextId(null); }}><TacticalToolIcon type="text" /><span>Draw text box</span></button>
-          {selectedShape?.type === "text" && <><label className="sr-tactical-text-editor-control"><span>Edit selected text</span><textarea ref={textEditorRef} rows="4" value={selectedShape.text || ""} onChange={(event) => updateSelectedShape({ text: event.target.value })} placeholder="Type text. Press Enter for a new line." /></label><button type="button" onClick={insertBulletIntoSelectedText}>Add bullet point</button><label className="sr-tactical-font-size-control"><span>Text size</span><input aria-label="Text size" type="range" min="12" max="42" step="1" value={selectedShape.fontSize || 22} onChange={(event) => updateSelectedShape({ fontSize: Number(event.target.value) })} /><output>{selectedShape.fontSize || 22}px</output></label></>}
+          {selectedShape?.type === "text" && <>
+            <label className="sr-tactical-text-editor-control"><span>Edit selected text</span><textarea ref={textEditorRef} rows="4" value={selectedShape.text || ""} onChange={(event) => updateSelectedShape({ text: event.target.value })} placeholder="Type text. Press Enter for a new line." /></label>
+            <div className="sr-tactical-text-format-toolbar" role="toolbar" aria-label="Text formatting">
+              <button type="button" aria-label="Bold" aria-pressed={selectedShape.bold !== false} className={selectedShape.bold !== false ? "active" : ""} onClick={() => updateSelectedShape({ bold: selectedShape.bold === false })}><strong>B</strong></button>
+              <button type="button" aria-label="Italic" aria-pressed={Boolean(selectedShape.italic)} className={selectedShape.italic ? "active" : ""} onClick={() => updateSelectedShape({ italic: !selectedShape.italic })}><em>I</em></button>
+              <button type="button" aria-label="Underline" aria-pressed={Boolean(selectedShape.underline)} className={selectedShape.underline ? "active" : ""} onClick={() => updateSelectedShape({ underline: !selectedShape.underline })}><u>U</u></button>
+              <span aria-hidden="true" />
+              {["left", "center", "right"].map((alignment) => <button key={alignment} type="button" aria-label={`Align ${alignment}`} aria-pressed={(selectedShape.textAlign || "left") === alignment} className={(selectedShape.textAlign || "left") === alignment ? "active" : ""} onClick={() => updateSelectedShape({ textAlign: alignment })}>{alignment === "left" ? "⇤" : alignment === "center" ? "↔" : "⇥"}</button>)}
+              <button type="button" onClick={insertBulletIntoSelectedText}>Add bullet point</button>
+            </div>
+            <label className="sr-tactical-font-size-control"><span>Text size</span><input aria-label="Text size" type="range" min="12" max="42" step="1" value={selectedShape.fontSize || 22} onChange={(event) => updateSelectedShape({ fontSize: Number(event.target.value) })} /><output>{selectedShape.fontSize || 22}px</output></label>
+          </>}
           <div className="sr-tactical-text-colours"><label><span>Text colour</span><input aria-label="Text colour" type="color" value={selectedShape?.type === "text" ? selectedShape.textColor || "#ffffff" : newTextColor} onChange={(event) => { setNewTextColor(event.target.value); if (selectedShape?.type === "text") updateSelectedShape({ textColor: event.target.value }); }} /></label><label><span>Box colour</span><input aria-label="Text box colour" type="color" value={selectedShape?.type === "text" ? selectedShape.backgroundColor || "#0c3769" : newTextBoxColor} onChange={(event) => { setNewTextBoxColor(event.target.value); if (selectedShape?.type === "text") updateSelectedShape({ backgroundColor: event.target.value }); }} /></label></div>
-          <small>{selectedShape?.type === "text" ? "Press Enter for a new line. Use Add bullet point to insert a bullet at the text cursor. Drag the box to move or resize it, and use Cmd/Ctrl+C and Cmd/Ctrl+V to copy it." : "Choose Draw text box, then drag on the pitch to set its size. New boxes switch back to Select automatically."}</small>
+          <small>{selectedShape?.type === "text" ? "Click the text box and type, or double-click to edit existing text. Enter adds a line. Use the toolbar for bold, italic, underline, alignment, and bullets." : "Choose Draw text box, then drag on the pitch to set its size. New boxes switch back to Select automatically."}</small>
         </div>}
         {dockPanel === "tools" && <div className="sr-tactical-dock-panel" role="tabpanel">
           <div className="sr-tactical-tools" role="toolbar" aria-label="Player and pitch tools">
