@@ -559,8 +559,8 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const [pdfBanner, setPdfBanner] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(pdfBannerStorageKey) || "{}");
-      return { title: "", fill: "#0f2d4e", text: "#ffffff", border: "#62dcff", style: "rounded", ...saved };
-    } catch { return { title: "", fill: "#0f2d4e", text: "#ffffff", border: "#62dcff", style: "rounded" }; }
+      return { title: "", fill: "#0f2d4e", text: "#ffffff", border: "#62dcff", pageBackground: "#eaf2f8", style: "rounded", ...saved };
+    } catch { return { title: "", fill: "#0f2d4e", text: "#ffffff", border: "#62dcff", pageBackground: "#eaf2f8", style: "rounded" }; }
   });
   const pitchRef = useRef(null);
   const textEditorRef = useRef(null);
@@ -1506,6 +1506,8 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     };
     frames.forEach((frame, index) => {
       if (index > 0) pdf.addPage("a4", orientation);
+      pdf.setFillColor(...toRgb(pdfBanner.pageBackground, "#eaf2f8"));
+      pdf.rect(0, 0, pageWidth, pageHeight, "F");
       drawTacticalVideoFrame(canvas, frame.board, exportPitchMode, { playerScale: 0.9 });
       const bannerX = 12;
       const bannerY = 20;
@@ -1669,6 +1671,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
             <label><span>Background</span><input aria-label="PDF banner background colour" type="color" value={pdfBanner.fill} onChange={(event) => setPdfBanner((current) => ({ ...current, fill: event.target.value }))} /></label>
             <label><span>Text</span><input aria-label="PDF banner text colour" type="color" value={pdfBanner.text} onChange={(event) => setPdfBanner((current) => ({ ...current, text: event.target.value }))} /></label>
             <label><span>Border</span><input aria-label="PDF banner border colour" type="color" value={pdfBanner.border} onChange={(event) => setPdfBanner((current) => ({ ...current, border: event.target.value }))} /></label>
+            <label><span>Page background</span><input aria-label="PDF page background colour" type="color" value={pdfBanner.pageBackground || "#eaf2f8"} onChange={(event) => setPdfBanner((current) => ({ ...current, pageBackground: event.target.value }))} /></label>
             <label><span>Style</span><select aria-label="PDF banner style" value={pdfBanner.style} onChange={(event) => setPdfBanner((current) => ({ ...current, style: event.target.value }))}><option value="rounded">Rounded</option><option value="square">Square</option></select></label>
           </div>
           <div className="sr-tactical-still-slides">
