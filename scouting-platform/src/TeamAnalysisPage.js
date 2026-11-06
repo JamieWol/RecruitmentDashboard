@@ -515,12 +515,8 @@ const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9, sourceBottom: 
   if (!context) return;
   const width = canvas.width;
   const height = canvas.height;
-  const fieldLeft = 30;
-  const fieldRight = width - 30;
   const fieldTop = 120;
-  // The set-piece pages were feeling too tall; keep a little more runoff at
-  // the bottom while preserving the full-width landscape presentation.
-  const fieldBottom = height - 130;
+  // Keep a little runoff below the field markings in the landscape PDF.
   const touchlineBottom = height - 24;
   const sourceLeft = 41;
   const sourceWidth = 668;
@@ -528,8 +524,15 @@ const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9, sourceBottom: 
   // Set-piece PDFs end the main field just before blue #2; the lower runoff
   // remains available so the disc can still be drawn in front of the lines.
   const sourceBottom = Math.max(sourceTop + 260, Math.min(965, Number(requestedSourceBottom) || 965));
-  const scaleX = (fieldRight - fieldLeft) / sourceWidth;
-  const scaleY = (fieldBottom - fieldTop) / (sourceBottom - sourceTop);
+  // Keep one coordinate scale in both directions. Previously the PDF filled
+  // the wide page by stretching x and y separately, which pulled teammates
+  // apart compared with their positions on the pad.
+  const pitchScale = Math.min((width - 60) / sourceWidth, (height - 250) / (sourceBottom - sourceTop));
+  const scaleX = pitchScale;
+  const scaleY = pitchScale;
+  const fieldWidth = sourceWidth * pitchScale;
+  const fieldLeft = (width - fieldWidth) / 2;
+  const fieldRight = fieldLeft + fieldWidth;
   const mapPoint = (point) => ({
     x: fieldLeft + (1.171875 * Number(point?.y || 0) - sourceLeft) * scaleX,
     y: fieldTop + (1000 - Number(point?.x || 0) - sourceTop) * scaleY,
@@ -722,13 +725,15 @@ const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9, sourceBottom: 
 
   (board.players || []).forEach((player) => {
     const point = mapPoint(player);
-    // PDF discs were reading smaller than the live board; increase their
-    // diameter modestly without changing the pitch or on-screen player size.
-    const radius = 24 * playerScale;
-    context.beginPath(); context.arc(point.x, point.y + 3, radius + 3, 0, Math.PI * 2); context.fillStyle = "rgba(5,34,63,0.42)"; context.fill();
-    context.beginPath(); context.arc(point.x, point.y, radius, 0, Math.PI * 2); context.fillStyle = player.color || (player.side === "home" ? "#1485dd" : "#e64b50"); context.fill();
-    context.strokeStyle = player.moving ? "#ffe36e" : "#f3f8ff"; context.lineWidth = player.moving ? 4 : 3; context.stroke();
-    context.fillStyle = "#fff"; context.font = "bold 17px Arial, sans-serif"; context.textAlign = "center"; context.textBaseline = "middle";
+    // Scale discs and labels with the pitch itself so distances between discs
+    // match what the user arranged on the pad. The slight x oval matches the
+    // pad's existing portrait transform.
+    const radiusX = 19 * playerScale * pitchScale * 1.171875;
+    const radiusY = 19 * playerScale * pitchScale;
+    context.beginPath(); context.ellipse(point.x, point.y + 3 * pitchScale, radiusX + 3 * pitchScale, radiusY + 3 * pitchScale, 0, 0, Math.PI * 2); context.fillStyle = "rgba(5,34,63,0.42)"; context.fill();
+    context.beginPath(); context.ellipse(point.x, point.y, radiusX, radiusY, 0, 0, Math.PI * 2); context.fillStyle = player.color || (player.side === "home" ? "#1485dd" : "#e64b50"); context.fill();
+    context.strokeStyle = player.moving ? "#ffe36e" : "#f3f8ff"; context.lineWidth = (player.moving ? 5 : 3) * pitchScale * playerScale; context.stroke();
+    context.fillStyle = "#fff"; context.font = `bold ${14 * pitchScale * playerScale}px Arial, sans-serif`; context.textAlign = "center"; context.textBaseline = "middle";
     context.fillText(String(tacticalDiscLabel(player)), point.x, point.y + 1);
   });
   const ball = mapPoint(board.ball || { x: 500, y: 320 });
@@ -1846,7 +1851,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       if (isSetPiecePdf || index > 0) pdf.addPage("a4", orientation);
       pdf.setFillColor(...toRgb(pdfBanner.pageBackground, "#eaf2f8"));
       pdf.rect(0, 0, pageWidth, pageHeight, "F");
-      if (isSetPiecePdf) drawSetPiecePdfFrame(canvas, frame.board, { playerScale: 0.9, sourceBottom: setPieceSourceBottom });
+      if (isSetPiecePdf) drawSetPiecePdfFrame(canvas, frame.board, { playerScale: 1, sourceBottom: setPieceSourceBottom });
       else drawTacticalVideoFrame(canvas, frame.board, exportPitchMode, { playerScale: 0.9 });
       const bannerX = pageSideMargin;
       const bannerY = isSetPiecePdf ? 4 : 20;
