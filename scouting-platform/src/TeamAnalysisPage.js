@@ -21,6 +21,9 @@ const displayName = (value) =>
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .replace(/\s+/g, " ");
 const pdfTitle = (value) => String(value ?? "").replace(/\s+/g, "\u00a0");
+// Keep the jersey number as the player's numeric identity, while allowing the
+// visible disc label to be edited to initials or an empty string.
+const tacticalDiscLabel = (player) => player?.label !== undefined ? player.label : (player?.number ?? "");
 const number = (value) => {
   const parsed = Number(
     String(value ?? "")
@@ -494,8 +497,8 @@ const drawTacticalVideoFrame = (canvas, board, viewMode = board.pitchMode || "fu
     context.strokeStyle = player.moving ? "#ffe36e" : "#f3f8ff"; context.lineWidth = player.moving ? 5 : 3; context.stroke();
     context.fillStyle = "#fff"; context.font = "bold 17px Arial, sans-serif"; context.textAlign = "center"; context.textBaseline = "middle";
     if (portrait) {
-      context.save(); context.translate(player.x, player.y + 1); context.rotate(Math.PI / 2); context.fillText(String(player.number), 0, 0); context.restore();
-    } else context.fillText(String(player.number), player.x, player.y + 1);
+      context.save(); context.translate(player.x, player.y + 1); context.rotate(Math.PI / 2); context.fillText(String(tacticalDiscLabel(player)), 0, 0); context.restore();
+    } else context.fillText(String(tacticalDiscLabel(player)), player.x, player.y + 1);
   });
   const ball = board.ball || { x: 500, y: 320 };
   context.beginPath(); context.arc(ball.x, ball.y + 2, 11, 0, Math.PI * 2); context.fillStyle = "#05223f70"; context.fill();
@@ -719,12 +722,14 @@ const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9, sourceBottom: 
 
   (board.players || []).forEach((player) => {
     const point = mapPoint(player);
-    const radius = 21 * playerScale;
+    // PDF discs were reading smaller than the live board; increase their
+    // diameter modestly without changing the pitch or on-screen player size.
+    const radius = 24 * playerScale;
     context.beginPath(); context.arc(point.x, point.y + 3, radius + 3, 0, Math.PI * 2); context.fillStyle = "rgba(5,34,63,0.42)"; context.fill();
     context.beginPath(); context.arc(point.x, point.y, radius, 0, Math.PI * 2); context.fillStyle = player.color || (player.side === "home" ? "#1485dd" : "#e64b50"); context.fill();
     context.strokeStyle = player.moving ? "#ffe36e" : "#f3f8ff"; context.lineWidth = player.moving ? 4 : 3; context.stroke();
     context.fillStyle = "#fff"; context.font = "bold 17px Arial, sans-serif"; context.textAlign = "center"; context.textBaseline = "middle";
-    context.fillText(String(player.number), point.x, point.y + 1);
+    context.fillText(String(tacticalDiscLabel(player)), point.x, point.y + 1);
   });
   const ball = mapPoint(board.ball || { x: 500, y: 320 });
   // Keep the ball's visible centre on the exact transformed board coordinate;
@@ -1996,7 +2001,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
           {displayedBoard.players.map((player) => <g key={player.id} className={`sr-tactical-player ${player.side} ${!videoPlaying && selectedTokens.includes(player.id) ? "selected" : ""} ${draggingIds.includes(player.id) ? "dragging" : ""} ${videoPlaying ? "video-playing" : ""}`} transform={`translate(${player.x} ${player.y})`} onPointerDown={(event) => beginPlayerDrag(event, player)}>
             <circle r={pitchViewMode === "full" ? 27 : 22} className="sr-tactical-disc-shadow" />
             <circle r={pitchViewMode === "full" ? 24 : 19} className="sr-tactical-disc" style={player.color ? { fill: player.color } : undefined} />
-            <text y="1" style={{ fontSize: pitchViewMode === "full" ? undefined : "14px" }} transform={pitchViewMode === "full" ? undefined : "rotate(90)"}>{player.number}</text>
+            <text y="1" style={{ fontSize: pitchViewMode === "full" ? undefined : "14px" }} transform={pitchViewMode === "full" ? undefined : "rotate(90)"}>{tacticalDiscLabel(player)}</text>
           </g>)}
           </g>
         </svg>
@@ -2098,7 +2103,8 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
           <div className="sr-tactical-disc-edit-controls" aria-label="Selected disc settings">
             <label><span>Disc colour</span><input aria-label="Selected disc colour" type="color" value={selectedPlayers[0]?.color || (selectedPlayers[0]?.side === "away" ? "#e64b50" : "#1485dd")} disabled={!selectedPlayers.length} onChange={(event) => updateSelectedPlayers({ color: event.target.value })} /></label>
             <label><span>Disc number</span><input aria-label="Selected disc number" type="number" min="1" max="99" step="1" value={selectedPlayers.length === 1 ? selectedPlayers[0].number : ""} disabled={selectedPlayers.length !== 1} onChange={(event) => { const nextNumber = Number(event.target.value); if (nextNumber >= 1 && nextNumber <= 99) updateSelectedPlayers({ number: nextNumber }); }} /></label>
-            <small>{selectedPlayers.length > 1 ? "Select one disc to change its number. " : ""}Select discs and use Cmd/Ctrl+C, Cmd/Ctrl+V, or Delete/Backspace to copy, paste, and remove them.</small>
+            <label><span>Disc label</span><input aria-label="Selected disc label" type="text" maxLength="4" placeholder="Initials or blank" value={selectedPlayers.length === 1 ? String(tacticalDiscLabel(selectedPlayers[0])) : ""} disabled={selectedPlayers.length !== 1} onChange={(event) => updateSelectedPlayers({ label: event.target.value })} /></label>
+            <small>{selectedPlayers.length > 1 ? "Select one disc to edit its number or label. " : "Enter initials or clear the label to leave the disc blank. "}Select discs and use Cmd/Ctrl+C, Cmd/Ctrl+V, or Delete/Backspace to copy, paste, and remove them.</small>
           </div>
           <div className="sr-tactical-tools sr-tactical-saved-tactics" role="toolbar" aria-label="Save and open tactics">
             <button type="button" className="sr-tactical-video" onClick={() => saveCurrentTactic()} disabled={finishingVideo || Boolean(activeClipStart)}>Save tactic and clips</button>
