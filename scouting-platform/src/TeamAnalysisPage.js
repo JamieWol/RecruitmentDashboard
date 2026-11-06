@@ -312,7 +312,7 @@ const wrapTacticalCanvasText = (context, value, maxWidth) => {
   return wrapped;
 };
 
-const drawTacticalVideoFrame = (canvas, board, viewMode = board.pitchMode || "full", { playerScale = 1 } = {}) => {
+const drawTacticalVideoFrame = (canvas, board, viewMode = board.pitchMode || "full", { playerScale = 1, boxPdfStyle = false } = {}) => {
   if (!canvas) return;
   const width = canvas.width;
   const height = canvas.height;
@@ -358,8 +358,27 @@ const drawTacticalVideoFrame = (canvas, board, viewMode = board.pitchMode || "fu
       context.strokeRect(146, 35, 458, 160);
       context.strokeRect(258, 35, 234, 60);
       context.beginPath(); context.arc(375, 145, 4, 0, Math.PI * 2); context.fillStyle = "#e8f4e9"; context.fill();
-      context.beginPath(); context.arc(375, 195, 96, Math.PI, 0, true); context.stroke();
-      context.beginPath(); context.moveTo(316, 20); context.lineTo(434, 20); context.stroke();
+      if (boxPdfStyle) {
+        const dRadius = 82;
+        const dHalfChord = Math.sqrt(dRadius * dRadius - 50 * 50);
+        context.beginPath();
+        context.arc(375, 145, dRadius, Math.atan2(50, -dHalfChord), Math.atan2(50, dHalfChord), true);
+        context.stroke();
+        context.fillStyle = "rgba(232,244,233,0.18)";
+        context.fillRect(316, 5, 118, 30);
+        context.strokeStyle = "#e8f4e9";
+        context.lineWidth = 3;
+        context.strokeRect(316, 5, 118, 30);
+        context.strokeStyle = "rgba(232,244,233,0.62)";
+        context.lineWidth = 1;
+        context.beginPath();
+        [336, 356, 376, 396, 416].forEach((x) => { context.moveTo(x, 5); context.lineTo(x, 35); });
+        [15, 25].forEach((y) => { context.moveTo(316, y); context.lineTo(434, y); });
+        context.stroke();
+      } else {
+        context.beginPath(); context.arc(375, 195, 96, Math.PI, 0, true); context.stroke();
+        context.beginPath(); context.moveTo(316, 20); context.lineTo(434, 20); context.stroke();
+      }
     }
     context.restore();
     context.save();
@@ -1480,13 +1499,14 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const downloadClipStillsPdf = () => {
     if (finishingVideo || activeClipStart) return;
     const exportPitchMode = pitchMode;
+    const isSetPiecePdf = exportPitchMode === "box";
     const canvas = videoCanvasRef.current;
     if (!canvas) {
       setVideoStatus("Could not prepare the pitch images for the PDF.");
       return;
     }
-    canvas.width = exportPitchMode === "full" ? 1280 : exportPitchMode === "box" ? Math.round(1280 * BOX_PITCH_VIEW.width / BOX_PITCH_VIEW.height) : 960;
-    canvas.height = exportPitchMode === "full" ? 819 : exportPitchMode === "half" ? 832 : 1280;
+    canvas.width = exportPitchMode === "full" || isSetPiecePdf ? 1280 : 960;
+    canvas.height = exportPitchMode === "full" ? 819 : exportPitchMode === "half" ? 832 : 760;
     const frames = stillSlides.length
       ? stillSlides.map((slide, index) => ({ label: slide.title || `Slide ${index + 1}`, board: { ...slide.board, pitchMode: exportPitchMode } }))
       : [{ label: "Current tactic", board: { ...boardRef.current, pitchMode: exportPitchMode } }];
@@ -1498,7 +1518,6 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     const pdf = new jsPDF(orientation, "mm", "a4");
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
-    const isSetPiecePdf = exportPitchMode === "box";
     const pageSideMargin = isSetPiecePdf ? 6 : 12;
     const imageMaxWidth = pageWidth - pageSideMargin * 2;
     const pitchTop = isSetPiecePdf ? 34 : 39;
@@ -1511,7 +1530,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       if (index > 0) pdf.addPage("a4", orientation);
       pdf.setFillColor(...toRgb(pdfBanner.pageBackground, "#eaf2f8"));
       pdf.rect(0, 0, pageWidth, pageHeight, "F");
-      drawTacticalVideoFrame(canvas, frame.board, exportPitchMode, { playerScale: 0.9 });
+      drawTacticalVideoFrame(canvas, frame.board, exportPitchMode, { playerScale: 0.9, boxPdfStyle: isSetPiecePdf });
       const bannerX = pageSideMargin;
       const bannerY = isSetPiecePdf ? 8 : 20;
       const bannerWidth = imageMaxWidth;
