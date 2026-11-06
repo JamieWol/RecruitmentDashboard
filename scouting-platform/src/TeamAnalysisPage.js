@@ -557,11 +557,11 @@ const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9, sourceBottom: 
   context.arc(fieldRight, fieldTop, cornerRadius, Math.PI / 2, Math.PI);
   context.stroke();
 
-  const penaltyLeft = fieldLeft + (235 - sourceLeft) * scaleX;
-  const penaltyRight = fieldLeft + (515 - sourceLeft) * scaleX;
+  const penaltyLeft = fieldLeft + (225 - sourceLeft) * scaleX;
+  const penaltyRight = fieldLeft + (525 - sourceLeft) * scaleX;
   const boxBottom = fieldTop + (228 - sourceTop) * scaleY;
-  const sixLeft = fieldLeft + (300 - sourceLeft) * scaleX;
-  const sixRight = fieldLeft + (450 - sourceLeft) * scaleX;
+  const sixLeft = fieldLeft + (295 - sourceLeft) * scaleX;
+  const sixRight = fieldLeft + (455 - sourceLeft) * scaleX;
   const sixBottom = fieldTop + (112 - sourceTop) * scaleY;
   context.lineWidth = 5;
   context.strokeRect(penaltyLeft, fieldTop, penaltyRight - penaltyLeft, boxBottom - fieldTop);
@@ -775,6 +775,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const [newArrowHeadSize, setNewArrowHeadSize] = useState(20);
   const [newTextColor, setNewTextColor] = useState("#ffffff");
   const [newTextBoxColor, setNewTextBoxColor] = useState("#0c3769");
+  const [newTextBoxOpacity, setNewTextBoxOpacity] = useState(0.85);
   const [dockPanel, setDockPanel] = useState("shapes");
   const [pitchMode, setPitchMode] = useState(() => board.pitchMode || "full");
   const [movementClips, setMovementClips] = useState(() => {
@@ -1306,7 +1307,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
         const centerY = drawnBox.y + drawnBox.height / 2;
         const x = Math.max(0, Math.min(1000 - width, centerX - width / 2));
         const y = Math.max(0, Math.min(640 - height, centerY - height / 2));
-        const newTextBox = { id: `text-${Date.now()}`, type: "text", x, y, width, height, text: "Text", fontSize: 22, color: newShapeColour, borderColor: newShapeBorderColour, textColor: newTextColor, backgroundColor: newTextBoxColor, opacity: 0.85 };
+        const newTextBox = { id: `text-${Date.now()}`, type: "text", x, y, width, height, text: "Text", fontSize: 22, color: newShapeColour, borderColor: newShapeBorderColour, textColor: newTextColor, backgroundColor: newTextBoxColor, opacity: newTextBoxOpacity };
         setBoard((current) => ({ ...current, shapes: [...(current.shapes || []), newTextBox] }));
         markGraphicEntering(newTextBox.id);
         setSelectedShapeId(newTextBox.id);
@@ -1795,7 +1796,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     const pageHeight = pdf.internal.pageSize.getHeight();
     const pageSideMargin = isSetPiecePdf ? 3 : 12;
     const imageMaxWidth = pageWidth - pageSideMargin * 2;
-    const pitchTop = isSetPiecePdf ? 28 : 39;
+    const pitchTop = isSetPiecePdf ? 32 : 39;
     const imageMaxHeight = pageHeight - pitchTop - (isSetPiecePdf ? 4 : 8);
     const toRgb = (colour, fallback) => {
       const value = /^#[\da-f]{6}$/i.test(colour || "") ? colour : fallback;
@@ -1958,7 +1959,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
           {arrowPreview && arrowStart && mode === "arrow" && <line x1={arrowStart.x} y1={arrowStart.y} x2={arrowPreview.x} y2={arrowPreview.y} className="sr-tactical-arrow sr-tactical-arrow-preview" stroke={newShapeColour} strokeDasharray={newArrowLineStyle === "dashed" ? "14 9" : newArrowLineStyle === "dotted" ? "2 8" : undefined} markerEnd={newArrowHeadStyle === "none" ? undefined : "url(#sr-tactical-arrowhead-preview)"} />}
           {arrowPreview && arrowStart && ["rectangle", "square", "circle", "triangle", "line", "text"].includes(mode) && (() => {
             const shape = mode === "text" ? textBoxForDrag(arrowStart, arrowPreview) : shapeForDrag(arrowStart, arrowPreview, mode);
-            if (mode === "text") return <g transform={pitchViewMode === "full" ? undefined : `rotate(90 ${shape.x + shape.width / 2} ${shape.y + shape.height / 2})`}><rect {...shape} rx="5" fill={newTextBoxColor} fillOpacity="0.85" stroke={newShapeBorderColour} strokeWidth={2} className="sr-tactical-shape-preview" /></g>;
+            if (mode === "text") return <g transform={pitchViewMode === "full" ? undefined : `rotate(90 ${shape.x + shape.width / 2} ${shape.y + shape.height / 2})`}><rect {...shape} rx="5" fill={newTextBoxColor} fillOpacity={newTextBoxOpacity} stroke={newShapeBorderColour} strokeWidth={2} className="sr-tactical-shape-preview" /></g>;
             if (mode === "line") return <line x1={arrowStart.x} y1={arrowStart.y} x2={arrowPreview.x} y2={arrowPreview.y} stroke={newShapeBorderColour} strokeOpacity={newShapeOpacity} strokeWidth={3} className="sr-tactical-shape-preview" />;
             if (mode === "circle") return <ellipse cx={shape.x + shape.width / 2} cy={shape.y + shape.height / 2} rx={shape.width / 2} ry={shape.height / 2} fill={newShapeColour} fillOpacity={newShapeOpacity} stroke={newShapeBorderColour} strokeOpacity={newShapeOpacity} strokeWidth={3} className="sr-tactical-shape-preview" />;
             if (mode === "triangle") return <polygon points={`${shape.x + shape.width / 2},${shape.y} ${shape.x + shape.width},${shape.y + shape.height} ${shape.x},${shape.y + shape.height}`} fill={newShapeColour} fillOpacity={newShapeOpacity} stroke={newShapeBorderColour} strokeOpacity={newShapeOpacity} strokeWidth={3} className="sr-tactical-shape-preview" />;
@@ -2060,6 +2061,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
             <label className="sr-tactical-font-size-control"><span>Text size</span><input aria-label="Text size" type="range" min="12" max="42" step="1" value={selectedShape.fontSize || 22} onChange={(event) => updateSelectedShape({ fontSize: Number(event.target.value) })} /><output>{selectedShape.fontSize || 22}px</output></label>
           </>}
           <div className="sr-tactical-text-colours"><label><span>Text colour</span><input aria-label="Text colour" type="color" value={selectedShape?.type === "text" ? selectedShape.textColor || "#ffffff" : newTextColor} onChange={(event) => { setNewTextColor(event.target.value); if (selectedShape?.type === "text") updateSelectedShape({ textColor: event.target.value }); }} /></label><label><span>Box colour</span><input aria-label="Text box colour" type="color" value={selectedShape?.type === "text" ? selectedShape.backgroundColor || "#0c3769" : newTextBoxColor} onChange={(event) => { setNewTextBoxColor(event.target.value); if (selectedShape?.type === "text") updateSelectedShape({ backgroundColor: event.target.value }); }} /></label><label><span>Border colour</span><input aria-label="Text box border colour" type="color" value={selectedShape?.type === "text" ? selectedShape.borderColor || selectedShape.color || newShapeBorderColour : newShapeBorderColour} onChange={(event) => { setNewShapeBorderColour(event.target.value); if (selectedShape?.type === "text") updateSelectedShape({ borderColor: event.target.value }); }} /></label></div>
+          <label className="sr-tactical-text-opacity-control"><span>Box fill opacity</span><input aria-label="Text box fill opacity" type="range" min="0" max="100" step="5" value={Math.round((selectedShape?.type === "text" ? selectedShape.opacity ?? 0.85 : newTextBoxOpacity) * 100)} onChange={(event) => { const opacity = Number(event.target.value) / 100; setNewTextBoxOpacity(opacity); if (selectedShape?.type === "text") updateSelectedShape({ opacity }); }} /><output>{Math.round((selectedShape?.type === "text" ? selectedShape.opacity ?? 0.85 : newTextBoxOpacity) * 100)}%</output></label>
           <small>{selectedShape?.type === "text" ? "Click the text box and type, or double-click to edit existing text. Enter adds a line. Use the toolbar for bold, italic, underline, alignment, and bullets." : "Choose Draw text box, then drag on the pitch to set its size. New boxes switch back to Select automatically."}</small>
         </div>}
         {dockPanel === "tools" && <div className="sr-tactical-dock-panel" role="tabpanel">
