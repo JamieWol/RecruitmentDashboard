@@ -518,11 +518,12 @@ const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9, sourceBottom: 
   // The set-piece pages were feeling too tall; keep a little more runoff at
   // the bottom while preserving the full-width landscape presentation.
   const fieldBottom = height - 130;
+  const touchlineBottom = height - 24;
   const sourceLeft = 41;
   const sourceWidth = 668;
   const sourceTop = 35;
-  // Set-piece PDFs focus on the attacking box and crop the lower pitch just
-  // above the blue #2 marker, matching the tighter framing of the reference.
+  // Set-piece PDFs end the main field just before blue #2; the lower runoff
+  // remains available so the disc can still be drawn in front of the lines.
   const sourceBottom = Math.max(sourceTop + 260, Math.min(965, Number(requestedSourceBottom) || 965));
   const scaleX = (fieldRight - fieldLeft) / sourceWidth;
   const scaleY = (fieldBottom - fieldTop) / (sourceBottom - sourceTop);
@@ -545,9 +546,9 @@ const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9, sourceBottom: 
   context.beginPath();
   context.moveTo(fieldLeft, fieldTop);
   context.lineTo(fieldRight, fieldTop);
-  context.lineTo(fieldRight, fieldBottom);
+  context.lineTo(fieldRight, touchlineBottom);
   context.moveTo(fieldLeft, fieldTop);
-  context.lineTo(fieldLeft, fieldBottom);
+  context.lineTo(fieldLeft, touchlineBottom);
   context.stroke();
   const cornerRadius = Math.min(38, (fieldRight - fieldLeft) * 0.025);
   context.lineWidth = 4;
@@ -616,7 +617,7 @@ const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9, sourceBottom: 
   context.beginPath();
   // Let foreground annotations and discs extend over the goal line/goal net;
   // only crop at the canvas edge and focused lower edge of the pitch.
-  context.rect(0, 0, width, fieldBottom);
+  context.rect(0, 0, width, touchlineBottom);
   context.clip();
   context.setTransform(0, -sy, sx, 0, tx, ty);
   (board.shapes || []).forEach((shape) => {
@@ -644,7 +645,7 @@ const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9, sourceBottom: 
   context.restore();
   context.save();
   context.beginPath();
-  context.rect(0, 0, width, fieldBottom);
+  context.rect(0, 0, width, touchlineBottom);
   context.clip();
   (board.shapes || []).filter((shape) => shape.type === "text").forEach((shape) => {
     const center = mapPoint({ x: (Number(shape.x) || 0) + (Number(shape.width) || 0) / 2, y: (Number(shape.y) || 0) + (Number(shape.height) || 0) / 2 });
@@ -1787,7 +1788,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       frames.push({ label: `Clip ${index + 1} · Finish`, board: { ...clip.to, pitchMode: exportPitchMode } });
     });
     const orientation = exportPitchMode === "half" ? "portrait" : "landscape";
-    const homeTwoCandidates = frames[0]?.board?.players?.filter((player) => player.side === "home" && Number(player.number) === 2) || [];
+    const homeTwoCandidates = frames.flatMap((frame) => frame.board?.players || []).filter((player) => player.side === "home" && Number(player.number) === 2);
     const lowestHomeTwo = homeTwoCandidates.reduce((lowest, player) =>
       !lowest || Number(player.x) < Number(lowest.x) ? player : lowest, null);
     const setPieceSourceBottom = lowestHomeTwo
