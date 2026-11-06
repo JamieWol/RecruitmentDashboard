@@ -557,11 +557,11 @@ const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9, sourceBottom: 
   context.arc(fieldRight, fieldTop, cornerRadius, Math.PI / 2, Math.PI);
   context.stroke();
 
-  const penaltyLeft = fieldLeft + (225 - sourceLeft) * scaleX;
-  const penaltyRight = fieldLeft + (525 - sourceLeft) * scaleX;
+  const penaltyLeft = fieldLeft + (217 - sourceLeft) * scaleX;
+  const penaltyRight = fieldLeft + (533 - sourceLeft) * scaleX;
   const boxBottom = fieldTop + (228 - sourceTop) * scaleY;
-  const sixLeft = fieldLeft + (295 - sourceLeft) * scaleX;
-  const sixRight = fieldLeft + (455 - sourceLeft) * scaleX;
+  const sixLeft = fieldLeft + (291 - sourceLeft) * scaleX;
+  const sixRight = fieldLeft + (459 - sourceLeft) * scaleX;
   const sixBottom = fieldTop + (112 - sourceTop) * scaleY;
   context.lineWidth = 5;
   context.strokeRect(penaltyLeft, fieldTop, penaltyRight - penaltyLeft, boxBottom - fieldTop);
@@ -607,9 +607,9 @@ const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9, sourceBottom: 
   };
   const sx = scaleX * 1.171875;
   const sy = scaleY;
-  // Text boxes use a balanced scale across the full-width pitch and the
-  // focused vertical crop so they remain legible in the exported stills.
-  const textScale = Math.sqrt(sx * sy) * 1.08;
+  // Use the tighter scale for PDF text boxes. The geometric mean made them
+  // much larger than their on-pitch size when the lower pitch was cropped.
+  const textScale = Math.min(sx, sy);
   const tx = fieldLeft - sourceLeft * scaleX;
   const ty = fieldTop + (965 * scaleY);
   context.save();
