@@ -1498,8 +1498,9 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     const pdf = new jsPDF(orientation, "mm", "a4");
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
-    const imageMaxWidth = pageWidth - 24;
-    const imageMaxHeight = pageHeight - 48;
+    const pageSideMargin = exportPitchMode === "box" ? 6 : 12;
+    const imageMaxWidth = pageWidth - pageSideMargin * 2;
+    const imageMaxHeight = pageHeight - 47;
     const toRgb = (colour, fallback) => {
       const value = /^#[\da-f]{6}$/i.test(colour || "") ? colour : fallback;
       return [1, 3, 5].map((index) => parseInt(value.slice(index, index + 2), 16));
@@ -1509,16 +1510,16 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       pdf.setFillColor(...toRgb(pdfBanner.pageBackground, "#eaf2f8"));
       pdf.rect(0, 0, pageWidth, pageHeight, "F");
       drawTacticalVideoFrame(canvas, frame.board, exportPitchMode, { playerScale: 0.9 });
-      const bannerX = 12;
+      const bannerX = pageSideMargin;
       const bannerY = 20;
-      const bannerWidth = pageWidth - 24;
+      const bannerWidth = imageMaxWidth;
       const bannerHeight = 16;
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(8);
       pdf.setTextColor(35, 55, 75);
-      pdf.text(`${boardRef.current.homeName || homeTeamName} vs ${boardRef.current.awayName || oppositionName}`, pageWidth / 2, 9, { align: "center", maxWidth: pageWidth - 24 });
+      pdf.text(`${boardRef.current.homeName || homeTeamName} vs ${boardRef.current.awayName || oppositionName}`, pageWidth / 2, 9, { align: "center", maxWidth: bannerWidth });
       pdf.setFontSize(9);
-      pdf.text(frame.label, pageWidth / 2, 15, { align: "center", maxWidth: pageWidth - 24 });
+      pdf.text(frame.label, pageWidth / 2, 15, { align: "center", maxWidth: bannerWidth });
       pdf.setFillColor(...toRgb(pdfBanner.fill, "#0f2d4e"));
       pdf.setDrawColor(...toRgb(pdfBanner.border, "#62dcff"));
       pdf.setLineWidth(0.7);
