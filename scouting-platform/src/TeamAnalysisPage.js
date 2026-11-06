@@ -553,12 +553,12 @@ const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9 } = {}) => {
   context.arc(fieldRight, fieldTop, cornerRadius, Math.PI / 2, Math.PI);
   context.stroke();
 
-  const penaltyLeft = fieldLeft + (266 - sourceLeft) * scaleX;
-  const penaltyRight = fieldLeft + (484 - sourceLeft) * scaleX;
-  const boxBottom = fieldTop + (195 - sourceTop) * scaleY;
-  const sixLeft = fieldLeft + (320 - sourceLeft) * scaleX;
-  const sixRight = fieldLeft + (430 - sourceLeft) * scaleX;
-  const sixBottom = fieldTop + (95 - sourceTop) * scaleY;
+  const penaltyLeft = fieldLeft + (259 - sourceLeft) * scaleX;
+  const penaltyRight = fieldLeft + (491 - sourceLeft) * scaleX;
+  const boxBottom = fieldTop + (209 - sourceTop) * scaleY;
+  const sixLeft = fieldLeft + (316 - sourceLeft) * scaleX;
+  const sixRight = fieldLeft + (434 - sourceLeft) * scaleX;
+  const sixBottom = fieldTop + (103 - sourceTop) * scaleY;
   context.lineWidth = 5;
   context.strokeRect(penaltyLeft, fieldTop, penaltyRight - penaltyLeft, boxBottom - fieldTop);
   context.strokeRect(sixLeft, fieldTop, sixRight - sixLeft, sixBottom - fieldTop);
@@ -577,7 +577,7 @@ const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9 } = {}) => {
   // Netted goal sits beyond the goal line, with a small runoff margin like the reference PDF.
   const goalWidth = Math.min(230, (fieldRight - fieldLeft) * 0.14);
   const goalLeft = width / 2 - goalWidth / 2;
-  const goalTop = 28;
+  const goalTop = 0;
   const goalBottom = fieldTop + 1;
   context.fillStyle = "rgba(232,244,233,0.16)";
   context.fillRect(goalLeft, goalTop, goalWidth, goalBottom - goalTop);
@@ -714,7 +714,9 @@ const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9 } = {}) => {
     context.fillText(String(player.number), point.x, point.y + 1);
   });
   const ball = mapPoint(board.ball || { x: 500, y: 320 });
-  context.beginPath(); context.arc(ball.x, ball.y + 2, 10, 0, Math.PI * 2); context.fillStyle = "rgba(5,34,63,0.42)"; context.fill();
+  // Keep the ball's visible centre on the exact transformed board coordinate;
+  // a displaced shadow made it appear offset from where it was placed.
+  context.beginPath(); context.arc(ball.x, ball.y, 10, 0, Math.PI * 2); context.fillStyle = "rgba(5,34,63,0.24)"; context.fill();
   context.beginPath(); context.arc(ball.x, ball.y, 9, 0, Math.PI * 2); context.fillStyle = "#f7f8f3"; context.fill();
   context.strokeStyle = "#142234"; context.lineWidth = 2; context.stroke();
   context.fillStyle = "#142234"; context.beginPath(); context.moveTo(ball.x, ball.y - 4); context.lineTo(ball.x + 3, ball.y - 2); context.lineTo(ball.x + 2, ball.y + 2); context.lineTo(ball.x - 2, ball.y + 2); context.lineTo(ball.x - 3, ball.y - 2); context.closePath(); context.fill();
@@ -1701,12 +1703,13 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const addStillSlide = () => {
     if (finishingVideo || activeClipStart) return;
     const snapshot = JSON.parse(JSON.stringify({ ...boardRef.current, pitchMode }));
-    const slide = { id: `still-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, title: `Slide ${stillSlides.length + 1}`, board: snapshot };
+    const slideTitle = `Slide ${stillSlides.length + 1}`;
+    const slide = { id: `still-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, title: slideTitle, bannerTitle: slideTitle, board: snapshot };
     setStillSlides((current) => [...current, slide]);
     setVideoStatus(`Added still slide ${stillSlides.length + 1}. Capture another setup whenever you’re ready.`);
   };
   const renameStillSlide = (slideId, title) => {
-    setStillSlides((current) => current.map((slide) => slide.id === slideId ? { ...slide, title } : slide));
+    setStillSlides((current) => current.map((slide) => slide.id === slideId ? { ...slide, title, bannerTitle: title } : slide));
   };
   const loadStillSlide = (slide) => {
     if (!slide?.board || finishingVideo || activeClipStart) return;
@@ -1735,7 +1738,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     canvas.width = isSetPiecePdf ? 1814 : exportPitchMode === "full" ? 1280 : 960;
     canvas.height = isSetPiecePdf ? 1080 : exportPitchMode === "full" ? 819 : 832;
     const frames = stillSlides.length
-      ? stillSlides.map((slide, index) => ({ label: slide.title || `Slide ${index + 1}`, board: { ...slide.board, pitchMode: exportPitchMode } }))
+      ? stillSlides.map((slide, index) => ({ label: slide.title || `Slide ${index + 1}`, bannerTitle: slide.bannerTitle || slide.title || `Slide ${index + 1}`, board: { ...slide.board, pitchMode: exportPitchMode } }))
       : [{ label: "Current tactic", board: { ...boardRef.current, pitchMode: exportPitchMode } }];
     movementClips.forEach((clip, index) => {
       frames.push({ label: `Clip ${index + 1} · Start`, board: { ...clip.from, pitchMode: exportPitchMode } });
@@ -1747,7 +1750,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     const pageHeight = pdf.internal.pageSize.getHeight();
     const pageSideMargin = isSetPiecePdf ? 6 : 12;
     const imageMaxWidth = pageWidth - pageSideMargin * 2;
-    const pitchTop = isSetPiecePdf ? 34 : 39;
+    const pitchTop = isSetPiecePdf ? 30 : 39;
     const imageMaxHeight = pageHeight - pitchTop - (isSetPiecePdf ? 6 : 8);
     const toRgb = (colour, fallback) => {
       const value = /^#[\da-f]{6}$/i.test(colour || "") ? colour : fallback;
@@ -1799,10 +1802,6 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       const opponentTextX = pageWidth / 2 - (opponentWidth + (awayBadge ? 20 : 0)) / 2;
       pdf.text(awayTeam, opponentTextX, 166, { align: "left", maxWidth: pageWidth - 40 });
       if (awayBadge) pdf.addImage(awayBadge, "PNG", opponentTextX + opponentWidth + 5, 155, 14, 14);
-      const tacticCoverTitle = boardRef.current.name || "Set-piece tactic";
-      pdf.setFontSize(12);
-      pdf.setTextColor(...toRgb(pdfCover.accent, "#62dcff"));
-      pdf.text(tacticCoverTitle, pageWidth / 2, 192, { align: "center", maxWidth: pageWidth - 30 });
     }
     frames.forEach((frame, index) => {
       if (isSetPiecePdf || index > 0) pdf.addPage("a4", orientation);
@@ -1828,7 +1827,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       if (pdfBanner.style === "square") pdf.rect(bannerX, bannerY, bannerWidth, bannerHeight, "FD");
       else pdf.roundedRect(bannerX, bannerY, bannerWidth, bannerHeight, 2, 2, "FD");
       pdf.setFont("helvetica", "bold");
-      const tacticTitle = pdfBanner.title.trim() || boardRef.current.name || "Tactic";
+      const tacticTitle = (frame.bannerTitle || "").trim() || pdfBanner.title.trim() || boardRef.current.name || "Tactic";
       const titleBaseSize = 16;
       pdf.setFontSize(Math.max(11, Math.min(titleBaseSize, titleBaseSize - Math.max(0, tacticTitle.length - 28) * 0.18)));
       pdf.setTextColor(...toRgb(pdfBanner.text, "#ffffff"));
@@ -1989,7 +1988,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
             <div className="sr-tactical-still-slides-heading"><strong>Still slides</strong><button type="button" onClick={addStillSlide} disabled={finishingVideo || Boolean(activeClipStart)}>Add current setup as slide</button><small>Capture the pitch as it is now. You can add another slide without recording a movement.</small></div>
             {stillSlides.length > 0 && <ol>{stillSlides.map((slide, index) => <li key={slide.id}>
               <span className="sr-tactical-still-slide-number">{index + 1}</span>
-              <label><span>Slide title</span><input aria-label={`Slide ${index + 1} title`} value={slide.title || `Slide ${index + 1}`} onChange={(event) => renameStillSlide(slide.id, event.target.value)} /></label>
+              <label><span>Slide banner title</span><input aria-label={`Slide ${index + 1} banner title`} value={slide.bannerTitle || slide.title || `Slide ${index + 1}`} onChange={(event) => renameStillSlide(slide.id, event.target.value)} /></label>
               <button type="button" onClick={() => loadStillSlide(slide)} disabled={finishingVideo || Boolean(activeClipStart)}>Load</button>
               <button type="button" onClick={() => replaceStillSlide(slide.id)} disabled={finishingVideo || Boolean(activeClipStart)}>Update</button>
               <button type="button" onClick={() => setStillSlides((current) => current.filter((item) => item.id !== slide.id))} disabled={finishingVideo || Boolean(activeClipStart)}>Remove</button>
