@@ -811,8 +811,8 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const [pdfBanner, setPdfBanner] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(pdfBannerStorageKey) || "{}");
-      return { title: "", fill: "#0f2d4e", text: "#ffffff", border: "#62dcff", pageBackground: "#eaf2f8", style: "rounded", ...saved };
-    } catch { return { title: "", fill: "#0f2d4e", text: "#ffffff", border: "#62dcff", pageBackground: "#eaf2f8", style: "rounded" }; }
+      return { title: "", fill: "#0f2d4e", text: "#ffffff", border: "#62dcff", pageBackground: "#eaf2f8", style: "rounded", fontSize: 16, bold: true, italic: false, underline: false, align: "center", ...saved };
+    } catch { return { title: "", fill: "#0f2d4e", text: "#ffffff", border: "#62dcff", pageBackground: "#eaf2f8", style: "rounded", fontSize: 16, bold: true, italic: false, underline: false, align: "center" }; }
   });
   const pdfCoverStorageKey = `${storageKey}:pdf-cover`;
   const [pdfCover, setPdfCover] = useState(() => {
@@ -1859,12 +1859,24 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       pdf.setLineWidth(isSetPiecePdf ? 1.3 : 0.7);
       if (pdfBanner.style === "square") pdf.rect(bannerX, bannerY, bannerWidth, bannerHeight, "FD");
       else pdf.roundedRect(bannerX, bannerY, bannerWidth, bannerHeight, 2, 2, "FD");
-      pdf.setFont("helvetica", "bold");
       const tacticTitle = (frame.bannerTitle || "").trim() || pdfBanner.title.trim() || boardRef.current.name || "Tactic";
-      const titleBaseSize = 16;
-      pdf.setFontSize(Math.max(11, Math.min(titleBaseSize, titleBaseSize - Math.max(0, tacticTitle.length - 28) * 0.18)));
+      const titleFontStyle = pdfBanner.bold ? (pdfBanner.italic ? "bolditalic" : "bold") : (pdfBanner.italic ? "italic" : "normal");
+      pdf.setFont("helvetica", titleFontStyle);
+      const titleBaseSize = Number(pdfBanner.fontSize) || 16;
+      const titleSize = Math.max(8, Math.min(titleBaseSize, titleBaseSize - Math.max(0, tacticTitle.length - 28) * 0.18));
+      pdf.setFontSize(titleSize);
       pdf.setTextColor(...toRgb(pdfBanner.text, "#ffffff"));
-      pdf.text(tacticTitle, pageWidth / 2, bannerY + bannerHeight * 0.67, { align: "center", maxWidth: bannerWidth - 12 });
+      const titleAlign = ["left", "center", "right"].includes(pdfBanner.align) ? pdfBanner.align : "center";
+      const titleX = titleAlign === "left" ? bannerX + 6 : titleAlign === "right" ? bannerX + bannerWidth - 6 : pageWidth / 2;
+      const titleY = bannerY + bannerHeight * 0.67;
+      pdf.text(tacticTitle, titleX, titleY, { align: titleAlign, maxWidth: bannerWidth - 12 });
+      if (pdfBanner.underline) {
+        const underlineWidth = Math.min(pdf.getTextWidth(tacticTitle), bannerWidth - 12);
+        const underlineLeft = titleAlign === "left" ? titleX : titleAlign === "right" ? titleX - underlineWidth : titleX - underlineWidth / 2;
+        pdf.setDrawColor(...toRgb(pdfBanner.text, "#ffffff"));
+        pdf.setLineWidth(0.35);
+        pdf.line(underlineLeft, titleY + 1.2, underlineLeft + underlineWidth, titleY + 1.2);
+      }
       const imageFormat = isSetPiecePdf ? "image/jpeg" : "image/png";
       const image = canvas.toDataURL(imageFormat, 0.96);
       const scale = Math.min(imageMaxWidth / canvas.width, imageMaxHeight / canvas.height);
@@ -2018,6 +2030,13 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
             <label><span>Border</span><input aria-label="PDF banner border colour" type="color" value={pdfBanner.border} onChange={(event) => setPdfBanner((current) => ({ ...current, border: event.target.value }))} /></label>
             <label><span>Page background</span><input aria-label="PDF page background colour" type="color" value={pdfBanner.pageBackground || "#eaf2f8"} onChange={(event) => setPdfBanner((current) => ({ ...current, pageBackground: event.target.value }))} /></label>
             <label><span>Style</span><select aria-label="PDF banner style" value={pdfBanner.style} onChange={(event) => setPdfBanner((current) => ({ ...current, style: event.target.value }))}><option value="rounded">Rounded</option><option value="square">Square</option></select></label>
+            <label className="sr-tactical-pdf-banner-size"><span>Text size</span><input aria-label="PDF banner text size" type="range" min="8" max="28" step="1" value={pdfBanner.fontSize || 16} onChange={(event) => setPdfBanner((current) => ({ ...current, fontSize: Number(event.target.value) }))} /><output>{pdfBanner.fontSize || 16}pt</output></label>
+            <div className="sr-tactical-pdf-banner-format" role="toolbar" aria-label="PDF banner text formatting">
+              <button type="button" aria-label="Bold banner title" aria-pressed={pdfBanner.bold !== false} className={pdfBanner.bold !== false ? "active" : ""} onClick={() => setPdfBanner((current) => ({ ...current, bold: current.bold === false }))}><strong>B</strong></button>
+              <button type="button" aria-label="Italic banner title" aria-pressed={Boolean(pdfBanner.italic)} className={pdfBanner.italic ? "active" : ""} onClick={() => setPdfBanner((current) => ({ ...current, italic: !current.italic }))}><em>I</em></button>
+              <button type="button" aria-label="Underline banner title" aria-pressed={Boolean(pdfBanner.underline)} className={pdfBanner.underline ? "active" : ""} onClick={() => setPdfBanner((current) => ({ ...current, underline: !current.underline }))}><u>U</u></button>
+            </div>
+            <label><span>Alignment</span><select aria-label="PDF banner title alignment" value={pdfBanner.align || "center"} onChange={(event) => setPdfBanner((current) => ({ ...current, align: event.target.value }))}><option value="left">Left</option><option value="center">Centre</option><option value="right">Right</option></select></label>
           </div>
           <div className="sr-tactical-still-slides">
             <div className="sr-tactical-still-slides-heading"><strong>Still slides</strong><button type="button" onClick={addStillSlide} disabled={finishingVideo || Boolean(activeClipStart)}>Add current setup as slide</button><small>Capture the pitch as it is now. You can add another slide without recording a movement.</small></div>

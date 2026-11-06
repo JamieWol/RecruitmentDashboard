@@ -222,6 +222,12 @@ header{z-index:1000!important}.sr-page{position:relative;z-index:1}.sr-pitch{z-i
 .sr-tactical-pdf-banner-controls>label{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:700}
 .sr-tactical-pdf-banner-controls input[type=text],.sr-tactical-pdf-banner-controls select{max-width:220px;padding:7px 9px;border:1px solid #78b4d8;border-radius:5px;background:#0c3769;color:#fff;font:inherit}
 .sr-tactical-pdf-banner-controls input[type=color]{width:38px;height:30px;padding:2px;border:1px solid #8abbd1;border-radius:5px;background:#fff;cursor:pointer}
+.sr-tactical-pdf-banner-controls .sr-tactical-pdf-banner-size{display:grid;grid-template-columns:auto minmax(100px,160px) auto;gap:8px}
+.sr-tactical-pdf-banner-size input{accent-color:#62dcff}
+.sr-tactical-pdf-banner-size output{min-width:35px;color:#fff;font-variant-numeric:tabular-nums}
+.sr-tactical-pdf-banner-format{display:flex;align-items:center;gap:5px}
+.sr-tactical-pdf-banner-format button{min-width:34px;padding:5px 9px;border:1px solid #456987;border-radius:5px;background:#20394f;color:#fff;font:inherit;cursor:pointer}
+.sr-tactical-pdf-banner-format button.active{border-color:#62dcff;background:#285372;box-shadow:inset 0 -2px #62dcff}
 .sr-tactical-tools button{padding:9px 12px;border:1px solid #78b4d8;border-radius:6px;background:#244f82;color:#fff;font:inherit;font-size:14px;font-weight:700;cursor:pointer}
 .sr-tactical-tools button:hover,.sr-tactical-tools button.selected{border-color:#62dcff;background:#0d668f}
 .sr-tactical-tools button:disabled{opacity:.45;cursor:not-allowed}
