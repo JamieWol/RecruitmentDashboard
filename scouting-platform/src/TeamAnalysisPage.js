@@ -614,7 +614,9 @@ const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9, sourceBottom: 
   const ty = fieldTop + (965 * scaleY);
   context.save();
   context.beginPath();
-  context.rect(fieldLeft, fieldTop, fieldRight - fieldLeft, fieldBottom - fieldTop);
+  // Let foreground annotations and discs extend over the goal line/goal net;
+  // only crop at the canvas edge and focused lower edge of the pitch.
+  context.rect(0, 0, width, fieldBottom);
   context.clip();
   context.setTransform(0, -sy, sx, 0, tx, ty);
   (board.shapes || []).forEach((shape) => {
@@ -642,7 +644,7 @@ const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9, sourceBottom: 
   context.restore();
   context.save();
   context.beginPath();
-  context.rect(fieldLeft, fieldTop, fieldRight - fieldLeft, fieldBottom - fieldTop);
+  context.rect(0, 0, width, fieldBottom);
   context.clip();
   (board.shapes || []).filter((shape) => shape.type === "text").forEach((shape) => {
     const center = mapPoint({ x: (Number(shape.x) || 0) + (Number(shape.width) || 0) / 2, y: (Number(shape.y) || 0) + (Number(shape.height) || 0) / 2 });
