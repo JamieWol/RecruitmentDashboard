@@ -1,4 +1,6 @@
 import { ClubBadge } from "./ClubBadge";
+import { clubBadgePathFor } from "./clubBadgePaths";
+import { supabase } from "./supabaseClient";
 import { useAuth } from "./AuthContext";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Papa from "papaparse";
@@ -501,6 +503,183 @@ const drawTacticalVideoFrame = (canvas, board, viewMode = board.pitchMode || "fu
   context.strokeStyle = "#142234"; context.lineWidth = 2; context.stroke();
   context.fillStyle = "#142234"; context.beginPath(); context.moveTo(ball.x, ball.y - 5); context.lineTo(ball.x + 4, ball.y - 2); context.lineTo(ball.x + 3, ball.y + 3); context.lineTo(ball.x - 3, ball.y + 3); context.lineTo(ball.x - 4, ball.y - 2); context.closePath(); context.fill();
   context.restore();
+};
+
+
+const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9 } = {}) => {
+  if (!canvas) return;
+  const context = canvas.getContext("2d");
+  if (!context) return;
+  const width = canvas.width;
+  const height = canvas.height;
+  const fieldLeft = 30;
+  const fieldRight = width - 30;
+  const fieldTop = 120;
+  const fieldBottom = height - 30;
+  const sourceLeft = 41;
+  const sourceWidth = 668;
+  const sourceTop = 35;
+  const sourceBottom = 690;
+  const scaleX = (fieldRight - fieldLeft) / sourceWidth;
+  const scaleY = (fieldBottom - fieldTop) / (sourceBottom - sourceTop);
+  const mapPoint = (point) => ({
+    x: fieldLeft + (1.171875 * Number(point?.y || 0) - sourceLeft) * scaleX,
+    y: fieldTop + (1000 - Number(point?.x || 0) - sourceTop) * scaleY,
+  });
+
+  context.clearRect(0, 0, width, height);
+  context.fillStyle = "#24734e";
+  context.fillRect(18, 22, width - 36, height - 44);
+  for (let y = 30; y < height - 24; y += 96) {
+    context.fillStyle = Math.floor((y - 30) / 96) % 2 === 0 ? "rgba(58,139,89,0.42)" : "rgba(17,91,60,0.18)";
+    context.fillRect(20, y, width - 40, 48);
+  }
+
+  context.strokeStyle = "#e8f4e9";
+  context.lineWidth = 5;
+  context.lineJoin = "round";
+  context.beginPath();
+  context.moveTo(fieldLeft, fieldTop);
+  context.lineTo(fieldRight, fieldTop);
+  context.lineTo(fieldRight, fieldBottom);
+  context.moveTo(fieldLeft, fieldTop);
+  context.lineTo(fieldLeft, fieldBottom);
+  context.stroke();
+  const cornerRadius = Math.min(38, (fieldRight - fieldLeft) * 0.025);
+  context.lineWidth = 4;
+  context.beginPath();
+  context.arc(fieldLeft, fieldTop, cornerRadius, 0, Math.PI / 2);
+  context.moveTo(fieldRight, fieldTop + cornerRadius);
+  context.arc(fieldRight, fieldTop, cornerRadius, Math.PI / 2, Math.PI);
+  context.stroke();
+
+  const penaltyLeft = fieldLeft + (146 - sourceLeft) * scaleX;
+  const penaltyRight = fieldLeft + (604 - sourceLeft) * scaleX;
+  const boxBottom = fieldTop + (195 - sourceTop) * scaleY;
+  const sixLeft = fieldLeft + (258 - sourceLeft) * scaleX;
+  const sixRight = fieldLeft + (492 - sourceLeft) * scaleX;
+  const sixBottom = fieldTop + (95 - sourceTop) * scaleY;
+  context.lineWidth = 5;
+  context.strokeRect(penaltyLeft, fieldTop, penaltyRight - penaltyLeft, boxBottom - fieldTop);
+  context.strokeRect(sixLeft, fieldTop, sixRight - sixLeft, sixBottom - fieldTop);
+  const spot = { x: width / 2, y: fieldTop + (145 - sourceTop) * scaleY };
+  context.fillStyle = "#e8f4e9";
+  context.beginPath();
+  context.arc(spot.x, spot.y, 5, 0, Math.PI * 2);
+  context.fill();
+  const dRadius = 108;
+  const lineOffset = boxBottom - spot.y;
+  const dHalfChord = Math.sqrt(Math.max(0, dRadius * dRadius - lineOffset * lineOffset));
+  context.beginPath();
+  context.arc(spot.x, spot.y, dRadius, Math.atan2(lineOffset, -dHalfChord), Math.atan2(lineOffset, dHalfChord), true);
+  context.stroke();
+
+  // Netted goal sits beyond the goal line, with a small runoff margin like the reference PDF.
+  const goalWidth = Math.min(230, (fieldRight - fieldLeft) * 0.14);
+  const goalLeft = width / 2 - goalWidth / 2;
+  const goalTop = 28;
+  const goalBottom = fieldTop + 1;
+  context.fillStyle = "rgba(232,244,233,0.16)";
+  context.fillRect(goalLeft, goalTop, goalWidth, goalBottom - goalTop);
+  context.strokeStyle = "#e8f4e9";
+  context.lineWidth = 5;
+  context.strokeRect(goalLeft, goalTop, goalWidth, goalBottom - goalTop);
+  context.strokeStyle = "rgba(232,244,233,0.62)";
+  context.lineWidth = 1.5;
+  context.beginPath();
+  for (let x = goalLeft + 20; x < goalLeft + goalWidth; x += 20) {
+    context.moveTo(x, goalTop);
+    context.lineTo(x, goalBottom);
+  }
+  for (let y = goalTop + 18; y < goalBottom; y += 18) {
+    context.moveTo(goalLeft, y);
+    context.lineTo(goalLeft + goalWidth, y);
+  }
+  context.stroke();
+
+  const opacityFor = (shape) => {
+    const opacity = Number(shape.opacity);
+    return Math.max(0, Math.min(1, Number.isFinite(opacity) ? opacity : shape.type === "text" ? 0.85 : 0.35)) * (shape._playbackOpacity ?? 1);
+  };
+  const sx = scaleX * 1.171875;
+  const sy = scaleY;
+  const tx = fieldLeft - sourceLeft * scaleX;
+  const ty = fieldTop + (965 * scaleY);
+  context.save();
+  context.setTransform(0, -sy, sx, 0, tx, ty);
+  (board.shapes || []).forEach((shape) => {
+    context.save();
+    context.globalAlpha = opacityFor(shape);
+    context.fillStyle = shape.type === "text" ? shape.backgroundColor || "#0c3769" : shape.color || "#62dcff";
+    context.strokeStyle = shape.borderColor || shape.color || "#62dcff";
+    context.lineWidth = Number(shape.strokeWidth) || 3;
+    const x = Number(shape.x) || 0;
+    const y = Number(shape.y) || 0;
+    const w = Number(shape.width) || 0;
+    const h = Number(shape.height) || 0;
+    if (shape.type === "text") {
+      context.fillRect(x, y, w, h);
+      context.strokeRect(x, y, w, h);
+      const fontSize = Number(shape.fontSize) || 22;
+      const lines = wrapTacticalCanvasText(context, shape.text || "", Math.max(20, w - 20)).slice(0, Math.max(1, Math.floor((h - 8) / (fontSize * 1.2))));
+      context.save();
+      context.translate(x + w / 2, y + h / 2);
+      context.rotate(Math.PI / 2);
+      context.globalAlpha = shape._playbackOpacity ?? 1;
+      context.fillStyle = shape.textColor || "#fff";
+      context.font = `${shape.italic ? "italic " : ""}${shape.bold === false ? "normal" : "bold"} ${fontSize}px Arial, sans-serif`;
+      context.textAlign = shape.textAlign === "center" ? "center" : shape.textAlign === "right" ? "right" : "left";
+      context.textBaseline = "middle";
+      lines.forEach((line, index) => context.fillText(line, shape.textAlign === "center" ? 0 : shape.textAlign === "right" ? w / 2 - 10 : -w / 2 + 10, (index - (lines.length - 1) / 2) * fontSize * 1.2, w - 20));
+      context.restore();
+    } else if (shape.type === "line") {
+      context.beginPath(); context.moveTo(x, y); context.lineTo(x + w, y + h); context.stroke();
+    } else if (shape.type === "circle") {
+      context.beginPath(); context.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); context.fill(); context.stroke();
+    } else if (shape.type === "triangle") {
+      context.beginPath(); context.moveTo(x + w / 2, y); context.lineTo(x + w, y + h); context.lineTo(x, y + h); context.closePath(); context.fill(); context.stroke();
+    } else {
+      context.fillRect(x, y, w, h); context.strokeRect(x, y, w, h);
+    }
+    context.restore();
+  });
+  context.restore();
+  (board.arrows || []).forEach((arrow) => {
+    const from = mapPoint(arrow.from || { x: 0, y: 0 });
+    const to = mapPoint(arrow.to || arrow.from || { x: 0, y: 0 });
+    const angle = Math.atan2(to.y - from.y, to.x - from.x);
+    const color = arrow.color || "#ffe36e";
+    const headSize = (Number(arrow.headSize) || 20) * 1.5;
+    context.save();
+    context.globalAlpha = arrow.opacity ?? 1;
+    context.strokeStyle = color; context.fillStyle = color;
+    context.lineWidth = (Number(arrow.strokeWidth) || 6) * 1.5;
+    context.lineCap = "round";
+    context.setLineDash(arrow.lineStyle === "dashed" ? [16, 11] : arrow.lineStyle === "dotted" ? [2, 9] : []);
+    context.beginPath(); context.moveTo(from.x, from.y); context.lineTo(to.x, to.y); context.stroke();
+    if (arrow.headStyle !== "none") {
+      context.beginPath(); context.moveTo(to.x, to.y);
+      context.lineTo(to.x - headSize * Math.cos(angle - Math.PI / 6), to.y - headSize * Math.sin(angle - Math.PI / 6));
+      context.lineTo(to.x - headSize * Math.cos(angle + Math.PI / 6), to.y - headSize * Math.sin(angle + Math.PI / 6));
+      if (arrow.headStyle === "open") context.stroke(); else { context.closePath(); context.fill(); }
+    }
+    context.restore();
+  });
+
+  (board.players || []).forEach((player) => {
+    const point = mapPoint(player);
+    const radius = 21 * playerScale;
+    context.beginPath(); context.arc(point.x, point.y + 3, radius + 3, 0, Math.PI * 2); context.fillStyle = "rgba(5,34,63,0.42)"; context.fill();
+    context.beginPath(); context.arc(point.x, point.y, radius, 0, Math.PI * 2); context.fillStyle = player.color || (player.side === "home" ? "#1485dd" : "#e64b50"); context.fill();
+    context.strokeStyle = player.moving ? "#ffe36e" : "#f3f8ff"; context.lineWidth = player.moving ? 4 : 3; context.stroke();
+    context.fillStyle = "#fff"; context.font = "bold 17px Arial, sans-serif"; context.textAlign = "center"; context.textBaseline = "middle";
+    context.fillText(String(player.number), point.x, point.y + 1);
+  });
+  const ball = mapPoint(board.ball || { x: 500, y: 320 });
+  context.beginPath(); context.arc(ball.x, ball.y + 2, 10, 0, Math.PI * 2); context.fillStyle = "rgba(5,34,63,0.42)"; context.fill();
+  context.beginPath(); context.arc(ball.x, ball.y, 9, 0, Math.PI * 2); context.fillStyle = "#f7f8f3"; context.fill();
+  context.strokeStyle = "#142234"; context.lineWidth = 2; context.stroke();
+  context.fillStyle = "#142234"; context.beginPath(); context.moveTo(ball.x, ball.y - 4); context.lineTo(ball.x + 3, ball.y - 2); context.lineTo(ball.x + 2, ball.y + 2); context.lineTo(ball.x - 2, ball.y + 2); context.lineTo(ball.x - 3, ball.y - 2); context.closePath(); context.fill();
 };
 
 function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
@@ -1496,7 +1675,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     setStillSlides((current) => current.map((slide) => slide.id === slideId ? { ...slide, board: snapshot } : slide));
     setVideoStatus("Still slide updated from the current pitch.");
   };
-  const downloadClipStillsPdf = () => {
+  const downloadClipStillsPdf = async () => {
     if (finishingVideo || activeClipStart) return;
     const exportPitchMode = pitchMode;
     const isSetPiecePdf = exportPitchMode === "box";
@@ -1505,8 +1684,8 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       setVideoStatus("Could not prepare the pitch images for the PDF.");
       return;
     }
-    canvas.width = exportPitchMode === "full" || isSetPiecePdf ? 1280 : 960;
-    canvas.height = exportPitchMode === "full" ? 819 : exportPitchMode === "half" ? 832 : 760;
+    canvas.width = isSetPiecePdf ? 1814 : exportPitchMode === "full" ? 1280 : 960;
+    canvas.height = isSetPiecePdf ? 1080 : exportPitchMode === "full" ? 819 : 832;
     const frames = stillSlides.length
       ? stillSlides.map((slide, index) => ({ label: slide.title || `Slide ${index + 1}`, board: { ...slide.board, pitchMode: exportPitchMode } }))
       : [{ label: "Current tactic", board: { ...boardRef.current, pitchMode: exportPitchMode } }];
@@ -1526,11 +1705,70 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       const value = /^#[\da-f]{6}$/i.test(colour || "") ? colour : fallback;
       return [1, 3, 5].map((index) => parseInt(value.slice(index, index + 2), 16));
     };
-    frames.forEach((frame, index) => {
-      if (index > 0) pdf.addPage("a4", orientation);
+    const loadBadgeData = async (team) => {
+      const path = clubBadgePathFor(team);
+      if (!path) return null;
+      try {
+        const url = supabase.storage.from("Club Badges").getPublicUrl(path).data?.publicUrl;
+        if (!url) return null;
+        const response = await fetch(url);
+        if (!response.ok) return null;
+        const blob = await response.blob();
+        return await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(blob);
+        });
+      } catch { return null; }
+    };
+    const homeTeam = boardRef.current.homeName || homeTeamName || "Home Team";
+    const awayTeam = boardRef.current.awayName || oppositionName || "Opposition";
+    if (isSetPiecePdf) {
+      const [homeBadge, awayBadge] = await Promise.all([loadBadgeData(homeTeam), loadBadgeData(awayTeam)]);
       pdf.setFillColor(...toRgb(pdfBanner.pageBackground, "#eaf2f8"));
       pdf.rect(0, 0, pageWidth, pageHeight, "F");
-      drawTacticalVideoFrame(canvas, frame.board, exportPitchMode, { playerScale: 0.9, boxPdfStyle: isSetPiecePdf });
+      const coverBannerX = pageSideMargin;
+      const coverBannerY = 8;
+      const coverBannerWidth = imageMaxWidth;
+      const coverBannerHeight = 24;
+      pdf.setFillColor(...toRgb(pdfBanner.fill, "#0f2d4e"));
+      pdf.setDrawColor(...toRgb(pdfBanner.border, "#62dcff"));
+      pdf.setLineWidth(0.8);
+      if (pdfBanner.style === "square") pdf.rect(coverBannerX, coverBannerY, coverBannerWidth, coverBannerHeight, "FD");
+      else pdf.roundedRect(coverBannerX, coverBannerY, coverBannerWidth, coverBannerHeight, 2, 2, "FD");
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(22);
+      pdf.setTextColor(...toRgb(pdfBanner.text, "#ffffff"));
+      pdf.text((pdfBanner.title.trim() || "SET PLAYS").toUpperCase(), pageWidth / 2, coverBannerY + 16, { align: "center", maxWidth: coverBannerWidth - 12 });
+      if (homeBadge) pdf.addImage(homeBadge, "PNG", pageWidth / 2 - 26, 42, 52, 52);
+      pdf.setFontSize(21);
+      pdf.setTextColor(20, 39, 58);
+      pdf.text(homeTeam, pageWidth / 2, 106, { align: "center", maxWidth: pageWidth - 30 });
+      pdf.setDrawColor(...toRgb(pdfBanner.border, "#62dcff"));
+      pdf.setLineWidth(0.6);
+      pdf.line(pageWidth * 0.28, 118, pageWidth * 0.72, 118);
+      pdf.setFontSize(17);
+      pdf.setTextColor(70, 91, 112);
+      pdf.text("VS", pageWidth / 2, 133, { align: "center" });
+      pdf.setFontSize(17);
+      pdf.setTextColor(20, 39, 58);
+      const opponentWidth = pdf.getTextWidth(awayTeam);
+      const opponentRowCenter = pageWidth / 2;
+      const opponentTextX = opponentRowCenter - (opponentWidth + (awayBadge ? 20 : 0)) / 2;
+      pdf.text(awayTeam, opponentTextX, 154, { align: "left", maxWidth: pageWidth - 40 });
+      if (awayBadge) pdf.addImage(awayBadge, "PNG", opponentTextX + opponentWidth + 5, 143, 14, 14);
+      const tacticCoverTitle = boardRef.current.name || "Set-piece tactic";
+      pdf.setFontSize(11);
+      pdf.setTextColor(90, 108, 124);
+      pdf.text(tacticCoverTitle, pageWidth / 2, 181, { align: "center", maxWidth: pageWidth - 30 });
+    }
+    frames.forEach((frame, index) => {
+      if (isSetPiecePdf || index > 0) pdf.addPage("a4", orientation);
+      pdf.setFillColor(...toRgb(pdfBanner.pageBackground, "#eaf2f8"));
+      pdf.rect(0, 0, pageWidth, pageHeight, "F");
+      if (isSetPiecePdf) drawSetPiecePdfFrame(canvas, frame.board, { playerScale: 0.9 });
+      else drawTacticalVideoFrame(canvas, frame.board, exportPitchMode, { playerScale: 0.9 });
       const bannerX = pageSideMargin;
       const bannerY = isSetPiecePdf ? 8 : 20;
       const bannerWidth = imageMaxWidth;
@@ -1550,8 +1788,8 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       else pdf.roundedRect(bannerX, bannerY, bannerWidth, bannerHeight, 2, 2, "FD");
       pdf.setFont("helvetica", "bold");
       const tacticTitle = pdfBanner.title.trim() || boardRef.current.name || "Tactic";
-      const titleBaseSize = isSetPiecePdf ? 20 : 16;
-      pdf.setFontSize(Math.max(isSetPiecePdf ? 14 : 11, Math.min(titleBaseSize, titleBaseSize - Math.max(0, tacticTitle.length - 28) * 0.18)));
+      const titleBaseSize = 16;
+      pdf.setFontSize(Math.max(11, Math.min(titleBaseSize, titleBaseSize - Math.max(0, tacticTitle.length - 28) * 0.18)));
       pdf.setTextColor(...toRgb(pdfBanner.text, "#ffffff"));
       pdf.text(tacticTitle, pageWidth / 2, bannerY + bannerHeight * 0.67, { align: "center", maxWidth: bannerWidth - 12 });
       const image = canvas.toDataURL("image/png");
