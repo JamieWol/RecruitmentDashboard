@@ -506,7 +506,7 @@ const drawTacticalVideoFrame = (canvas, board, viewMode = board.pitchMode || "fu
 };
 
 
-const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9 } = {}) => {
+const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9, sourceBottom: requestedSourceBottom } = {}) => {
   if (!canvas) return;
   const context = canvas.getContext("2d");
   if (!context) return;
@@ -521,9 +521,9 @@ const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9 } = {}) => {
   const sourceLeft = 41;
   const sourceWidth = 668;
   const sourceTop = 35;
-  // Map the complete pitch length into the shorter PDF field so discs remain
-  // inside the lines instead of spilling into the runoff area.
-  const sourceBottom = 965;
+  // Set-piece PDFs focus on the attacking box and crop the lower pitch just
+  // above the blue #2 marker, matching the tighter framing of the reference.
+  const sourceBottom = Math.max(sourceTop + 260, Math.min(965, Number(requestedSourceBottom) || 965));
   const scaleX = (fieldRight - fieldLeft) / sourceWidth;
   const scaleY = (fieldBottom - fieldTop) / (sourceBottom - sourceTop);
   const mapPoint = (point) => ({
@@ -557,11 +557,11 @@ const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9 } = {}) => {
   context.arc(fieldRight, fieldTop, cornerRadius, Math.PI / 2, Math.PI);
   context.stroke();
 
-  const penaltyLeft = fieldLeft + (245 - sourceLeft) * scaleX;
-  const penaltyRight = fieldLeft + (505 - sourceLeft) * scaleX;
+  const penaltyLeft = fieldLeft + (235 - sourceLeft) * scaleX;
+  const penaltyRight = fieldLeft + (515 - sourceLeft) * scaleX;
   const boxBottom = fieldTop + (228 - sourceTop) * scaleY;
-  const sixLeft = fieldLeft + (306 - sourceLeft) * scaleX;
-  const sixRight = fieldLeft + (444 - sourceLeft) * scaleX;
+  const sixLeft = fieldLeft + (300 - sourceLeft) * scaleX;
+  const sixRight = fieldLeft + (450 - sourceLeft) * scaleX;
   const sixBottom = fieldTop + (112 - sourceTop) * scaleY;
   context.lineWidth = 5;
   context.strokeRect(penaltyLeft, fieldTop, penaltyRight - penaltyLeft, boxBottom - fieldTop);
@@ -571,7 +571,7 @@ const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9 } = {}) => {
   context.beginPath();
   context.arc(spot.x, spot.y, 5, 0, Math.PI * 2);
   context.fill();
-  const dRadius = 126;
+  const dRadius = 110 * scaleY;
   const lineOffset = boxBottom - spot.y;
   const dHalfChord = Math.sqrt(Math.max(0, dRadius * dRadius - lineOffset * lineOffset));
   context.beginPath();
@@ -607,13 +607,15 @@ const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9 } = {}) => {
   };
   const sx = scaleX * 1.171875;
   const sy = scaleY;
-  // Text boxes should stay visually consistent with the editor. The pitch is
-  // deliberately stretched to fill a landscape PDF page, so applying sx/sy
-  // independently to text-box dimensions makes them look unnaturally wide.
-  const textScale = Math.min(sx, sy);
+  // Text boxes use a balanced scale across the full-width pitch and the
+  // focused vertical crop so they remain legible in the exported stills.
+  const textScale = Math.sqrt(sx * sy) * 1.08;
   const tx = fieldLeft - sourceLeft * scaleX;
   const ty = fieldTop + (965 * scaleY);
   context.save();
+  context.beginPath();
+  context.rect(fieldLeft, fieldTop, fieldRight - fieldLeft, fieldBottom - fieldTop);
+  context.clip();
   context.setTransform(0, -sy, sx, 0, tx, ty);
   (board.shapes || []).forEach((shape) => {
     if (shape.type === "text") return;
@@ -638,6 +640,10 @@ const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9 } = {}) => {
     context.restore();
   });
   context.restore();
+  context.save();
+  context.beginPath();
+  context.rect(fieldLeft, fieldTop, fieldRight - fieldLeft, fieldBottom - fieldTop);
+  context.clip();
   (board.shapes || []).filter((shape) => shape.type === "text").forEach((shape) => {
     const center = mapPoint({ x: (Number(shape.x) || 0) + (Number(shape.width) || 0) / 2, y: (Number(shape.y) || 0) + (Number(shape.height) || 0) / 2 });
     const boxWidth = Math.max(24, (Number(shape.width) || 0) * textScale);
@@ -724,6 +730,7 @@ const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9 } = {}) => {
   context.beginPath(); context.arc(ball.x, ball.y, 9, 0, Math.PI * 2); context.fillStyle = "#f7f8f3"; context.fill();
   context.strokeStyle = "#142234"; context.lineWidth = 2; context.stroke();
   context.fillStyle = "#142234"; context.beginPath(); context.moveTo(ball.x, ball.y - 4); context.lineTo(ball.x + 3, ball.y - 2); context.lineTo(ball.x + 2, ball.y + 2); context.lineTo(ball.x - 2, ball.y + 2); context.lineTo(ball.x - 3, ball.y - 2); context.closePath(); context.fill();
+  context.restore();
 };
 
 function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
@@ -1777,6 +1784,12 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       frames.push({ label: `Clip ${index + 1} · Finish`, board: { ...clip.to, pitchMode: exportPitchMode } });
     });
     const orientation = exportPitchMode === "half" ? "portrait" : "landscape";
+    const homeTwoCandidates = frames[0]?.board?.players?.filter((player) => player.side === "home" && Number(player.number) === 2) || [];
+    const lowestHomeTwo = homeTwoCandidates.reduce((lowest, player) =>
+      !lowest || Number(player.x) < Number(lowest.x) ? player : lowest, null);
+    const setPieceSourceBottom = lowestHomeTwo
+      ? Math.max(295, Math.min(965, 1000 - Number(lowestHomeTwo.x || 0) - 18))
+      : 965;
     const pdf = new jsPDF(orientation, "mm", "a4");
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
@@ -1824,7 +1837,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       if (isSetPiecePdf || index > 0) pdf.addPage("a4", orientation);
       pdf.setFillColor(...toRgb(pdfBanner.pageBackground, "#eaf2f8"));
       pdf.rect(0, 0, pageWidth, pageHeight, "F");
-      if (isSetPiecePdf) drawSetPiecePdfFrame(canvas, frame.board, { playerScale: 0.9 });
+      if (isSetPiecePdf) drawSetPiecePdfFrame(canvas, frame.board, { playerScale: 0.9, sourceBottom: setPieceSourceBottom });
       else drawTacticalVideoFrame(canvas, frame.board, exportPitchMode, { playerScale: 0.9 });
       const bannerX = pageSideMargin;
       const bannerY = isSetPiecePdf ? 4 : 20;
