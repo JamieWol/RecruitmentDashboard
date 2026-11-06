@@ -553,11 +553,11 @@ const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9 } = {}) => {
   context.arc(fieldRight, fieldTop, cornerRadius, Math.PI / 2, Math.PI);
   context.stroke();
 
-  const penaltyLeft = fieldLeft + (146 - sourceLeft) * scaleX;
-  const penaltyRight = fieldLeft + (604 - sourceLeft) * scaleX;
+  const penaltyLeft = fieldLeft + (266 - sourceLeft) * scaleX;
+  const penaltyRight = fieldLeft + (484 - sourceLeft) * scaleX;
   const boxBottom = fieldTop + (195 - sourceTop) * scaleY;
-  const sixLeft = fieldLeft + (258 - sourceLeft) * scaleX;
-  const sixRight = fieldLeft + (492 - sourceLeft) * scaleX;
+  const sixLeft = fieldLeft + (320 - sourceLeft) * scaleX;
+  const sixRight = fieldLeft + (430 - sourceLeft) * scaleX;
   const sixBottom = fieldTop + (95 - sourceTop) * scaleY;
   context.lineWidth = 5;
   context.strokeRect(penaltyLeft, fieldTop, penaltyRight - penaltyLeft, boxBottom - fieldTop);
@@ -567,7 +567,7 @@ const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9 } = {}) => {
   context.beginPath();
   context.arc(spot.x, spot.y, 5, 0, Math.PI * 2);
   context.fill();
-  const dRadius = 108;
+  const dRadius = 126;
   const lineOffset = boxBottom - spot.y;
   const dHalfChord = Math.sqrt(Math.max(0, dRadius * dRadius - lineOffset * lineOffset));
   context.beginPath();
@@ -603,36 +603,26 @@ const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9 } = {}) => {
   };
   const sx = scaleX * 1.171875;
   const sy = scaleY;
+  // Text boxes should stay visually consistent with the editor. The pitch is
+  // deliberately stretched to fill a landscape PDF page, so applying sx/sy
+  // independently to text-box dimensions makes them look unnaturally wide.
+  const textScale = Math.min(sx, sy);
   const tx = fieldLeft - sourceLeft * scaleX;
   const ty = fieldTop + (965 * scaleY);
   context.save();
   context.setTransform(0, -sy, sx, 0, tx, ty);
   (board.shapes || []).forEach((shape) => {
+    if (shape.type === "text") return;
     context.save();
     context.globalAlpha = opacityFor(shape);
-    context.fillStyle = shape.type === "text" ? shape.backgroundColor || "#0c3769" : shape.color || "#62dcff";
+    context.fillStyle = shape.color || "#62dcff";
     context.strokeStyle = shape.borderColor || shape.color || "#62dcff";
     context.lineWidth = Number(shape.strokeWidth) || 3;
     const x = Number(shape.x) || 0;
     const y = Number(shape.y) || 0;
     const w = Number(shape.width) || 0;
     const h = Number(shape.height) || 0;
-    if (shape.type === "text") {
-      context.fillRect(x, y, w, h);
-      context.strokeRect(x, y, w, h);
-      const fontSize = Number(shape.fontSize) || 22;
-      const lines = wrapTacticalCanvasText(context, shape.text || "", Math.max(20, w - 20)).slice(0, Math.max(1, Math.floor((h - 8) / (fontSize * 1.2))));
-      context.save();
-      context.translate(x + w / 2, y + h / 2);
-      context.rotate(Math.PI / 2);
-      context.globalAlpha = shape._playbackOpacity ?? 1;
-      context.fillStyle = shape.textColor || "#fff";
-      context.font = `${shape.italic ? "italic " : ""}${shape.bold === false ? "normal" : "bold"} ${fontSize}px Arial, sans-serif`;
-      context.textAlign = shape.textAlign === "center" ? "center" : shape.textAlign === "right" ? "right" : "left";
-      context.textBaseline = "middle";
-      lines.forEach((line, index) => context.fillText(line, shape.textAlign === "center" ? 0 : shape.textAlign === "right" ? w / 2 - 10 : -w / 2 + 10, (index - (lines.length - 1) / 2) * fontSize * 1.2, w - 20));
-      context.restore();
-    } else if (shape.type === "line") {
+    if (shape.type === "line") {
       context.beginPath(); context.moveTo(x, y); context.lineTo(x + w, y + h); context.stroke();
     } else if (shape.type === "circle") {
       context.beginPath(); context.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); context.fill(); context.stroke();
@@ -644,6 +634,54 @@ const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9 } = {}) => {
     context.restore();
   });
   context.restore();
+  (board.shapes || []).filter((shape) => shape.type === "text").forEach((shape) => {
+    const center = mapPoint({ x: (Number(shape.x) || 0) + (Number(shape.width) || 0) / 2, y: (Number(shape.y) || 0) + (Number(shape.height) || 0) / 2 });
+    const boxWidth = Math.max(24, (Number(shape.width) || 0) * textScale);
+    const boxHeight = Math.max(24, (Number(shape.height) || 0) * textScale);
+    const left = center.x - boxWidth / 2;
+    const top = center.y - boxHeight / 2;
+    context.save();
+    context.globalAlpha = opacityFor(shape);
+    context.fillStyle = shape.backgroundColor || "#0c3769";
+    context.strokeStyle = shape.borderColor || shape.color || "#62dcff";
+    context.lineWidth = Math.max(1.5, (Number(shape.strokeWidth) || 3) * 1.4);
+    context.fillRect(left, top, boxWidth, boxHeight);
+    context.strokeRect(left, top, boxWidth, boxHeight);
+
+    let fontSize = Math.max(10, (Number(shape.fontSize) || 22) * textScale);
+    const padding = Math.max(6, fontSize * 0.35);
+    const availableHeight = Math.max(16, boxHeight - padding * 2);
+    let lines = [];
+    for (let pass = 0; pass < 3; pass += 1) {
+      context.font = `${shape.italic ? "italic " : ""}${shape.bold === false ? "normal" : "bold"} ${fontSize}px Arial, sans-serif`;
+      lines = wrapTacticalCanvasText(context, shape.text || "", Math.max(20, boxWidth - padding * 2));
+      const neededHeight = lines.length * fontSize * 1.2;
+      if (neededHeight <= availableHeight) break;
+      fontSize = Math.max(9, fontSize * (availableHeight / neededHeight));
+    }
+    const lineHeight = fontSize * 1.2;
+    context.font = `${shape.italic ? "italic " : ""}${shape.bold === false ? "normal" : "bold"} ${fontSize}px Arial, sans-serif`;
+    context.globalAlpha = (shape._playbackOpacity ?? 1);
+    context.fillStyle = shape.textColor || "#ffffff";
+    context.textAlign = ["left", "center", "right"].includes(shape.textAlign) ? shape.textAlign : "left";
+    context.textBaseline = "middle";
+    lines.forEach((line, index) => {
+      const y = center.y + (index - (lines.length - 1) / 2) * lineHeight;
+      const x = context.textAlign === "center" ? center.x : context.textAlign === "right" ? left + boxWidth - padding : left + padding;
+      context.fillText(line, x, y, Math.max(20, boxWidth - padding * 2));
+      if (shape.underline) {
+        const measuredWidth = Math.min(boxWidth - padding * 2, context.measureText(line).width);
+        const lineLeft = context.textAlign === "center" ? x - measuredWidth / 2 : context.textAlign === "right" ? x - measuredWidth : x;
+        context.beginPath();
+        context.moveTo(lineLeft, y + fontSize * 0.38);
+        context.lineTo(lineLeft + measuredWidth, y + fontSize * 0.38);
+        context.strokeStyle = shape.textColor || "#ffffff";
+        context.lineWidth = Math.max(1, fontSize / 16);
+        context.stroke();
+      }
+    });
+    context.restore();
+  });
   (board.arrows || []).forEach((arrow) => {
     const from = mapPoint(arrow.from || { x: 0, y: 0 });
     const to = mapPoint(arrow.to || arrow.from || { x: 0, y: 0 });
@@ -760,6 +798,13 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       return { title: "", fill: "#0f2d4e", text: "#ffffff", border: "#62dcff", pageBackground: "#eaf2f8", style: "rounded", ...saved };
     } catch { return { title: "", fill: "#0f2d4e", text: "#ffffff", border: "#62dcff", pageBackground: "#eaf2f8", style: "rounded" }; }
   });
+  const pdfCoverStorageKey = `${storageKey}:pdf-cover`;
+  const [pdfCover, setPdfCover] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(pdfCoverStorageKey) || "{}");
+      return { title: "SET PLAYS", background: "#0f2d4e", text: "#ffffff", accent: "#62dcff", ...saved };
+    } catch { return { title: "SET PLAYS", background: "#0f2d4e", text: "#ffffff", accent: "#62dcff" }; }
+  });
   const pitchRef = useRef(null);
   const textEditorRef = useRef(null);
   const inlineTextRef = useRef(null);
@@ -845,6 +890,9 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   useEffect(() => {
     try { localStorage.setItem(pdfBannerStorageKey, JSON.stringify(pdfBanner)); } catch {}
   }, [pdfBanner, pdfBannerStorageKey]);
+  useEffect(() => {
+    try { localStorage.setItem(pdfCoverStorageKey, JSON.stringify(pdfCover)); } catch {}
+  }, [pdfCover, pdfCoverStorageKey]);
   useEffect(() => () => {
     if (videoFrameRef.current) window.cancelAnimationFrame(videoFrameRef.current);
     if (clipPreviewFrameRef.current) window.cancelAnimationFrame(clipPreviewFrameRef.current);
@@ -1726,42 +1774,35 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     const awayTeam = boardRef.current.awayName || oppositionName || "Opposition";
     if (isSetPiecePdf) {
       const [homeBadge, awayBadge] = await Promise.all([loadBadgeData(homeTeam), loadBadgeData(awayTeam)]);
-      pdf.setFillColor(...toRgb(pdfBanner.pageBackground, "#eaf2f8"));
+      pdf.setFillColor(...toRgb(pdfCover.background, "#0f2d4e"));
       pdf.rect(0, 0, pageWidth, pageHeight, "F");
-      const coverBannerX = pageSideMargin;
-      const coverBannerY = 8;
-      const coverBannerWidth = imageMaxWidth;
-      const coverBannerHeight = 24;
-      pdf.setFillColor(...toRgb(pdfBanner.fill, "#0f2d4e"));
-      pdf.setDrawColor(...toRgb(pdfBanner.border, "#62dcff"));
-      pdf.setLineWidth(0.8);
-      if (pdfBanner.style === "square") pdf.rect(coverBannerX, coverBannerY, coverBannerWidth, coverBannerHeight, "FD");
-      else pdf.roundedRect(coverBannerX, coverBannerY, coverBannerWidth, coverBannerHeight, 2, 2, "FD");
       pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(27);
+      pdf.setTextColor(...toRgb(pdfCover.text, "#ffffff"));
+      pdf.text((pdfCover.title.trim() || "SET PLAYS").toUpperCase(), pageWidth / 2, 32, { align: "center", maxWidth: pageWidth - 24 });
+      pdf.setDrawColor(...toRgb(pdfCover.accent, "#62dcff"));
+      pdf.setLineWidth(1.1);
+      pdf.line(pageWidth * 0.32, 40, pageWidth * 0.68, 40);
+      if (homeBadge) pdf.addImage(homeBadge, "PNG", pageWidth / 2 - 27, 50, 54, 54);
       pdf.setFontSize(22);
-      pdf.setTextColor(...toRgb(pdfBanner.text, "#ffffff"));
-      pdf.text((pdfBanner.title.trim() || "SET PLAYS").toUpperCase(), pageWidth / 2, coverBannerY + 16, { align: "center", maxWidth: coverBannerWidth - 12 });
-      if (homeBadge) pdf.addImage(homeBadge, "PNG", pageWidth / 2 - 26, 42, 52, 52);
-      pdf.setFontSize(21);
-      pdf.setTextColor(20, 39, 58);
-      pdf.text(homeTeam, pageWidth / 2, 106, { align: "center", maxWidth: pageWidth - 30 });
-      pdf.setDrawColor(...toRgb(pdfBanner.border, "#62dcff"));
+      pdf.setTextColor(...toRgb(pdfCover.text, "#ffffff"));
+      pdf.text(homeTeam, pageWidth / 2, 116, { align: "center", maxWidth: pageWidth - 30 });
+      pdf.setDrawColor(...toRgb(pdfCover.accent, "#62dcff"));
       pdf.setLineWidth(0.6);
-      pdf.line(pageWidth * 0.28, 118, pageWidth * 0.72, 118);
-      pdf.setFontSize(17);
-      pdf.setTextColor(70, 91, 112);
-      pdf.text("VS", pageWidth / 2, 133, { align: "center" });
-      pdf.setFontSize(17);
-      pdf.setTextColor(20, 39, 58);
+      pdf.line(pageWidth * 0.36, 128, pageWidth * 0.64, 128);
+      pdf.setFontSize(18);
+      pdf.setTextColor(...toRgb(pdfCover.accent, "#62dcff"));
+      pdf.text("VS", pageWidth / 2, 145, { align: "center" });
+      pdf.setFontSize(18);
+      pdf.setTextColor(...toRgb(pdfCover.text, "#ffffff"));
       const opponentWidth = pdf.getTextWidth(awayTeam);
-      const opponentRowCenter = pageWidth / 2;
-      const opponentTextX = opponentRowCenter - (opponentWidth + (awayBadge ? 20 : 0)) / 2;
-      pdf.text(awayTeam, opponentTextX, 154, { align: "left", maxWidth: pageWidth - 40 });
-      if (awayBadge) pdf.addImage(awayBadge, "PNG", opponentTextX + opponentWidth + 5, 143, 14, 14);
+      const opponentTextX = pageWidth / 2 - (opponentWidth + (awayBadge ? 20 : 0)) / 2;
+      pdf.text(awayTeam, opponentTextX, 166, { align: "left", maxWidth: pageWidth - 40 });
+      if (awayBadge) pdf.addImage(awayBadge, "PNG", opponentTextX + opponentWidth + 5, 155, 14, 14);
       const tacticCoverTitle = boardRef.current.name || "Set-piece tactic";
-      pdf.setFontSize(11);
-      pdf.setTextColor(90, 108, 124);
-      pdf.text(tacticCoverTitle, pageWidth / 2, 181, { align: "center", maxWidth: pageWidth - 30 });
+      pdf.setFontSize(12);
+      pdf.setTextColor(...toRgb(pdfCover.accent, "#62dcff"));
+      pdf.text(tacticCoverTitle, pageWidth / 2, 192, { align: "center", maxWidth: pageWidth - 30 });
     }
     frames.forEach((frame, index) => {
       if (isSetPiecePdf || index > 0) pdf.addPage("a4", orientation);
@@ -1928,8 +1969,15 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
             <button type="button" onClick={downloadClipStillsPdf} disabled={finishingVideo || Boolean(activeClipStart)}>Download stills PDF</button>
             <small>Start a clip, move the discs or ball, then save it. Repeat to build a sequence.</small>
           </div>
+          {pitchMode === "box" && <div className="sr-tactical-pdf-banner-controls" aria-label="PDF title page settings">
+            <strong>PDF title page</strong>
+            <label><span>Title</span><input aria-label="PDF title page title" type="text" value={pdfCover.title} onChange={(event) => setPdfCover((current) => ({ ...current, title: event.target.value }))} /></label>
+            <label><span>Background</span><input aria-label="PDF title page background colour" type="color" value={pdfCover.background} onChange={(event) => setPdfCover((current) => ({ ...current, background: event.target.value }))} /></label>
+            <label><span>Text</span><input aria-label="PDF title page text colour" type="color" value={pdfCover.text} onChange={(event) => setPdfCover((current) => ({ ...current, text: event.target.value }))} /></label>
+            <label><span>Accent</span><input aria-label="PDF title page accent colour" type="color" value={pdfCover.accent} onChange={(event) => setPdfCover((current) => ({ ...current, accent: event.target.value }))} /></label>
+          </div>}
           <div className="sr-tactical-pdf-banner-controls" aria-label="PDF banner settings">
-            <strong>PDF banner</strong>
+            <strong>PDF tactic banner</strong>
             <label><span>Banner title</span><input aria-label="PDF banner title" type="text" value={pdfBanner.title} placeholder={board.name || "Use tactic name"} onChange={(event) => setPdfBanner((current) => ({ ...current, title: event.target.value }))} /></label>
             <label><span>Background</span><input aria-label="PDF banner background colour" type="color" value={pdfBanner.fill} onChange={(event) => setPdfBanner((current) => ({ ...current, fill: event.target.value }))} /></label>
             <label><span>Text</span><input aria-label="PDF banner text colour" type="color" value={pdfBanner.text} onChange={(event) => setPdfBanner((current) => ({ ...current, text: event.target.value }))} /></label>
