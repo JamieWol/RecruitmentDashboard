@@ -515,11 +515,15 @@ const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9 } = {}) => {
   const fieldLeft = 30;
   const fieldRight = width - 30;
   const fieldTop = 120;
-  const fieldBottom = height - 30;
+  // The set-piece pages were feeling too tall; keep a little more runoff at
+  // the bottom while preserving the full-width landscape presentation.
+  const fieldBottom = height - 130;
   const sourceLeft = 41;
   const sourceWidth = 668;
   const sourceTop = 35;
-  const sourceBottom = 690;
+  // Map the complete pitch length into the shorter PDF field so discs remain
+  // inside the lines instead of spilling into the runoff area.
+  const sourceBottom = 965;
   const scaleX = (fieldRight - fieldLeft) / sourceWidth;
   const scaleY = (fieldBottom - fieldTop) / (sourceBottom - sourceTop);
   const mapPoint = (point) => ({
@@ -553,12 +557,12 @@ const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9 } = {}) => {
   context.arc(fieldRight, fieldTop, cornerRadius, Math.PI / 2, Math.PI);
   context.stroke();
 
-  const penaltyLeft = fieldLeft + (259 - sourceLeft) * scaleX;
-  const penaltyRight = fieldLeft + (491 - sourceLeft) * scaleX;
-  const boxBottom = fieldTop + (209 - sourceTop) * scaleY;
-  const sixLeft = fieldLeft + (316 - sourceLeft) * scaleX;
-  const sixRight = fieldLeft + (434 - sourceLeft) * scaleX;
-  const sixBottom = fieldTop + (103 - sourceTop) * scaleY;
+  const penaltyLeft = fieldLeft + (245 - sourceLeft) * scaleX;
+  const penaltyRight = fieldLeft + (505 - sourceLeft) * scaleX;
+  const boxBottom = fieldTop + (228 - sourceTop) * scaleY;
+  const sixLeft = fieldLeft + (306 - sourceLeft) * scaleX;
+  const sixRight = fieldLeft + (444 - sourceLeft) * scaleX;
+  const sixBottom = fieldTop + (112 - sourceTop) * scaleY;
   context.lineWidth = 5;
   context.strokeRect(penaltyLeft, fieldTop, penaltyRight - penaltyLeft, boxBottom - fieldTop);
   context.strokeRect(sixLeft, fieldTop, sixRight - sixLeft, sixBottom - fieldTop);
@@ -807,6 +811,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       return { title: "SET PLAYS", background: "#0f2d4e", text: "#ffffff", accent: "#62dcff", ...saved };
     } catch { return { title: "SET PLAYS", background: "#0f2d4e", text: "#ffffff", accent: "#62dcff" }; }
   });
+  const pdfBadgeDataRef = useRef(null);
   const pitchRef = useRef(null);
   const textEditorRef = useRef(null);
   const inlineTextRef = useRef(null);
@@ -837,6 +842,33 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
   const finishGraphicEntering = (id) => setEnteringGraphicIds((current) => current.filter((item) => item !== id));
 
   useEffect(() => { boardRef.current = board; }, [board]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const homeTeam = board.homeName || homeTeamName || "Home Team";
+    const awayTeam = board.awayName || oppositionName || "Opposition";
+    const loadBadgeData = async (team) => {
+      const path = clubBadgePathFor(team);
+      if (!path) return null;
+      try {
+        const url = supabase.storage.from("Club Badges").getPublicUrl(path).data?.publicUrl;
+        if (!url) return null;
+        const response = await fetch(url);
+        if (!response.ok) return null;
+        const blob = await response.blob();
+        return await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(blob);
+        });
+      } catch { return null; }
+    };
+    Promise.all([loadBadgeData(homeTeam), loadBadgeData(awayTeam)]).then(([homeBadge, awayBadge]) => {
+      if (!cancelled) pdfBadgeDataRef.current = { homeTeam, awayTeam, homeBadge, awayBadge };
+    });
+    return () => { cancelled = true; };
+  }, [board.homeName, board.awayName, homeTeamName, oppositionName]);
 
   useEffect(() => {
     if (pitchMode !== "box") return;
@@ -1726,7 +1758,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     setStillSlides((current) => current.map((slide) => slide.id === slideId ? { ...slide, board: snapshot } : slide));
     setVideoStatus("Still slide updated from the current pitch.");
   };
-  const downloadClipStillsPdf = async () => {
+  const downloadClipStillsPdf = () => {
     if (finishingVideo || activeClipStart) return;
     const exportPitchMode = pitchMode;
     const isSetPiecePdf = exportPitchMode === "box";
@@ -1748,35 +1780,20 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     const pdf = new jsPDF(orientation, "mm", "a4");
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
-    const pageSideMargin = isSetPiecePdf ? 6 : 12;
+    const pageSideMargin = isSetPiecePdf ? 3 : 12;
     const imageMaxWidth = pageWidth - pageSideMargin * 2;
-    const pitchTop = isSetPiecePdf ? 30 : 39;
-    const imageMaxHeight = pageHeight - pitchTop - (isSetPiecePdf ? 6 : 8);
+    const pitchTop = isSetPiecePdf ? 28 : 39;
+    const imageMaxHeight = pageHeight - pitchTop - (isSetPiecePdf ? 4 : 8);
     const toRgb = (colour, fallback) => {
       const value = /^#[\da-f]{6}$/i.test(colour || "") ? colour : fallback;
       return [1, 3, 5].map((index) => parseInt(value.slice(index, index + 2), 16));
     };
-    const loadBadgeData = async (team) => {
-      const path = clubBadgePathFor(team);
-      if (!path) return null;
-      try {
-        const url = supabase.storage.from("Club Badges").getPublicUrl(path).data?.publicUrl;
-        if (!url) return null;
-        const response = await fetch(url);
-        if (!response.ok) return null;
-        const blob = await response.blob();
-        return await new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);
-          reader.onerror = () => resolve(null);
-          reader.readAsDataURL(blob);
-        });
-      } catch { return null; }
-    };
     const homeTeam = boardRef.current.homeName || homeTeamName || "Home Team";
     const awayTeam = boardRef.current.awayName || oppositionName || "Opposition";
     if (isSetPiecePdf) {
-      const [homeBadge, awayBadge] = await Promise.all([loadBadgeData(homeTeam), loadBadgeData(awayTeam)]);
+      const cachedBadges = pdfBadgeDataRef.current;
+      const homeBadge = cachedBadges?.homeTeam === homeTeam ? cachedBadges.homeBadge : null;
+      const awayBadge = cachedBadges?.awayTeam === awayTeam ? cachedBadges.awayBadge : null;
       pdf.setFillColor(...toRgb(pdfCover.background, "#0f2d4e"));
       pdf.rect(0, 0, pageWidth, pageHeight, "F");
       pdf.setFont("helvetica", "bold");
@@ -1786,7 +1803,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       pdf.setDrawColor(...toRgb(pdfCover.accent, "#62dcff"));
       pdf.setLineWidth(1.1);
       pdf.line(pageWidth * 0.32, 40, pageWidth * 0.68, 40);
-      if (homeBadge) pdf.addImage(homeBadge, "PNG", pageWidth / 2 - 27, 50, 54, 54);
+      if (homeBadge) pdf.addImage(homeBadge, homeBadge.includes("image/jpeg") ? "JPEG" : "PNG", pageWidth / 2 - 27, 50, 54, 54);
       pdf.setFontSize(22);
       pdf.setTextColor(...toRgb(pdfCover.text, "#ffffff"));
       pdf.text(homeTeam, pageWidth / 2, 116, { align: "center", maxWidth: pageWidth - 30 });
@@ -1801,7 +1818,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       const opponentWidth = pdf.getTextWidth(awayTeam);
       const opponentTextX = pageWidth / 2 - (opponentWidth + (awayBadge ? 20 : 0)) / 2;
       pdf.text(awayTeam, opponentTextX, 166, { align: "left", maxWidth: pageWidth - 40 });
-      if (awayBadge) pdf.addImage(awayBadge, "PNG", opponentTextX + opponentWidth + 5, 155, 14, 14);
+      if (awayBadge) pdf.addImage(awayBadge, awayBadge.includes("image/jpeg") ? "JPEG" : "PNG", opponentTextX + opponentWidth + 5, 155, 14, 14);
     }
     frames.forEach((frame, index) => {
       if (isSetPiecePdf || index > 0) pdf.addPage("a4", orientation);
@@ -1810,9 +1827,9 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       if (isSetPiecePdf) drawSetPiecePdfFrame(canvas, frame.board, { playerScale: 0.9 });
       else drawTacticalVideoFrame(canvas, frame.board, exportPitchMode, { playerScale: 0.9 });
       const bannerX = pageSideMargin;
-      const bannerY = isSetPiecePdf ? 8 : 20;
+      const bannerY = isSetPiecePdf ? 4 : 20;
       const bannerWidth = imageMaxWidth;
-      const bannerHeight = isSetPiecePdf ? 22 : 16;
+      const bannerHeight = isSetPiecePdf ? 24 : 16;
       if (!isSetPiecePdf) {
         pdf.setFont("helvetica", "normal");
         pdf.setFontSize(8);
@@ -1823,7 +1840,7 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       }
       pdf.setFillColor(...toRgb(pdfBanner.fill, "#0f2d4e"));
       pdf.setDrawColor(...toRgb(pdfBanner.border, "#62dcff"));
-      pdf.setLineWidth(0.7);
+      pdf.setLineWidth(isSetPiecePdf ? 1.3 : 0.7);
       if (pdfBanner.style === "square") pdf.rect(bannerX, bannerY, bannerWidth, bannerHeight, "FD");
       else pdf.roundedRect(bannerX, bannerY, bannerWidth, bannerHeight, 2, 2, "FD");
       pdf.setFont("helvetica", "bold");
@@ -1832,11 +1849,13 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       pdf.setFontSize(Math.max(11, Math.min(titleBaseSize, titleBaseSize - Math.max(0, tacticTitle.length - 28) * 0.18)));
       pdf.setTextColor(...toRgb(pdfBanner.text, "#ffffff"));
       pdf.text(tacticTitle, pageWidth / 2, bannerY + bannerHeight * 0.67, { align: "center", maxWidth: bannerWidth - 12 });
-      const image = canvas.toDataURL("image/png");
+      const imageFormat = isSetPiecePdf ? "image/jpeg" : "image/png";
+      const image = canvas.toDataURL(imageFormat, 0.96);
       const scale = Math.min(imageMaxWidth / canvas.width, imageMaxHeight / canvas.height);
       const imageWidth = canvas.width * scale;
       const imageHeight = canvas.height * scale;
-      pdf.addImage(image, "PNG", (pageWidth - imageWidth) / 2, pitchTop + Math.max(0, (imageMaxHeight - imageHeight) / 2), imageWidth, imageHeight);
+      const imageY = isSetPiecePdf ? pitchTop : pitchTop + Math.max(0, (imageMaxHeight - imageHeight) / 2);
+      pdf.addImage(image, isSetPiecePdf ? "JPEG" : "PNG", (pageWidth - imageWidth) / 2, imageY, imageWidth, imageHeight);
     });
     const filename = (boardRef.current.name || "tactical-clips").trim().replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "tactical-clips";
     pdf.save(`${filename}-stills.pdf`);
