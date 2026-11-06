@@ -1498,9 +1498,11 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
     const pdf = new jsPDF(orientation, "mm", "a4");
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
-    const pageSideMargin = exportPitchMode === "box" ? 6 : 12;
+    const isSetPiecePdf = exportPitchMode === "box";
+    const pageSideMargin = isSetPiecePdf ? 6 : 12;
     const imageMaxWidth = pageWidth - pageSideMargin * 2;
-    const imageMaxHeight = pageHeight - 47;
+    const pitchTop = isSetPiecePdf ? 34 : 39;
+    const imageMaxHeight = pageHeight - pitchTop - (isSetPiecePdf ? 6 : 8);
     const toRgb = (colour, fallback) => {
       const value = /^#[\da-f]{6}$/i.test(colour || "") ? colour : fallback;
       return [1, 3, 5].map((index) => parseInt(value.slice(index, index + 2), 16));
@@ -1511,15 +1513,17 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       pdf.rect(0, 0, pageWidth, pageHeight, "F");
       drawTacticalVideoFrame(canvas, frame.board, exportPitchMode, { playerScale: 0.9 });
       const bannerX = pageSideMargin;
-      const bannerY = 20;
+      const bannerY = isSetPiecePdf ? 8 : 20;
       const bannerWidth = imageMaxWidth;
-      const bannerHeight = 16;
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(8);
-      pdf.setTextColor(35, 55, 75);
-      pdf.text(`${boardRef.current.homeName || homeTeamName} vs ${boardRef.current.awayName || oppositionName}`, pageWidth / 2, 9, { align: "center", maxWidth: bannerWidth });
-      pdf.setFontSize(9);
-      pdf.text(frame.label, pageWidth / 2, 15, { align: "center", maxWidth: bannerWidth });
+      const bannerHeight = isSetPiecePdf ? 22 : 16;
+      if (!isSetPiecePdf) {
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(8);
+        pdf.setTextColor(35, 55, 75);
+        pdf.text(`${boardRef.current.homeName || homeTeamName} vs ${boardRef.current.awayName || oppositionName}`, pageWidth / 2, 9, { align: "center", maxWidth: bannerWidth });
+        pdf.setFontSize(9);
+        pdf.text(frame.label, pageWidth / 2, 15, { align: "center", maxWidth: bannerWidth });
+      }
       pdf.setFillColor(...toRgb(pdfBanner.fill, "#0f2d4e"));
       pdf.setDrawColor(...toRgb(pdfBanner.border, "#62dcff"));
       pdf.setLineWidth(0.7);
@@ -1527,14 +1531,15 @@ function TacticalPad({ storageKey, homeTeamName, oppositionName }) {
       else pdf.roundedRect(bannerX, bannerY, bannerWidth, bannerHeight, 2, 2, "FD");
       pdf.setFont("helvetica", "bold");
       const tacticTitle = pdfBanner.title.trim() || boardRef.current.name || "Tactic";
-      pdf.setFontSize(Math.max(11, Math.min(16, 16 - Math.max(0, tacticTitle.length - 28) * 0.18)));
+      const titleBaseSize = isSetPiecePdf ? 20 : 16;
+      pdf.setFontSize(Math.max(isSetPiecePdf ? 14 : 11, Math.min(titleBaseSize, titleBaseSize - Math.max(0, tacticTitle.length - 28) * 0.18)));
       pdf.setTextColor(...toRgb(pdfBanner.text, "#ffffff"));
-      pdf.text(tacticTitle, pageWidth / 2, 30, { align: "center", maxWidth: bannerWidth - 12 });
+      pdf.text(tacticTitle, pageWidth / 2, bannerY + bannerHeight * 0.67, { align: "center", maxWidth: bannerWidth - 12 });
       const image = canvas.toDataURL("image/png");
       const scale = Math.min(imageMaxWidth / canvas.width, imageMaxHeight / canvas.height);
       const imageWidth = canvas.width * scale;
       const imageHeight = canvas.height * scale;
-      pdf.addImage(image, "PNG", (pageWidth - imageWidth) / 2, 39 + Math.max(0, (imageMaxHeight - imageHeight) / 2), imageWidth, imageHeight);
+      pdf.addImage(image, "PNG", (pageWidth - imageWidth) / 2, pitchTop + Math.max(0, (imageMaxHeight - imageHeight) / 2), imageWidth, imageHeight);
     });
     const filename = (boardRef.current.name || "tactical-clips").trim().replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "tactical-clips";
     pdf.save(`${filename}-stills.pdf`);
