@@ -728,21 +728,23 @@ const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9, sourceBottom: 
     // Scale discs and labels with the pitch itself so distances between discs
     // match what the user arranged on the pad. The slight x oval matches the
     // pad's existing portrait transform.
-    const radiusX = 19 * playerScale * pitchScale * 1.171875;
-    const radiusY = 19 * playerScale * pitchScale;
+    const radiusX = 18 * playerScale * pitchScale * 1.171875;
+    const radiusY = 18 * playerScale * pitchScale;
     context.beginPath(); context.ellipse(point.x, point.y + 3 * pitchScale, radiusX + 3 * pitchScale, radiusY + 3 * pitchScale, 0, 0, Math.PI * 2); context.fillStyle = "rgba(5,34,63,0.42)"; context.fill();
     context.beginPath(); context.ellipse(point.x, point.y, radiusX, radiusY, 0, 0, Math.PI * 2); context.fillStyle = player.color || (player.side === "home" ? "#1485dd" : "#e64b50"); context.fill();
     context.strokeStyle = player.moving ? "#ffe36e" : "#f3f8ff"; context.lineWidth = (player.moving ? 5 : 3) * pitchScale * playerScale; context.stroke();
-    context.fillStyle = "#fff"; context.font = `bold ${14 * pitchScale * playerScale}px Arial, sans-serif`; context.textAlign = "center"; context.textBaseline = "middle";
+    context.fillStyle = "#fff"; context.font = `bold ${13.5 * pitchScale * playerScale}px Arial, sans-serif`; context.textAlign = "center"; context.textBaseline = "middle";
     context.fillText(String(tacticalDiscLabel(player)), point.x, point.y + 1);
   });
   const ball = mapPoint(board.ball || { x: 500, y: 320 });
   // Keep the ball's visible centre on the exact transformed board coordinate;
   // a displaced shadow made it appear offset from where it was placed.
-  context.beginPath(); context.arc(ball.x, ball.y, 10, 0, Math.PI * 2); context.fillStyle = "rgba(5,34,63,0.24)"; context.fill();
-  context.beginPath(); context.arc(ball.x, ball.y, 9, 0, Math.PI * 2); context.fillStyle = "#f7f8f3"; context.fill();
-  context.strokeStyle = "#142234"; context.lineWidth = 2; context.stroke();
-  context.fillStyle = "#142234"; context.beginPath(); context.moveTo(ball.x, ball.y - 4); context.lineTo(ball.x + 3, ball.y - 2); context.lineTo(ball.x + 2, ball.y + 2); context.lineTo(ball.x - 2, ball.y + 2); context.lineTo(ball.x - 3, ball.y - 2); context.closePath(); context.fill();
+  const ballRadiusX = 9 * pitchScale * 1.171875;
+  const ballRadiusY = 9 * pitchScale;
+  context.beginPath(); context.ellipse(ball.x, ball.y, ballRadiusX + 2 * pitchScale, ballRadiusY + 2 * pitchScale, 0, 0, Math.PI * 2); context.fillStyle = "rgba(5,34,63,0.24)"; context.fill();
+  context.beginPath(); context.ellipse(ball.x, ball.y, ballRadiusX, ballRadiusY, 0, 0, Math.PI * 2); context.fillStyle = "#f7f8f3"; context.fill();
+  context.strokeStyle = "#142234"; context.lineWidth = 2 * pitchScale; context.stroke();
+  context.fillStyle = "#142234"; context.beginPath(); context.moveTo(ball.x, ball.y - 4 * pitchScale); context.lineTo(ball.x + 3 * pitchScale * 1.171875, ball.y - 2 * pitchScale); context.lineTo(ball.x + 2 * pitchScale * 1.171875, ball.y + 2 * pitchScale); context.lineTo(ball.x - 2 * pitchScale * 1.171875, ball.y + 2 * pitchScale); context.lineTo(ball.x - 3 * pitchScale * 1.171875, ball.y - 2 * pitchScale); context.closePath(); context.fill();
   context.restore();
 };
 
