@@ -728,8 +728,8 @@ const drawSetPiecePdfFrame = (canvas, board, { playerScale = 0.9, sourceBottom: 
     // Scale discs and labels with the pitch itself so distances between discs
     // match what the user arranged on the pad. The slight x oval matches the
     // pad's existing portrait transform.
-    const radiusX = 18 * playerScale * pitchScale * 1.171875;
-    const radiusY = 18 * playerScale * pitchScale;
+    const radiusX = 17 * playerScale * pitchScale * 1.171875;
+    const radiusY = 17 * playerScale * pitchScale;
     context.beginPath(); context.ellipse(point.x, point.y + 3 * pitchScale, radiusX + 3 * pitchScale, radiusY + 3 * pitchScale, 0, 0, Math.PI * 2); context.fillStyle = "rgba(5,34,63,0.42)"; context.fill();
     context.beginPath(); context.ellipse(point.x, point.y, radiusX, radiusY, 0, 0, Math.PI * 2); context.fillStyle = player.color || (player.side === "home" ? "#1485dd" : "#e64b50"); context.fill();
     context.strokeStyle = player.moving ? "#ffe36e" : "#f3f8ff"; context.lineWidth = (player.moving ? 5 : 3) * pitchScale * playerScale; context.stroke();
