@@ -101,6 +101,7 @@ main.sr-page.sr-squad-plan .sr-real-pitch {
   min-height: var(--pitch-height) !important;
   max-height: none !important;
   justify-content: space-around;
+  gap: clamp(14px, 1.4vw, 22px);
   padding-top: 24px;
   padding-bottom: 24px;
 }
@@ -109,6 +110,7 @@ main.sr-page.sr-squad-plan .sr-real-pitch > .sr-pitch-row {
   flex: 1 1 0;
   min-height: 0;
   align-items: stretch;
+  column-gap: clamp(12px, 1.3vw, 18px);
 }
 
 /* The shared shortlist pitch styles give each position a fixed 240px height.
