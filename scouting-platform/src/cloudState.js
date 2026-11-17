@@ -58,6 +58,11 @@ export async function migrateAndLoadState(user) {
   return {
     assignments: state.assignments || [],
     shortlists: state.shortlists || [],
+    shortlistFolders: Array.isArray(state.shortlistFolders)
+      ? state.shortlistFolders
+      : Array.isArray(state.squadPlan?.shortlistFolders)
+        ? state.squadPlan.shortlistFolders
+        : undefined,
     tags: state.tags || [],
     squadPlan: state.squadPlan || { savedPlans: [] },
     playerSummaries: state.playerSummaries || {},
@@ -66,7 +71,13 @@ export async function migrateAndLoadState(user) {
 
 export async function saveCloudState(user, state) {
   if (!user) return;
-  const { error } = await supabase.from("user_app_state").upsert({ user_id: user.id, ...state, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+  // Keep folder metadata in the existing JSONB squadPlan column so accounts
+  // do not need a database migration to organize their shortlists.
+  const hasFolderState = Object.prototype.hasOwnProperty.call(state, "shortlistFolders");
+  const { shortlistFolders = [], ...columns } = state;
+  const squadPlan = { ...(columns.squadPlan || {}) };
+  if (hasFolderState) squadPlan.shortlistFolders = shortlistFolders;
+  const { error } = await supabase.from("user_app_state").upsert({ user_id: user.id, ...columns, squadPlan, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
   if (error) throw error;
 }
 

@@ -146,13 +146,45 @@ const defaultTags = [
   { id: "contract", name: "Out of contract", color: "#22c55e" },
   { id: "deprioritise", name: "Deprioritise", color: "#f2b807" },
 ];
+const shortlistFolderCacheKey = (userId) => `scoutingShortlistFolders:${userId || "anonymous"}`;
+const readShortlistFolderCache = (userId) => {
+  try {
+    const value = JSON.parse(localStorage.getItem(shortlistFolderCacheKey(userId)) || "[]");
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
+};
+const writeShortlistFolderCache = (userId, folders) => {
+  try {
+    localStorage.setItem(shortlistFolderCacheKey(userId), JSON.stringify(folders));
+  } catch {
+    // Cloud persistence remains the primary store if browser storage is unavailable.
+  }
+};
 export default function ShortlistsPage() {
   const { appState, updateAppState, profile: accountProfile, user } = useAuth();
+  const folderCacheUserId = user?.id || "anonymous";
+  const folderCacheKey = shortlistFolderCacheKey(folderCacheUserId);
   const [databasePlayers, setDatabasePlayers] = useState([]);
   const [sharedReports, setSharedReports] = useState([]);
   const [sharedLists, setSharedLists] = useState([]), [showShared, setShowShared] = useState(false);
   const [scouts, setScouts] = useState([]), [shareEnabled, setShareEnabled] = useState(false), [shareScout, setShareScout] = useState(""), [sharePermission, setSharePermission] = useState("view");
-  useEffect(() => { if (appState) { setLists(appState.shortlists || []); setFolders(appState.shortlistFolders || []); setTags(appState.tags?.length ? appState.tags : defaultTags); } }, [appState]);
+  useEffect(() => {
+    if (!appState) return;
+    setLists(appState.shortlists || []);
+    setTags(appState.tags?.length ? appState.tags : defaultTags);
+    if (Array.isArray(appState.shortlistFolders)) {
+      setFolders(appState.shortlistFolders);
+      writeShortlistFolderCache(folderCacheUserId, appState.shortlistFolders);
+    } else {
+      const cachedFolders = readShortlistFolderCache(folderCacheUserId);
+      setFolders(cachedFolders);
+      if (cachedFolders.length) {
+        updateAppState({ ...appState, shortlistFolders: cachedFolders }).catch((error) => console.error("Could not sync saved shortlist folders", error));
+      }
+    }
+  }, [appState, folderCacheKey, folderCacheUserId, updateAppState]);
   useEffect(() => { if (accountProfile?.club) supabase.from("club_reports").select("player").eq("status", "Published").then(({ data }) => setSharedReports(data || [])); }, [accountProfile?.club]);
   useEffect(() => { if (accountProfile?.club) supabase.from("profiles").select("id,full_name").eq("club", accountProfile.club).eq("approved", true).then(({ data }) => setScouts((data || []).filter((x) => x.id !== user?.id))); }, [accountProfile?.club, user?.id]);
   useEffect(() => {
@@ -172,10 +204,12 @@ export default function ShortlistsPage() {
     return () => window.removeEventListener("focus", loadSharedLists);
   }, [user]);
   const [lists, setLists] = useState(() => JSON.parse(localStorage.getItem("scoutingShortlists") || "[]"));
-  const [folders, setFolders] = useState(() => appState?.shortlistFolders || []);
+  const [folders, setFolders] = useState(() => appState?.shortlistFolders || readShortlistFolderCache(folderCacheUserId));
   const [activeFolderId, setActiveFolderId] = useState("all");
   const [folderModalOpen, setFolderModalOpen] = useState(false);
   const [folderName, setFolderName] = useState("");
+  const [folderSaveMessage, setFolderSaveMessage] = useState("");
+  const [folderSaving, setFolderSaving] = useState(false);
   const [createFolderId, setCreateFolderId] = useState(null);
   useEffect(() => {
     if (activeFolderId !== "all" && !folders.some((folder) => String(folder.id) === String(activeFolderId))) setActiveFolderId("all");
@@ -287,6 +321,7 @@ export default function ShortlistsPage() {
   }, [databasePlayers, published]);
   const persist = async (n, sharedUpdate = null) => {
     setLists(n);
+    writeShortlistFolderCache(folderCacheUserId, folders);
     updateAppState({ ...appState, assignments: appState?.assignments || [], shortlists: n, shortlistFolders: folders, tags });
     if (current?.shared && user && (current.owner_id === user.id || current.sharedPermission === "edit")) {
       const changed = sharedUpdate || n.find((list) => list.id === current.id) || current;
@@ -320,15 +355,25 @@ export default function ShortlistsPage() {
     setShareEnabled(false); setShareScout(""); setSharePermission("view");
     setCurrent(sharedL);
   };
-  const saveFolder = (event) => {
+  const saveFolder = async (event) => {
     event.preventDefault();
     const cleanName = folderName.trim();
-    if (!cleanName) return;
+    if (!cleanName || folderSaving) return;
     const nextFolders = [...folders, { id: `folder-${Date.now()}`, name: cleanName }];
+    setFolderSaving(true);
     setFolders(nextFolders);
-    updateAppState({ ...appState, assignments: appState?.assignments || [], shortlists: lists, shortlistFolders: nextFolders, tags });
-    setFolderName("");
-    setFolderModalOpen(false);
+    writeShortlistFolderCache(folderCacheUserId, nextFolders);
+    setFolderSaveMessage("");
+    try {
+      await updateAppState({ ...appState, assignments: appState?.assignments || [], shortlists: lists, shortlistFolders: nextFolders, tags });
+    } catch (error) {
+      console.error("Could not save shortlist folder to the account", error);
+      setFolderSaveMessage("Folder saved on this device. Account sync failed; it will retry when you return to Shortlists.");
+    } finally {
+      setFolderName("");
+      setFolderSaving(false);
+      setFolderModalOpen(false);
+    }
   };
   const moveShortlist = (listId, folderId) => {
     const nextLists = lists.map((list) => String(list.id) === String(listId) ? { ...list, folderId: folderId || "" } : list);
@@ -339,7 +384,8 @@ export default function ShortlistsPage() {
     if (!nextName || nextName === folder.name) return;
     const nextFolders = folders.map((item) => item.id === folder.id ? { ...item, name: nextName } : item);
     setFolders(nextFolders);
-    updateAppState({ ...appState, assignments: appState?.assignments || [], shortlists: lists, shortlistFolders: nextFolders, tags });
+    writeShortlistFolderCache(folderCacheUserId, nextFolders);
+    updateAppState({ ...appState, assignments: appState?.assignments || [], shortlists: lists, shortlistFolders: nextFolders, tags }).catch((error) => { console.error("Could not save renamed shortlist folder", error); setFolderSaveMessage("Folder change saved on this device, but account sync failed."); });
   };
   const deleteFolder = (folder) => {
     const count = lists.filter((list) => String(list.folderId) === String(folder.id)).length;
@@ -348,8 +394,9 @@ export default function ShortlistsPage() {
     const nextLists = lists.map((list) => String(list.folderId) === String(folder.id) ? { ...list, folderId: "" } : list);
     setFolders(nextFolders);
     setLists(nextLists);
+    writeShortlistFolderCache(folderCacheUserId, nextFolders);
     if (activeFolderId === folder.id) setActiveFolderId("all");
-    updateAppState({ ...appState, assignments: appState?.assignments || [], shortlists: nextLists, shortlistFolders: nextFolders, tags });
+    updateAppState({ ...appState, assignments: appState?.assignments || [], shortlists: nextLists, shortlistFolders: nextFolders, tags }).catch((error) => { console.error("Could not save folder deletion", error); setFolderSaveMessage("Folder change saved on this device, but account sync failed."); });
   };
   const add = (p, pos) => {
     if (current.players.some((x) => x.id === p.id && x.slot === pos)) return;
@@ -944,13 +991,14 @@ export default function ShortlistsPage() {
         </div>
         <div className="sr-head-actions"><button className={!showShared ? "sr-cyan" : "sr-outline"} onClick={() => { setShowShared(false); setActiveFolderId("all"); }}>My Shortlists</button><button className={showShared ? "sr-cyan" : "sr-outline"} onClick={() => { setShowShared(true); setActiveFolderId("all"); }}>Shared Shortlists</button>{!showShared && <><button className="sr-outline" onClick={() => setFolderModalOpen(true)}>Create Folder</button><button className="sr-cyan" onClick={() => { setCreateFolderId(activeFolder?.id || ""); setShow(true); }}>Create New Shortlist</button></>}</div>
       </section>
+      {folderSaveMessage && <p className="sr-folder-save-message" role="status">{folderSaveMessage}</p>}
       {!showShared && activeFolder && <button type="button" className="sr-back sr-shortlist-folder-back" onClick={() => setActiveFolderId("all")}>‹ All folders and shortlists</button>}
       {!showShared && activeFolderId === "all" && folders.length > 0 && <section className="sr-shortlist-folder-section"><div className="sr-shortlist-section-heading"><h2>Folders</h2><span>{folders.length} folder{folders.length === 1 ? "" : "s"}</span></div><div className="sr-list-grid sr-shortlist-folder-grid">{folders.map(folderCard)}</div></section>}
       <section className="sr-shortlist-folder-section">
         <div className="sr-shortlist-section-heading"><h2>{showShared ? "Shared shortlists" : activeFolder ? activeFolder.name : "Unfiled shortlists"}</h2>{!showShared && activeFolder && <span>{visibleShortlists.length} shortlist{visibleShortlists.length === 1 ? "" : "s"}</span>}</div>
         {visibleShortlists.length > 0 ? <div className="sr-list-grid sr-shortlist-list-grid">{visibleShortlists.map(shortlistCard)}</div> : <div className="sr-empty">{showShared ? "No shortlists have been shared with you yet." : activeFolder ? "This folder is empty. Create a shortlist here or move one into it." : folders.length ? "No unfiled shortlists. Open a folder to see its shortlists, or create a new folder." : lists.length ? "All shortlists are in folders." : "Create a folder for a team, then add shortlists inside it."}</div>}
       </section>
-      {folderModalOpen && <div className="sr-modal" onClick={() => setFolderModalOpen(false)}><form className="sr-form sr-shortlist-folder-form" onClick={(event) => event.stopPropagation()} onSubmit={saveFolder}><div className="sr-form-head"><div><div className="sr-kicker">SHORTLIST ORGANISATION</div><h2>Create Folder</h2></div><button type="button" className="sr-close" onClick={() => setFolderModalOpen(false)}>×</button></div><label className="sr-field"><span>Folder name</span><input autoFocus value={folderName} onChange={(event) => setFolderName(event.target.value)} placeholder="For example, Preston North End" /></label><div className="sr-actions"><button type="button" className="sr-outline" onClick={() => setFolderModalOpen(false)}>Cancel</button><button className="sr-cyan" disabled={!folderName.trim()}>Create Folder</button></div></form></div>}
+      {folderModalOpen && <div className="sr-modal" onClick={() => !folderSaving && setFolderModalOpen(false)}><form className="sr-form sr-shortlist-folder-form" onClick={(event) => event.stopPropagation()} onSubmit={saveFolder}><div className="sr-form-head"><div><div className="sr-kicker">SHORTLIST ORGANISATION</div><h2>Create Folder</h2></div><button type="button" className="sr-close" disabled={folderSaving} onClick={() => setFolderModalOpen(false)}>×</button></div><label className="sr-field"><span>Folder name</span><input autoFocus value={folderName} onChange={(event) => setFolderName(event.target.value)} placeholder="For example, Preston North End" /></label><div className="sr-actions"><button type="button" className="sr-outline" disabled={folderSaving} onClick={() => setFolderModalOpen(false)}>Cancel</button><button className="sr-cyan" disabled={!folderName.trim() || folderSaving}>{folderSaving ? "Saving…" : "Create Folder"}</button></div></form></div>}
       {show && (
         <div className="sr-modal">
           <form className="sr-form sr-shortlist-create" onSubmit={create}>

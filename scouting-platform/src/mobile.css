@@ -435,6 +435,17 @@
   }
 }
 
+@media (max-width: 768px) {
+  .sr-shortlists-page .sr-dashboard-head { display: block; }
+  .sr-shortlists-page .sr-head-actions { justify-content: flex-start; gap: 8px; }
+  .sr-shortlists-page .sr-head-actions button { flex: 1 1 auto; }
+  .sr-shortlists-page .sr-shortlist-folder-section { margin-top: 22px; }
+  .sr-shortlists-page .sr-list-grid.sr-shortlist-folder-grid,
+  .sr-shortlists-page .sr-list-grid.sr-shortlist-list-grid { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  .sr-shortlists-page .sr-shortlist-folder-card,
+  .sr-shortlists-page .sr-shortlist-item { min-height: 220px; }
+}
+
 @media (max-width: 380px) {
   .sr-page {
     padding-right: 12px;

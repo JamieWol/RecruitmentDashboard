@@ -1,7 +1,7 @@
 jest.mock("./supabaseClient", () => ({ supabase: { from: jest.fn() } }));
 
 import { supabase } from "./supabaseClient";
-import { migrateAndLoadState } from "./cloudState";
+import { migrateAndLoadState, saveCloudState } from "./cloudState";
 
 describe("account scoped squad plans", () => {
   beforeEach(() => {
@@ -59,5 +59,52 @@ describe("account scoped squad plans", () => {
     expect(state.squadPlan.savedPlans[0].id).toBe("plan-a");
     expect(upsert).toHaveBeenCalledTimes(1);
     expect(localStorage.getItem("squadPlans")).toBeNull();
+  });
+});
+
+describe("shortlist folders", () => {
+  beforeEach(() => {
+    supabase.from.mockReset();
+  });
+
+  it("stores folder data inside the existing squad plan JSON field", async () => {
+    const upsert = jest.fn().mockResolvedValue({ error: null });
+    supabase.from.mockReturnValue({ upsert });
+    const folderList = [{ id: "team-folder", name: "Preston North End" }];
+
+    await saveCloudState({ id: "scout-a" }, {
+      assignments: [], shortlists: [], shortlistFolders: folderList, tags: [], squadPlan: { savedPlans: [] },
+    });
+
+    const saved = upsert.mock.calls[0][0];
+    expect(saved.shortlistFolders).toBeUndefined();
+    expect(saved.squadPlan.shortlistFolders).toEqual(folderList);
+  });
+
+  it("can persist an empty folder list after the last folder is deleted", async () => {
+    const upsert = jest.fn().mockResolvedValue({ error: null });
+    supabase.from.mockReturnValue({ upsert });
+
+    await saveCloudState({ id: "scout-a" }, {
+      assignments: [], shortlists: [], shortlistFolders: [], tags: [],
+      squadPlan: { savedPlans: [], shortlistFolders: [{ id: "old", name: "Old folder" }] },
+    });
+
+    expect(upsert.mock.calls[0][0].squadPlan.shortlistFolders).toEqual([]);
+  });
+
+  it("loads saved folders from the existing squad plan JSON field", async () => {
+    const folders = [{ id: "team-folder", name: "Preston North End" }];
+    const maybeSingle = jest.fn().mockResolvedValue({
+      data: { user_id: "scout-a", assignments: [], shortlists: [], tags: [], squadPlan: { savedPlans: [], shortlistFolders: folders } },
+      error: null,
+    });
+    const eq = jest.fn(() => ({ maybeSingle }));
+    const select = jest.fn(() => ({ eq }));
+    supabase.from.mockReturnValue({ select });
+
+    const state = await migrateAndLoadState({ id: "scout-a" });
+
+    expect(state.shortlistFolders).toEqual(folders);
   });
 });

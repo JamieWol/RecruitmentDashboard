@@ -54,6 +54,7 @@ export function AuthProvider({ children }) {
     const latest = {
       assignments: data.assignments || [],
       shortlists: data.shortlists || [],
+      shortlistFolders: data.shortlistFolders || data.squadPlan?.shortlistFolders || [],
       tags: data.tags || [],
       squadPlan: data.squadPlan || { savedPlans: [] },
       playerSummaries: data.playerSummaries || {},
