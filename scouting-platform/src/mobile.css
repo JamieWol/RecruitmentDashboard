@@ -1279,3 +1279,172 @@
     box-sizing: border-box;
   }
 }
+
+/* Player role map and scout-report editor on phone-sized screens. */
+@media (max-width: 768px) {
+  .sr-profile-position {
+    margin: 14px 0 22px;
+    padding: 15px;
+  }
+
+  .sr-profile-position-heading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .sr-profile-position-heading h2 {
+    font-size: 22px;
+  }
+
+  .sr-profile-position-heading strong {
+    min-height: 34px;
+    font-size: 14px;
+  }
+
+  .sr-position-pitch {
+    width: 100%;
+  }
+
+  .sr-modal.sr-report-modal {
+    position: fixed;
+    inset: 0;
+    display: block;
+    padding: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  .sr-modal.sr-report-modal .sr-report {
+    width: 100%;
+    min-width: 0;
+    min-height: 100vh;
+    min-height: 100dvh;
+    max-height: none;
+    margin: 0 !important;
+    padding: calc(14px + env(safe-area-inset-top)) 15px calc(24px + env(safe-area-inset-bottom)) !important;
+    border: 0;
+    border-radius: 0;
+    box-sizing: border-box;
+    overflow: visible;
+  }
+
+  .sr-modal.sr-report-modal .sr-report-back {
+    margin: 0 0 12px;
+    padding: 8px 0;
+  }
+
+  .sr-modal.sr-report-modal .sr-report-banner {
+    display: block;
+    min-height: 0;
+    margin: 0 0 16px !important;
+    padding: 14px !important;
+  }
+
+  .sr-modal.sr-report-modal .sr-report-banner-main {
+    display: grid;
+    grid-template-columns: 58px minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+  }
+
+  .sr-modal.sr-report-modal .sr-report-banner-photo {
+    width: 58px;
+    height: 72px;
+  }
+
+  .sr-modal.sr-report-modal .sr-report-banner .sr-report-player-link span {
+    font-size: 21px;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+  }
+
+  .sr-modal.sr-report-modal .sr-report-player-meta {
+    font-size: 13px;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+  }
+
+  .sr-modal.sr-report-modal .sr-banner-publish,
+  .sr-modal.sr-report-modal .sr-readonly-note,
+  .sr-modal.sr-report-modal .sr-publish-error {
+    display: block;
+    width: 100%;
+    margin: 12px 0 0;
+    white-space: normal;
+    box-sizing: border-box;
+  }
+
+  .sr-modal.sr-report-modal .sr-fixture-box {
+    display: block;
+    margin-bottom: 14px;
+    padding: 13px;
+  }
+
+  .sr-modal.sr-report-modal .sr-fixture-list {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    margin: 10px 0;
+  }
+
+  .sr-modal.sr-report-modal .sr-fixture-card {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .sr-modal.sr-report-modal .sr-edit-games {
+    width: 100%;
+    margin: 8px 0 0;
+    white-space: normal;
+  }
+
+  .sr-modal.sr-report-modal .sr-form-grid,
+  .sr-modal.sr-report-modal .sr-grade-row,
+  .sr-modal.sr-report-modal .sr-report-columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0 12px;
+  }
+
+  .sr-modal.sr-report-modal .sr-field {
+    min-width: 0;
+    margin: 11px 0;
+  }
+
+  .sr-modal.sr-report-modal .sr-field input,
+  .sr-modal.sr-report-modal .sr-field select,
+  .sr-modal.sr-report-modal .sr-field textarea {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 46px;
+    box-sizing: border-box;
+    font-size: 16px;
+  }
+
+  .sr-modal.sr-report-modal .sr-field textarea {
+    min-height: 96px;
+    max-height: 220px;
+    padding: 12px;
+  }
+
+  .sr-modal.sr-report-modal .sr-report-bottom-actions,
+  .sr-modal.sr-report-modal .sr-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: stretch;
+    gap: 9px;
+  }
+
+  .sr-modal.sr-report-modal .sr-report-bottom-actions button,
+  .sr-modal.sr-report-modal .sr-actions button,
+  .sr-modal.sr-report-modal .sr-save {
+    flex: 1 1 100%;
+    width: 100%;
+    min-height: 44px;
+    margin-left: 0;
+    white-space: normal;
+  }
+}

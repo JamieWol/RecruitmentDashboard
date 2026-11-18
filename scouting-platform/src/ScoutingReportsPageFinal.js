@@ -20,6 +20,33 @@ const fixtureTeams = (fixture) => {
   const parts = String(fixture || "").split(/\s+(?:vs\.?|v)\s+/i).map((team) => team.trim()).filter(Boolean);
   return parts.length === 2 ? parts : [];
 };
+const positionPoint = (position) => {
+  const value = String(position || "").toUpperCase().replace(/[^A-Z]/g, " ").replace(/\s+/g, " ").trim();
+  const has = (...terms) => terms.some((term) => ` ${value} `.includes(` ${term} `));
+  if (!value || value === "—" || value === "-") return null;
+  if (has("GK", "GOALKEEPER")) return [55, 180];
+  if (has("LWB", "LEFT WING BACK")) return [170, 75];
+  if (has("RWB", "RIGHT WING BACK")) return [170, 285];
+  if (has("LB", "LEFT BACK")) return [135, 85];
+  if (has("RB", "RIGHT BACK")) return [135, 275];
+  if (has("LCB", "LEFT CENTRE BACK", "LEFT CENTER BACK")) return [135, 145];
+  if (has("RCB", "RIGHT CENTRE BACK", "RIGHT CENTER BACK")) return [135, 215];
+  if (has("CB", "CENTRE BACK", "CENTER BACK", "CENTRAL DEFENDER")) return [135, 180];
+  if (has("LDM", "LEFT DEFENSIVE MIDFIELDER")) return [225, 145];
+  if (has("RDM", "RIGHT DEFENSIVE MIDFIELDER")) return [225, 215];
+  if (has("DM", "CDM", "DEFENSIVE MIDFIELDER")) return [225, 180];
+  if (has("LCM", "LEFT CENTRAL MIDFIELDER")) return [285, 145];
+  if (has("RCM", "RIGHT CENTRAL MIDFIELDER")) return [285, 215];
+  if (has("LM", "LEFT MIDFIELDER")) return [285, 95];
+  if (has("RM", "RIGHT MIDFIELDER")) return [285, 265];
+  if (has("CM", "CENTRAL MIDFIELDER", "CENTRE MIDFIELDER", "CENTER MIDFIELDER")) return [285, 180];
+  if (has("LW", "LEFT WINGER", "LEFT WING")) return [415, 85];
+  if (has("RW", "RIGHT WINGER", "RIGHT WING")) return [415, 275];
+  if (has("AM", "CAM", "ATTACKING MIDFIELDER")) return [405, 180];
+  if (has("CF", "CENTRE FORWARD", "CENTER FORWARD")) return [465, 180];
+  if (has("ST", "STRIKER", "FORWARD")) return [500, 180];
+  return null;
+};
 const empty = {
   type: "Long Report",
   foot: "",
@@ -1000,6 +1027,12 @@ export default function ScoutingReportsPageFinal() {
       const updatedAssignment = { ...active, report: reportWithFixtures, games: fixtures, fixtureDates, status: "In Progress", updatedAt: new Date().toISOString() };
       const nextItems = items.map((item) => String(item.id) === String(active.id) ? updatedAssignment : item);
       try {
+        const activeAssignmentId = String(active.sharedAssignmentId || active.id);
+        setSharedAssignments((current) => current.map((item) =>
+          String(item.sharedAssignmentId || item.id) === activeAssignmentId
+            ? { ...item, ...updatedAssignment, sharedAssignmentId: item.sharedAssignmentId || updatedAssignment.sharedAssignmentId }
+            : item,
+        ));
         await saveItems(nextItems);
         if (user && accountProfile?.club) {
           const { error } = await supabase.from("club_assignments")
@@ -1173,6 +1206,8 @@ export default function ScoutingReportsPageFinal() {
     setSummaryEditing(false);
   };
   const clubName = dataValue("club", "Club", "team", "Team");
+  const mainPosition = dataValue("Playing Position", "Primary Position", "Position", "playing_position", "primary_position", "position");
+  const mainPositionPoint = positionPoint(mainPosition);
   const clubBadge = dataValue("badgeUrl", "club_badge_url", "clubBadgeUrl", "badge_url");
   const profileHasDirectPhoto = Boolean(["Photo", "photo", "_photoUrl", "photoUrl", "playerPhoto", "Image", "image", "Photo URL"].some((key) => String((playerData || profile)?.[key] || "").trim()));
   const reportFoot = [
@@ -1237,7 +1272,7 @@ export default function ScoutingReportsPageFinal() {
     </div>
   );
   const reportPage = active && (
-    <div className="sr-modal">
+    <div className="sr-modal sr-report-modal">
       <section
         className={`sr-form sr-report ${!editing ? "readonly" : ""}`}
       >
@@ -1557,6 +1592,32 @@ export default function ScoutingReportsPageFinal() {
           >
             Add to Shortlist
           </button>
+        </section>
+        <section className="sr-profile-position" aria-labelledby="sr-main-position-heading">
+          <div className="sr-profile-position-heading">
+            <div>
+              <div className="sr-kicker">PLAYER ROLE</div>
+              <h2 id="sr-main-position-heading">Main position</h2>
+            </div>
+            <strong>{mainPosition && mainPosition !== "—" ? mainPosition : "Position not available"}</strong>
+          </div>
+          <svg className="sr-position-pitch" viewBox="0 0 560 360" role="img" aria-label={`Football pitch showing ${mainPosition && mainPosition !== "—" ? `the main position ${mainPosition}` : "no main position set"}`}>
+            <rect className="sr-position-pitch-surface" x="20" y="12" width="520" height="336" rx="16" />
+            <rect className="sr-position-pitch-line" x="20" y="12" width="520" height="336" rx="16" />
+            <line className="sr-position-pitch-line" x1="280" y1="12" x2="280" y2="348" />
+            <circle className="sr-position-pitch-line" cx="280" cy="180" r="47" />
+            <circle className="sr-position-pitch-spot" cx="280" cy="180" r="3" />
+            <rect className="sr-position-pitch-line" x="20" y="86" width="82" height="188" />
+            <rect className="sr-position-pitch-line" x="20" y="133" width="38" height="94" />
+            <path className="sr-position-pitch-line" d="M102 143 A38 38 0 0 1 102 217" />
+            <rect className="sr-position-pitch-line" x="458" y="86" width="82" height="188" />
+            <rect className="sr-position-pitch-line" x="502" y="133" width="38" height="94" />
+            <path className="sr-position-pitch-line" d="M458 143 A38 38 0 0 0 458 217" />
+            {mainPositionPoint && <g className="sr-position-marker" transform={`translate(${mainPositionPoint[0]} ${mainPositionPoint[1]})`}>
+              <circle className="sr-position-marker-halo" r="23" />
+              <circle className="sr-position-marker-core" r="16" />
+            </g>}
+          </svg>
         </section>
         <section
           className="sr-player-details sr-player-summary-editor"
