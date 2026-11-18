@@ -1078,3 +1078,204 @@
     font-size: 14px;
   }
 }
+
+/* Use a full-width, touch-friendly formation on squad plans instead of a clipped desktop pitch. */
+@media (max-width: 768px) {
+  .sr-squad-plan.sr-page .sr-real-pitch {
+    width: 100%;
+    height: var(--pitch-height) !important;
+    min-height: var(--pitch-height) !important;
+    max-height: none !important;
+    padding: 14px 7px !important;
+    overflow: visible !important;
+    gap: 8px;
+  }
+
+  .sr-squad-plan.sr-page .sr-real-pitch > .sr-pitch-row {
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 0;
+    justify-content: space-around;
+    column-gap: 3px;
+  }
+
+  .sr-squad-plan.sr-page .sr-real-pitch .sr-zone {
+    width: 23.5%;
+    min-width: 0;
+    max-width: 23.5%;
+    min-height: 0 !important;
+    padding: 5px 4px;
+    box-sizing: border-box;
+  }
+
+  .sr-squad-plan.sr-page .sr-real-pitch .row-size-1 .sr-zone { width: 48%; max-width: 48%; }
+  .sr-squad-plan.sr-page .sr-real-pitch .row-size-2 .sr-zone { width: 39%; max-width: 39%; }
+  .sr-squad-plan.sr-page .sr-real-pitch .row-size-3 .sr-zone { width: 29%; max-width: 29%; }
+  .sr-squad-plan.sr-page .sr-real-pitch .row-size-5 .sr-zone { width: 18.5%; max-width: 18.5%; }
+
+  .sr-squad-plan.sr-page .sr-zone-head {
+    min-width: 0;
+    gap: 3px;
+    font-size: 11px;
+  }
+
+  .sr-squad-plan.sr-page .sr-zone-head span {
+    display: none;
+  }
+
+  .sr-squad-plan.sr-page .sr-zone-head input {
+    width: 34px;
+    min-width: 0;
+    padding: 2px;
+    font-size: 12px;
+  }
+
+  .sr-squad-plan.sr-page .sr-zone-head button {
+    width: 24px;
+    height: 24px;
+    flex: 0 0 24px;
+  }
+
+  .sr-squad-plan.sr-page .sr-real-pitch .sr-zone-list {
+    display: flex;
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: none;
+    flex-direction: column;
+    gap: 3px;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .sr-squad-plan.sr-page .sr-pitch-player-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-rows: auto auto;
+    align-items: center;
+    gap: 2px 4px;
+    min-width: 0;
+    min-height: 0;
+    margin: 2px 0;
+    padding: 5px 4px;
+  }
+
+  .sr-squad-plan.sr-page .sr-pitch-player-card > button:first-child {
+    display: flex;
+    grid-column: 1 / -1;
+    grid-row: 1;
+    width: 100%;
+    min-width: 0;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+  }
+
+  .sr-squad-plan.sr-page .sr-pitch-player-card > button:first-child span {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .sr-squad-plan.sr-page .sr-pitch-player-card > button:first-child strong {
+    display: block;
+    overflow: hidden;
+    font-size: 11px !important;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .sr-squad-plan.sr-page .sr-pitch-player-card > button:first-child small {
+    display: flex;
+    align-items: center;
+    margin-top: 2px;
+    font-size: 9px !important;
+  }
+
+  .sr-squad-plan.sr-page .sr-pitch-player-card > button:first-child small > span > span:last-child,
+  .sr-squad-plan.sr-page .row-size-4 .sr-shortlist-player-photo,
+  .sr-squad-plan.sr-page .row-size-5 .sr-shortlist-player-photo {
+    display: none;
+  }
+
+  .sr-squad-plan.sr-page .sr-pitch-player-card .sr-squad-tag-button {
+    grid-column: 2;
+    grid-row: 2;
+    width: 24px;
+    height: 24px;
+  }
+
+  .sr-squad-plan.sr-page .sr-pitch-player-card .sr-slot-remove {
+    grid-column: 3;
+    grid-row: 2;
+    min-width: 24px;
+    min-height: 24px;
+    padding: 1px 4px;
+  }
+}
+
+/* Shared phone-width safeguards for the remaining app tabs. */
+@media (max-width: 768px) {
+  .sr-page {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .sr-page input,
+  .sr-page select,
+  .sr-page textarea,
+  .sr-page button {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .sr-dashboard-head,
+  .sr-profile-head,
+  .sr-section-line,
+  .sr-toolbar,
+  .sr-head-actions,
+  .sr-shortlist-head-actions {
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
+  .sr-toolbar > *,
+  .sr-field,
+  .sr-card,
+  .sr-list-card {
+    min-width: 0;
+  }
+
+  .sr-section-line {
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+  }
+
+  .sr-profile-summary,
+  .sr-profile-layout,
+  .sr-report-columns,
+  .sr-form-grid {
+    min-width: 0;
+  }
+
+  .sr-auth-screen {
+    padding: calc(24px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
+    box-sizing: border-box;
+  }
+
+  .sr-auth-landing {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .sr-report-management-filters,
+  .sr-report-management-export {
+    min-width: 0;
+  }
+
+  .sr-form,
+  .sr-report-management-panel {
+    min-width: 0;
+    box-sizing: border-box;
+  }
+}
