@@ -208,6 +208,7 @@ export default function ShortlistsPage() {
   const [activeFolderId, setActiveFolderId] = useState("all");
   const [folderModalOpen, setFolderModalOpen] = useState(false);
   const [folderName, setFolderName] = useState("");
+  const [folderColor, setFolderColor] = useState("#3478e8");
   const [folderSaveMessage, setFolderSaveMessage] = useState("");
   const [folderSaving, setFolderSaving] = useState(false);
   const [createFolderId, setCreateFolderId] = useState(null);
@@ -359,7 +360,7 @@ export default function ShortlistsPage() {
     event.preventDefault();
     const cleanName = folderName.trim();
     if (!cleanName || folderSaving) return;
-    const nextFolders = [...folders, { id: `folder-${Date.now()}`, name: cleanName }];
+    const nextFolders = [...folders, { id: `folder-${Date.now()}`, name: cleanName, color: folderColor }];
     setFolderSaving(true);
     setFolders(nextFolders);
     writeShortlistFolderCache(folderCacheUserId, nextFolders);
@@ -961,11 +962,12 @@ export default function ShortlistsPage() {
         : [];
   const folderCard = (folder) => {
     const count = lists.filter((list) => String(list.folderId) === String(folder.id)).length;
-    return <article className="sr-list-card sr-shortlist-folder-card" key={folder.id}>
+    return <article className="sr-list-card sr-shortlist-folder-card" key={folder.id} style={{ "--folder-color": folder.color || "#3478e8" }}>
       <button type="button" className="sr-folder-open" onClick={() => setActiveFolderId(folder.id)}>
-        <span className="sr-folder-icon" aria-hidden="true">▰</span>
+        <span className="sr-folder-icon" aria-hidden="true"><svg viewBox="0 0 48 48" focusable="false"><path d="M5 12a4 4 0 0 1 4-4h10l5 5h15a4 4 0 0 1 4 4v18a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V12Z" /></svg></span>
         <h2>{folder.name}</h2>
         <p>{count} shortlist{count === 1 ? "" : "s"}</p>
+        <span className="sr-folder-open-label">Open ›</span>
       </button>
       <div className="sr-folder-actions">
         <button type="button" onClick={() => renameFolder(folder)}>Rename</button>
@@ -998,7 +1000,7 @@ export default function ShortlistsPage() {
         <div className="sr-shortlist-section-heading"><h2>{showShared ? "Shared shortlists" : activeFolder ? activeFolder.name : "Unfiled shortlists"}</h2>{!showShared && activeFolder && <span>{visibleShortlists.length} shortlist{visibleShortlists.length === 1 ? "" : "s"}</span>}</div>
         {visibleShortlists.length > 0 ? <div className="sr-list-grid sr-shortlist-list-grid">{visibleShortlists.map(shortlistCard)}</div> : <div className="sr-empty">{showShared ? "No shortlists have been shared with you yet." : activeFolder ? "This folder is empty. Create a shortlist here or move one into it." : folders.length ? "No unfiled shortlists. Open a folder to see its shortlists, or create a new folder." : lists.length ? "All shortlists are in folders." : "Create a folder for a team, then add shortlists inside it."}</div>}
       </section>
-      {folderModalOpen && <div className="sr-modal" onClick={() => !folderSaving && setFolderModalOpen(false)}><form className="sr-form sr-shortlist-folder-form" onClick={(event) => event.stopPropagation()} onSubmit={saveFolder}><div className="sr-form-head"><div><div className="sr-kicker">SHORTLIST ORGANISATION</div><h2>Create Folder</h2></div><button type="button" className="sr-close" disabled={folderSaving} onClick={() => setFolderModalOpen(false)}>×</button></div><label className="sr-field"><span>Folder name</span><input autoFocus value={folderName} onChange={(event) => setFolderName(event.target.value)} placeholder="For example, Preston North End" /></label><div className="sr-actions"><button type="button" className="sr-outline" disabled={folderSaving} onClick={() => setFolderModalOpen(false)}>Cancel</button><button className="sr-cyan" disabled={!folderName.trim() || folderSaving}>{folderSaving ? "Saving…" : "Create Folder"}</button></div></form></div>}
+      {folderModalOpen && <div className="sr-modal" onClick={() => !folderSaving && setFolderModalOpen(false)}><form className="sr-form sr-shortlist-folder-form" onClick={(event) => event.stopPropagation()} onSubmit={saveFolder}><div className="sr-form-head"><div><div className="sr-kicker">SHORTLIST ORGANISATION</div><h2>Create Folder</h2></div><button type="button" className="sr-close" disabled={folderSaving} onClick={() => setFolderModalOpen(false)}>×</button></div><label className="sr-field"><span>Folder name</span><input autoFocus value={folderName} onChange={(event) => setFolderName(event.target.value)} placeholder="For example, Preston North End" /></label><label className="sr-field sr-folder-colour-field"><span>Folder colour</span><div className="sr-folder-colour-picker"><input aria-label="Choose folder colour" type="color" value={folderColor} onChange={(event) => setFolderColor(event.target.value)} /><output>{folderColor.toUpperCase()}</output><span className="sr-folder-colour-preview" style={{ background: folderColor }} /></div></label><div className="sr-actions"><button type="button" className="sr-outline" disabled={folderSaving} onClick={() => setFolderModalOpen(false)}>Cancel</button><button className="sr-cyan" disabled={!folderName.trim() || folderSaving}>{folderSaving ? "Saving…" : "Create Folder"}</button></div></form></div>}
       {show && (
         <div className="sr-modal">
           <form className="sr-form sr-shortlist-create" onSubmit={create}>
