@@ -910,3 +910,171 @@
     height: 32px;
   }
 }
+
+/* Keep the entire shortlist formation on the phone screen and prevent card content from wrapping into columns. */
+@media (max-width: 768px) {
+  .sr-shortlists-page .sr-tag-legend {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px 12px;
+    margin: 14px 0;
+    font-size: 13px;
+    line-height: 1.25;
+  }
+
+  .sr-shortlists-page.sr-shortlist-view .sr-real-pitch {
+    width: 100% !important;
+    height: 790px !important;
+    min-height: 790px !important;
+    max-height: none !important;
+    margin: 10px 0 0;
+    padding: 18px 7px;
+    box-sizing: border-box;
+    overflow: visible;
+    justify-content: space-around;
+    gap: 12px;
+  }
+
+  .sr-shortlists-page.sr-shortlist-view .sr-real-pitch .sr-pitch-row {
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 0;
+    justify-content: space-around;
+    gap: 3px;
+  }
+
+  .sr-shortlists-page.sr-shortlist-view .sr-real-pitch .sr-zone,
+  .sr-shortlists-page.sr-shortlist-view .sr-real-pitch .sr-zone-position-lcb,
+  .sr-shortlists-page.sr-shortlist-view .sr-real-pitch .sr-zone-position-rcb {
+    width: 23.5%;
+    min-width: 0;
+    max-width: 23.5%;
+    height: auto !important;
+    min-height: 112px !important;
+    max-height: 150px !important;
+    flex: 0 1 23.5%;
+    padding: 5px 4px;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+
+  .sr-shortlists-page.sr-shortlist-view .sr-real-pitch .sr-pitch-row.row-size-1 .sr-zone { width: 48%; max-width: 48%; flex-basis: 48%; }
+  .sr-shortlists-page.sr-shortlist-view .sr-real-pitch .sr-pitch-row.row-size-2 .sr-zone { width: 39%; max-width: 39%; flex-basis: 39%; }
+  .sr-shortlists-page.sr-shortlist-view .sr-real-pitch .sr-pitch-row.row-size-3 .sr-zone { width: 29%; max-width: 29%; flex-basis: 29%; }
+  .sr-shortlists-page.sr-shortlist-view .sr-real-pitch .sr-pitch-row.row-size-5 .sr-zone { width: 18.5%; max-width: 18.5%; flex-basis: 18.5%; }
+
+  .sr-shortlists-page.sr-shortlist-view .sr-zone-head {
+    min-width: 0;
+    gap: 3px;
+    font-size: 11px;
+  }
+
+  .sr-shortlists-page.sr-shortlist-view .sr-zone-head .sr-position-label-input {
+    width: 34px;
+    flex: 0 1 34px;
+    font-size: 12px;
+  }
+
+  .sr-shortlists-page.sr-shortlist-view .sr-zone-head span {
+    display: none;
+  }
+
+  .sr-shortlists-page.sr-shortlist-view .sr-zone-head button {
+    flex: 0 0 24px;
+    width: 24px;
+    height: 24px;
+    font-size: 18px;
+    line-height: 1;
+  }
+
+  .sr-shortlists-page.sr-shortlist-view .sr-zone-list {
+    max-height: 105px;
+    margin-top: 4px;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .sr-shortlists-page.sr-shortlist-view .sr-pitch-player-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-rows: auto auto;
+    align-items: center;
+    gap: 2px 4px;
+    min-width: 0;
+    min-height: 0;
+    margin: 3px 0;
+    padding: 5px 4px;
+  }
+
+  .sr-shortlists-page.sr-shortlist-view .sr-pitch-player-card > button:first-child {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+  }
+
+  .sr-shortlists-page.sr-shortlist-view .sr-shortlist-player-photo {
+    width: 28px;
+    height: 32px;
+    flex: 0 0 28px;
+  }
+
+  .sr-shortlists-page.sr-shortlist-view .sr-pitch-row.row-size-4 .sr-shortlist-player-photo,
+  .sr-shortlists-page.sr-shortlist-view .sr-pitch-row.row-size-5 .sr-shortlist-player-photo {
+    display: none;
+  }
+
+  .sr-shortlists-page.sr-shortlist-view .sr-pitch-player-card > button:first-child span {
+    min-width: 0;
+    flex: 1;
+    line-height: 1.15;
+  }
+
+  .sr-shortlists-page.sr-shortlist-view .sr-pitch-player-card > button:first-child strong {
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sr-shortlists-page.sr-shortlist-view .sr-pitch-player-card > button:first-child small {
+    display: flex;
+    align-items: center;
+    margin-top: 2px;
+    font-size: 9px;
+  }
+
+  .sr-shortlists-page.sr-shortlist-view .sr-pitch-player-card > button:first-child small > span > span:last-child {
+    display: none;
+  }
+
+  .sr-shortlists-page.sr-shortlist-view .sr-pitch-player-card > button:first-child .sr-report-count {
+    margin-top: 2px;
+    font-size: 9px;
+  }
+
+  .sr-shortlists-page.sr-shortlist-view .sr-card-tags {
+    grid-column: 2;
+    grid-row: 2;
+    gap: 2px;
+  }
+
+  .sr-shortlists-page.sr-shortlist-view .sr-card-tags i {
+    width: 8px;
+    height: 8px;
+  }
+
+  .sr-shortlists-page.sr-shortlist-view .sr-pitch-player-card > button:last-child {
+    grid-column: 3;
+    grid-row: 2;
+    min-width: 24px;
+    min-height: 24px;
+    padding: 1px 4px;
+    font-size: 14px;
+  }
+}

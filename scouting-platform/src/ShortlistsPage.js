@@ -921,7 +921,7 @@ export default function ShortlistsPage() {
             : formationRows[current.formation] || formationRows["4-3-3"]
           ).map((r, i) => (
             <div
-              className={"sr-pitch-row row-" + i}
+              className={`sr-pitch-row row-${i} row-size-${r.length}`}
               style={{
                 zIndex: r.some((pos) => pick && pick.startsWith(pos + "-"))
                   ? 10
