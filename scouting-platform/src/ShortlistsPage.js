@@ -999,7 +999,7 @@ export default function ShortlistsPage() {
       {folderSaveMessage && <p className="sr-folder-save-message" role="status">{folderSaveMessage}</p>}
       {!showShared && activeFolder && <button type="button" className="sr-back sr-shortlist-folder-back" onClick={() => setActiveFolderId("all")}>‹ All folders and shortlists</button>}
       {!showShared && activeFolderId === "all" ? <section className="sr-shortlist-folder-section">
-        <div className="sr-shortlist-section-heading"><h2>Folders &amp; unfiled shortlists</h2><span>{folders.length} folder{folders.length === 1 ? "" : "s"} · {visibleShortlists.length} unfiled</span></div>
+        <div className="sr-shortlist-section-heading"><h2>Folders &amp; unfiled shortlists</h2></div>
         {folders.length || visibleShortlists.length ? <div className="sr-list-grid sr-shortlist-folder-grid">{folders.map(folderCard)}{visibleShortlists.map(shortlistCard)}</div> : <div className="sr-empty">Create a folder for a team or project, or create a shortlist on its own.</div>}
       </section> : <section className="sr-shortlist-folder-section">
         <div className="sr-shortlist-section-heading"><h2>{showShared ? "Shared shortlists" : activeFolder?.name}</h2>{!showShared && activeFolder && <span>{visibleShortlists.length} shortlist{visibleShortlists.length === 1 ? "" : "s"}</span>}</div>
