@@ -798,3 +798,115 @@
     padding-left: 12px;
   }
 }
+
+/* Preserve the desktop card structure on phones, with comfortable spacing. */
+@media (max-width: 768px) {
+  .sr-shortlists-page.sr-page,
+  .sr-squad-plans-page.sr-page,
+  .sr-squad-plan.sr-page {
+    padding-top: 24px;
+    padding-right: calc(18px + env(safe-area-inset-right));
+    padding-left: calc(18px + env(safe-area-inset-left));
+  }
+
+  .sr-shortlists-page .sr-list-grid.sr-shortlist-folder-grid,
+  .sr-shortlists-page .sr-list-grid.sr-shortlist-list-grid,
+  .sr-squad-plans-page .sr-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 16px;
+  }
+
+  .sr-shortlists-page .sr-shortlist-folder-card,
+  .sr-shortlists-page .sr-shortlist-item,
+  .sr-squad-plans-page .sr-squad-plan-card {
+    min-height: 0;
+    padding: 16px;
+    border-width: 2px;
+    border-radius: 11px;
+  }
+
+  .sr-shortlists-page .sr-shortlist-folder-card .sr-folder-open {
+    min-height: 176px;
+    padding: 18px 16px 14px;
+  }
+
+  .sr-shortlists-page .sr-folder-icon {
+    width: 56px;
+    height: 56px;
+    margin-bottom: 14px;
+  }
+
+  .sr-shortlists-page .sr-folder-icon svg {
+    width: 34px;
+    height: 34px;
+  }
+
+  .sr-shortlists-page .sr-folder-open h2,
+  .sr-shortlists-page .sr-shortlist-item .sr-list-card-button h2 {
+    font-size: 22px;
+    line-height: 1.2;
+  }
+
+  .sr-shortlists-page .sr-shortlist-item .sr-list-card-button {
+    min-height: 158px !important;
+    padding: 18px 16px;
+  }
+
+  .sr-shortlists-page .sr-shortlist-item .sr-list-card-button p,
+  .sr-squad-plans-page .sr-squad-plan-card p {
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  .sr-shortlists-page .sr-shortlist-card-actions {
+    min-height: 52px;
+    margin: 0 -16px -16px;
+    padding: 8px 14px;
+  }
+
+  .sr-shortlists-page .sr-shortlist-folder-select {
+    flex-direction: row;
+    align-items: center;
+    font-size: 13px;
+  }
+
+  .sr-shortlists-page .sr-shortlist-folder-select select {
+    width: auto;
+  }
+
+  .sr-squad-plans-page .sr-squad-plan-card {
+    padding: 18px;
+  }
+
+  .sr-squad-plans-page .sr-squad-plan-card h3 {
+    font-size: 23px;
+  }
+
+  .sr-squad-plans-page .sr-squad-plan-card small {
+    font-size: 13px;
+  }
+
+  .sr-squad-plan .sr-real-pitch .sr-zone {
+    width: 160px;
+    min-width: 160px;
+  }
+
+  .sr-squad-plan .sr-real-pitch .sr-pitch-player-card {
+    min-height: 42px;
+    padding: 4px;
+    gap: 4px;
+  }
+
+  .sr-squad-plan .sr-real-pitch .sr-pitch-player-card strong {
+    font-size: 11px !important;
+  }
+
+  .sr-squad-plan .sr-real-pitch .sr-pitch-player-card small {
+    font-size: 9px !important;
+  }
+
+  .sr-squad-plan .sr-real-pitch .sr-shortlist-player-photo {
+    width: 28px;
+    height: 32px;
+  }
+}
