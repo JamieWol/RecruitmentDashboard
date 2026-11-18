@@ -384,6 +384,7 @@ export default function ScoutingReportsPageFinal() {
     } catch { return null; }
   });
   const [profileReturnReport, setProfileReturnReport] = useState(null);
+  const [profileContentTab, setProfileContentTab] = useState("reports");
   const [sharedReports, setSharedReports] = useState([]);
   const [sharedAssignments, setSharedAssignments] = useState([]);
   const [deleteError, setDeleteError] = useState("");
@@ -418,6 +419,94 @@ export default function ScoutingReportsPageFinal() {
     ...items.filter((item) => item.player === profile?.player && String(item.status || "").toLowerCase() === "published"),
     ...sharedReports.filter((item) => item.player === profile?.player && String(item.status || "Published").toLowerCase() === "published"),
   ].map((item) => [String(item.assignment_id || item.id || `${item.player}-${item.completed_at || item.date || ""}`), item])).values()];
+  const reportSectionDefinitions = [
+    ["In Possession", "inPossession"],
+    ["Out of Possession", "outPossession"],
+    ["Physical", "physical"],
+    ["On-Pitch Behaviour", "behaviour"],
+    ["Strengths", "strengths"],
+    ["Weaknesses", "weaknesses"],
+    ["Conclusions", "conclusion"],
+    ["Reasons Why", "reasons"],
+  ];
+  const profileSummarySections = reportSectionDefinitions.map(([title, key]) => {
+    const observations = new Map();
+    summaryReports.forEach((item, reportIndex) => {
+      const sourceReport = item.report || item;
+      reportSummaryPhrases([sourceReport[key]], 12).forEach((text) => {
+        const normalized = text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+        if (!normalized) return;
+        const scout = item.scout || item.scout_name || sourceReport.scout || "Scout not listed";
+        const fixture = fixtureLabel(item);
+        const date = item.completed_at || item.completedAt || item.date || "";
+        const source = [scout, fixture && fixture !== "Fixture not added" ? fixture : date].filter(Boolean).join(" · ");
+        const existing = observations.get(normalized);
+        if (existing) {
+          existing.sources.add(source);
+        } else {
+          observations.set(normalized, { text, sources: new Set([source]), reportIndex });
+        }
+      });
+    });
+    return { title, key, observations: [...observations.values()].slice(0, 8) };
+  });
+  const profileGradeRows = summaryReports.map((item) => {
+    const report = item.report || item;
+    const performanceValue = Number.parseFloat(String(report.performance ?? item.performance ?? "").match(/[1-5](?:\.\d+)?/)?.[0]);
+    const potentialValue = String(report.potential ?? item.potential ?? "").match(/(?:^|\b)([A-F])(?:\b|$)/i)?.[1]?.toUpperCase() || "";
+    return { performance: performanceValue >= 1 && performanceValue <= 5 ? performanceValue : null, potential: potentialValue };
+  });
+  const performanceGrades = profileGradeRows.map((row) => row.performance).filter(Number.isFinite);
+  const averagePerformance = performanceGrades.length ? performanceGrades.reduce((sum, value) => sum + value, 0) / performanceGrades.length : null;
+  const potentialGradeCounts = profileGradeRows.reduce((counts, row) => {
+    if (row.potential) counts[row.potential] = (counts[row.potential] || 0) + 1;
+    return counts;
+  }, {});
+  const commonPotentialGrade = Object.entries(potentialGradeCounts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
+  const gradeMatrix = "ABCDEF".split("").map((grade) => ({
+    grade,
+    counts: [1, 2, 3, 4, 5].map((performance) => profileGradeRows.filter((row) => row.potential === grade && row.performance === performance).length),
+  }));
+  const contradictionTraits = [
+    ["Pace", /\b(pace|speed|quick|quickness|fast|slow|acceleration)\b/i],
+    ["First touch and control", /\b(first touch|touch|control)\b/i],
+    ["Passing and distribution", /\b(pass|passing|distribution|vision)\b/i],
+    ["Physical strength", /\b(physical|strength|strong|power)\b/i],
+    ["Aerial ability", /\b(aerial|heading|headers|head(?:ing)?)\b/i],
+    ["Defensive duels", /\b(defen[cs]ive|tackl(?:e|ing)|duel|marking)\b/i],
+    ["Work rate", /\b(work rate|work-rate|effort|engine|intensity|hard working)\b/i],
+    ["Decision-making", /\b(decision|decision making|awareness|judgement|judgment)\b/i],
+    ["Finishing", /\b(finish(?:ing)?|scoring|shot|shooting)\b/i],
+    ["Positioning and movement", /\b(positioning|movement|runs|running lanes)\b/i],
+    ["Dribbling and carrying", /\b(dribbl(?:e|ing)|carry|carrying|take[- ]ons)\b/i],
+    ["Possession security", /\b(possession|turnover|retain|retention|protect(?:s|ing)? the ball)\b/i],
+  ];
+  const positiveLanguage = /\b(strong|good|effective|quick|fast|confident|consistent|excellent|dominant|comfortable|quality|impressive|mobile|decisive|composed|well|positive|capable)\b/i;
+  const negativeLanguage = /\b(weak|poor|slow|inconsistent|struggl(?:e|es|ed)|lack(?:s|ing)?|unable|loose|careless|limited|below|ineffective|not|doesn['’]?t|rarely|fail(?:s|ed)?|overly)\b/i;
+  const contradictionClaims = [];
+  summaryReports.forEach((item, reportIndex) => {
+    const report = item.report || item;
+    const scout = item.scout || item.scout_name || report.scout || "Scout not listed";
+    const fixture = fixtureLabel(item);
+    const date = item.completed_at || item.completedAt || item.date || "";
+    const source = [scout, fixture && fixture !== "Fixture not added" ? fixture : date].filter(Boolean).join(" · ");
+    const fields = ["inPossession", "outPossession", "physical", "behaviour", "strengths", "weaknesses", "conclusion", "reasons"];
+    fields.forEach((field) => reportSummaryPhrases([report[field]], 20).forEach((text) => {
+      const positive = positiveLanguage.test(text);
+      const negative = negativeLanguage.test(text);
+      if (positive === negative) return;
+      const sentiment = positive ? "positive" : "negative";
+      contradictionTraits.forEach(([trait, pattern]) => {
+        if (pattern.test(text)) contradictionClaims.push({ trait, sentiment, text, source, reportIndex });
+      });
+    }));
+  });
+  const contradictions = [...new Set(contradictionTraits.map(([trait]) => trait))].map((trait) => {
+    const claims = contradictionClaims.filter((claim) => claim.trait === trait);
+    const positive = claims.find((claim) => claim.sentiment === "positive");
+    const negative = claims.find((claim) => claim.sentiment === "negative" && claim.reportIndex !== positive?.reportIndex);
+    return positive && negative ? { trait, positive, negative } : null;
+  }).filter(Boolean);
   const generatedPlayerSummary = playerSummaryText(playerData, profile, summaryReports);
   const shownPlayerSummary = typeof savedPlayerSummary === "string" ? savedPlayerSummary : generatedPlayerSummary;
   useEffect(() => {
@@ -1603,33 +1692,6 @@ export default function ScoutingReportsPageFinal() {
             Add to Shortlist
           </button>
         </section>
-        <section
-          className="sr-player-details sr-player-summary-editor"
-          style={{ width: "100%", boxSizing: "border-box", border: "1px solid #2f84c5", borderRadius: 12, padding: 20, marginBottom: 20 }}
-        >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
-            <h2 style={{ margin: 0 }}>Player Summary</h2>
-            {!summaryEditing && <button className="sr-outline" type="button" onClick={() => setSummaryEditing(true)}>Edit Summary</button>}
-          </div>
-          {summaryEditing ? (
-            <>
-              <textarea
-                aria-label="Player Summary"
-                value={summaryDraft}
-                onChange={(e) => setSummaryDraft(e.target.value)}
-                rows={5}
-                style={{ display: "block", width: "100%", boxSizing: "border-box", resize: "vertical", padding: 12, font: "inherit", lineHeight: 1.55, border: "1px solid #cbd5e1", borderRadius: 8 }}
-              />
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
-                {summaryReports.length > 0 && <button className="sr-outline" type="button" onClick={() => setSummaryDraft(generatedPlayerSummary)}>Use Report Summary</button>}
-                <button className="sr-outline" type="button" onClick={() => { setSummaryDraft(shownPlayerSummary); setSummaryEditing(false); }}>Cancel</button>
-                <button className="sr-cyan" type="button" onClick={savePlayerSummary}>Save Summary</button>
-              </div>
-            </>
-          ) : (
-            <p style={{ margin: 0, whiteSpace: "pre-wrap", lineHeight: 1.6 }}>{shownPlayerSummary || "No summary yet. Select Edit Summary to add one."}</p>
-          )}
-        </section>
         <section className="sr-profile-layout">
           <div className="sr-profile-info-column">
             <section className="sr-player-details">
@@ -1702,7 +1764,12 @@ export default function ScoutingReportsPageFinal() {
           </svg>
         </section>
           </div>
-          <section className="sr-profile-reports">
+          <section className="sr-profile-content">
+            <div className="sr-profile-view-tabs" role="tablist" aria-label="Player profile content">
+              <button type="button" role="tab" aria-selected={profileContentTab === "reports"} className={profileContentTab === "reports" ? "active" : ""} onClick={() => setProfileContentTab("reports")}>Reports</button>
+              <button type="button" role="tab" aria-selected={profileContentTab === "summary"} className={profileContentTab === "summary" ? "active" : ""} onClick={() => setProfileContentTab("summary")}>Player Summary</button>
+            </div>
+            {profileContentTab === "reports" ? <div className="sr-profile-reports" role="tabpanel">
             <h2>Reports</h2>
             <div className="sr-report-table">
               <div className="sr-table-head">
@@ -1732,6 +1799,42 @@ export default function ScoutingReportsPageFinal() {
                   </button>
                 ))}
             </div>
+          </div> : <div className="sr-profile-player-summary" role="tabpanel">
+            <div className="sr-summary-heading">
+              <div><h2>Player Summary</h2><p>Combined view of published scouting reports</p></div>
+              {!summaryEditing && <button className="sr-outline" type="button" onClick={() => setSummaryEditing(true)}>Edit Overview</button>}
+            </div>
+            <div className="sr-summary-kpis">
+              <article><span>Most Common Potential Grade</span><strong>{commonPotentialGrade?.[0] || "—"}</strong><small>{commonPotentialGrade ? `${commonPotentialGrade[1]} of ${summaryReports.length} reports` : "No potential grades yet"}</small></article>
+              <article><span>Average Performance</span><strong>{averagePerformance == null ? "—" : averagePerformance.toFixed(1)}</strong><small>{performanceGrades.length ? `From ${performanceGrades.length} rated reports` : "No performance grades yet"}</small></article>
+              <article><span>Reports Included</span><strong>{summaryReports.length}</strong><small>Published reports</small></article>
+            </div>
+            <div className="sr-summary-columns">
+              <section className="sr-summary-card sr-grade-matrix-card">
+                <h3>Potential vs Performance</h3>
+                <p className="sr-summary-caption">Report count by potential grade and performance rating</p>
+                <div className="sr-grade-matrix" role="table" aria-label="Potential versus performance report counts">
+                  <div className="sr-grade-matrix-row header" role="row"><span>Grade</span>{[1, 2, 3, 4, 5].map((rating) => <span key={rating}>{rating}</span>)}</div>
+                  {gradeMatrix.map(({ grade, counts }) => <div className="sr-grade-matrix-row" role="row" key={grade}><strong>{grade}</strong>{counts.map((count, index) => <span className={count ? "has-count" : ""} key={`${grade}-${index}`}>{count || ""}</span>)}</div>)}
+                </div>
+              </section>
+              {summaryEditing ? <section className="sr-summary-card sr-summary-overview">
+                <div className="sr-summary-section-title"><h3>Overview</h3><button type="button" className="sr-outline" onClick={() => setSummaryDraft(generatedPlayerSummary)}>Use Report Summary</button></div>
+                <textarea aria-label="Player summary overview" value={summaryDraft} onChange={(event) => setSummaryDraft(event.target.value)} rows={5} />
+                <div className="sr-summary-actions"><button className="sr-outline" type="button" onClick={() => { setSummaryDraft(shownPlayerSummary); setSummaryEditing(false); }}>Cancel</button><button className="sr-cyan" type="button" onClick={savePlayerSummary}>Save Overview</button></div>
+              </section> : <section className="sr-summary-card sr-summary-overview"><h3>Overview</h3><p>{shownPlayerSummary || "No summary yet. Use Edit Overview to add one."}</p></section>}
+            </div>
+            <div className="sr-summary-observations">
+              {profileSummarySections.filter((section) => section.observations.length).map((section) => <section className="sr-summary-card" key={section.key}>
+                <h3>{section.title}</h3><ul>{section.observations.map((observation, index) => <li key={`${section.key}-${index}`}><span>{observation.text}</span>{observation.sources.size > 0 && <small>Source: {[...observation.sources].join("; ")}</small>}</li>)}</ul>
+              </section>)}
+              {!summaryReports.length && <p className="sr-summary-empty">Published reports will appear here once available.</p>}
+            </div>
+            <section className="sr-summary-card sr-contradictions">
+              <h3>Different Scout Views</h3><p className="sr-summary-caption">Possible contradictions are flagged when reports use clearly opposing language about the same attribute.</p>
+              {contradictions.length ? <ul>{contradictions.map(({ trait, positive, negative }) => <li key={trait}><strong>{trait}</strong><div><span>Positive: “{positive.text}”</span><small>{positive.source || "Scout not listed"}</small></div><div><span>Concern: “{negative.text}”</span><small>{negative.source || "Scout not listed"}</small></div></li>)}</ul> : <p>{summaryReports.length ? "No clear differences between reports were detected." : "No reports to compare yet."}</p>}
+            </section>
+          </div>}
           </section>
         </section>
         {shortlistPicker && (

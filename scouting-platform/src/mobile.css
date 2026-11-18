@@ -1591,3 +1591,14 @@
     max-width: 100%;
   }
 }
+@media (max-width: 700px) {
+  .sr-profile-view-tabs { border-radius: 14px; display: grid; grid-template-columns: 1fr 1fr; }
+  .sr-profile-view-tabs button { padding: 11px 8px; font-size: 14px; }
+  .sr-summary-heading, .sr-summary-section-title { align-items: flex-start; flex-direction: column; }
+  .sr-summary-kpis, .sr-summary-columns, .sr-summary-observations { grid-template-columns: minmax(0, 1fr); }
+  .sr-summary-kpis article, .sr-summary-card { padding: 15px; }
+  .sr-contradictions li { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .sr-profile-player-summary, .sr-profile-content, .sr-profile-layout { min-width: 0; max-width: 100%; }
+  .sr-profile-view-tabs button, .sr-summary-actions button, .sr-summary-section-title button { min-height: 42px; }
+  .sr-summary-actions { flex-wrap: wrap; }
+}
