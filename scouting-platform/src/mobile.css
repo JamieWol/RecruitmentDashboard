@@ -435,36 +435,6 @@
   }
 }
 
-@media (max-width: 768px) {
-  .sr-shortlists-page .sr-dashboard-head { display: block; }
-  .sr-shortlists-page .sr-head-actions { justify-content: flex-start; gap: 8px; }
-  .sr-shortlists-page .sr-head-actions button { flex: 1 1 auto; }
-  .sr-shortlists-page .sr-shortlist-folder-section { margin-top: 22px; }
-  .sr-shortlists-page .sr-list-grid.sr-shortlist-folder-grid,
-  .sr-shortlists-page .sr-list-grid.sr-shortlist-list-grid { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
-  .sr-shortlists-page .sr-shortlist-folder-card,
-  .sr-shortlists-page .sr-shortlist-item { min-height: 220px; }
-}
-
-@media (max-width: 380px) {
-  .sr-page {
-    padding-right: 12px;
-    padding-left: 12px;
-  }
-
-  .sr-profile-filters {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .sr-tabs {
-    width: calc(100% + 24px);
-    margin-right: -12px;
-    margin-left: -12px;
-    padding-right: 12px;
-    padding-left: 12px;
-  }
-}
-
 /* Keep the Shortlists mobile spacing and pitch sizing from its earlier layout. */
 @media (max-width: 768px) {
   .sr-shortlists-page.sr-page {
@@ -532,5 +502,299 @@
 
   .sr-shortlists-page.sr-shortlist-view .sr-pitch-player-card {
     min-width: 0;
+  }
+}
+
+/* Compact shortlist and squad-plan screens on phones, including installed PWAs. */
+@media (max-width: 768px) {
+  .sr-shortlists-page.sr-page,
+  .sr-squad-plans-page.sr-page,
+  .sr-squad-plan.sr-page {
+    min-height: calc(100dvh - 64px - env(safe-area-inset-top));
+    padding-top: 20px;
+    padding-right: calc(14px + env(safe-area-inset-right));
+    padding-bottom: calc(24px + env(safe-area-inset-bottom));
+    padding-left: calc(14px + env(safe-area-inset-left));
+  }
+
+  .sr-shortlists-page .sr-dashboard-head,
+  .sr-squad-plans-page .sr-dashboard-head,
+  .sr-squad-plan .sr-dashboard-head {
+    margin-bottom: 16px;
+  }
+
+  .sr-shortlists-page .sr-dashboard-head p,
+  .sr-squad-plans-page .sr-dashboard-head p,
+  .sr-squad-plan .sr-dashboard-head p {
+    margin: 7px 0 0;
+    font-size: 14px;
+    line-height: 1.4;
+  }
+
+  .sr-shortlists-page .sr-dashboard-head h1,
+  .sr-squad-plans-page .sr-dashboard-head h1,
+  .sr-squad-plan .sr-dashboard-head h1 {
+    font-size: clamp(27px, 7vw, 34px);
+  }
+
+  .sr-shortlists-page .sr-head-actions,
+  .sr-squad-plans-page .sr-shortlist-head-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-content: stretch;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .sr-shortlists-page .sr-head-actions > *,
+  .sr-squad-plans-page .sr-shortlist-head-actions > * {
+    min-width: 0;
+    width: 100%;
+    min-height: 42px;
+    box-sizing: border-box;
+    padding: 9px 10px;
+    font-size: 13px;
+    white-space: normal;
+  }
+
+  .sr-shortlists-page .sr-list-grid.sr-shortlist-folder-grid,
+  .sr-shortlists-page .sr-list-grid.sr-shortlist-list-grid,
+  .sr-squad-plans-page .sr-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 12px;
+  }
+
+  .sr-shortlists-page .sr-shortlist-folder-card,
+  .sr-shortlists-page .sr-shortlist-item,
+  .sr-squad-plans-page .sr-squad-plan-card {
+    min-width: 0;
+    min-height: 0;
+    padding: 13px;
+    border-width: 2px;
+    border-radius: 10px;
+  }
+
+  .sr-shortlists-page .sr-shortlist-folder-card .sr-folder-open {
+    min-height: 150px;
+    padding: 14px 12px 12px;
+  }
+
+  .sr-shortlists-page .sr-folder-icon {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 11px;
+    border-radius: 10px;
+  }
+
+  .sr-shortlists-page .sr-folder-icon svg {
+    width: 30px;
+    height: 30px;
+  }
+
+  .sr-shortlists-page .sr-folder-open h2,
+  .sr-shortlists-page .sr-shortlist-item .sr-list-card-button h2 {
+    font-size: 19px;
+    line-height: 1.15;
+  }
+
+  .sr-shortlists-page .sr-shortlist-item .sr-list-card-button {
+    min-height: 135px !important;
+    padding: 14px 12px;
+  }
+
+  .sr-shortlists-page .sr-shortlist-item .sr-list-card-button p,
+  .sr-squad-plans-page .sr-squad-plan-card p {
+    margin: 5px 0 8px;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
+  .sr-squad-plans-page .sr-squad-plan-card h3 {
+    margin: 12px 0 6px;
+    font-size: 20px;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+  }
+
+  .sr-squad-plans-page .sr-squad-plan-card small {
+    margin-top: 5px;
+    font-size: 12px;
+  }
+
+  .sr-squad-plans-page .sr-squad-plan-card .sr-card-top {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .sr-squad-plans-page .sr-squad-plan-card .sr-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .sr-squad-plans-page .sr-squad-plan-card .sr-small-action {
+    min-height: 34px;
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+
+  .sr-shortlists-page .sr-folder-actions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .sr-shortlists-page .sr-folder-actions button {
+    min-height: 36px;
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+
+  .sr-shortlists-page .sr-shortlist-folder-select {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+    padding: 8px;
+    font-size: 11px;
+  }
+
+  .sr-shortlists-page .sr-shortlist-folder-select select {
+    width: 100%;
+    min-height: 38px;
+  }
+
+  .sr-shortlists-page.sr-shortlist-view .sr-real-pitch .sr-zone {
+    width: 176px;
+    min-width: 176px;
+    flex-basis: 176px;
+  }
+
+  .sr-shortlists-page.sr-shortlist-view .sr-real-pitch .sr-zone-position-lcb,
+  .sr-shortlists-page.sr-shortlist-view .sr-real-pitch .sr-zone-position-rcb {
+    width: 176px;
+  }
+
+  .sr-squad-plan .sr-squad-roster {
+    max-height: 190px;
+    padding: 10px;
+  }
+
+  .sr-squad-plan .sr-real-pitch {
+    width: calc(100vw - 28px);
+    max-height: none;
+    height: var(--pitch-height) !important;
+    min-height: var(--pitch-height) !important;
+    padding: 12px 8px !important;
+    gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x pan-y pinch-zoom;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .sr-squad-plan .sr-real-pitch > .sr-pitch-row {
+    min-height: 0;
+    column-gap: 8px;
+  }
+
+  .sr-squad-plan .sr-real-pitch .sr-zone {
+    width: 140px;
+    min-width: 140px;
+    padding: 5px;
+  }
+
+  .sr-squad-plan .sr-real-pitch .sr-zone-head input {
+    max-width: 88px;
+    font-size: 12px;
+  }
+
+  .sr-squad-plan .sr-real-pitch .sr-zone-head button {
+    width: 28px;
+    height: 28px;
+    flex: 0 0 28px;
+  }
+
+  .sr-squad-plan .sr-real-pitch .sr-pitch-player-card {
+    min-height: 38px;
+    padding: 3px;
+    gap: 3px;
+  }
+
+  .sr-squad-plan .sr-real-pitch .sr-pitch-player-card strong {
+    font-size: 10px !important;
+  }
+
+  .sr-squad-plan .sr-real-pitch .sr-pitch-player-card small {
+    font-size: 8px !important;
+  }
+
+  .sr-squad-plan .sr-real-pitch .sr-shortlist-player-photo {
+    width: 24px;
+    height: 28px;
+  }
+
+  .sr-squad-plan .sr-squad-tag-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    padding: 8px;
+  }
+
+  .sr-squad-plan .sr-squad-tag-tools input:not(.sr-tag-color) {
+    flex: 1 1 130px;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 430px) {
+  .sr-shortlists-page .sr-list-grid.sr-shortlist-folder-grid,
+  .sr-shortlists-page .sr-list-grid.sr-shortlist-list-grid,
+  .sr-squad-plans-page .sr-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .sr-shortlists-page .sr-shortlist-folder-card .sr-folder-open {
+    min-height: 125px;
+  }
+
+  .sr-shortlists-page .sr-shortlist-item .sr-list-card-button {
+    min-height: 118px !important;
+  }
+
+  .sr-squad-plans-page .sr-squad-plan-card {
+    padding: 14px;
+  }
+}
+
+@media (max-width: 768px) {
+  .sr-shortlists-page .sr-dashboard-head { display: block; }
+  .sr-shortlists-page .sr-head-actions { justify-content: flex-start; gap: 8px; }
+  .sr-shortlists-page .sr-head-actions button { flex: 1 1 auto; }
+  .sr-shortlists-page .sr-shortlist-folder-section { margin-top: 22px; }
+  .sr-shortlists-page .sr-list-grid.sr-shortlist-folder-grid,
+  .sr-shortlists-page .sr-list-grid.sr-shortlist-list-grid { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  .sr-shortlists-page .sr-shortlist-folder-card,
+  .sr-shortlists-page .sr-shortlist-item { min-height: 220px; }
+}
+
+@media (max-width: 380px) {
+  .sr-page {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .sr-profile-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sr-tabs {
+    width: calc(100% + 24px);
+    margin-right: -12px;
+    margin-left: -12px;
+    padding-right: 12px;
+    padding-left: 12px;
   }
 }
