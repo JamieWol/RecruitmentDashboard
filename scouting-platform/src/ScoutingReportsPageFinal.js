@@ -1672,14 +1672,7 @@ export default function ScoutingReportsPageFinal() {
             {!playerDataLoading && playerDataError && <p className="sr-player-data-notice error" role="alert">Could not load player details: {playerDataError}</p>}
             {!playerDataLoading && !playerDataError && !playerData && <div className="sr-player-data-notice"><p>The report is available, but no matching player record was found in the master player database. Add their missing details below so their DOB and age can appear on the profile.</p><button type="button" className="sr-outline" onClick={() => setProfilePlayerFormOpen((open) => !open)} disabled={addingProfilePlayer}>{profilePlayerFormOpen ? "Close player details" : "Add this player to the database"}</button>{profilePlayerFormOpen && <><div className="sr-form-grid" style={{ marginTop: 14 }}><label className="sr-field"><span>Date of birth</span><input type="date" value={missingPlayerDob} onChange={(event) => setMissingPlayerDob(event.target.value)} /></label><label className="sr-field"><span>Nationality</span><input value={missingPlayerNationality} onChange={(event) => setMissingPlayerNationality(event.target.value)} /></label><label className="sr-field"><span>Preferred foot</span><select value={missingPlayerFoot} onChange={(event) => setMissingPlayerFoot(event.target.value)}><option value="">Select</option><option>Right</option><option>Left</option><option>Both</option></select></label></div><button type="button" className="sr-cyan" onClick={addProfilePlayerToMaster} disabled={addingProfilePlayer}>{addingProfilePlayer ? "Adding player…" : "Save player to database"}</button></>}{profilePlayerSaveMessage && <p role="status">{profilePlayerSaveMessage}</p>}</div>}
             </section>
-        <section className="sr-profile-position" aria-labelledby="sr-main-position-heading">
-          <div className="sr-profile-position-heading">
-            <div>
-              <div className="sr-kicker">PLAYER ROLE</div>
-              <h2 id="sr-main-position-heading">Main position</h2>
-            </div>
-            <strong>{mainPosition && mainPosition !== "—" ? mainPosition : "Position not available"}</strong>
-          </div>
+        <section className="sr-profile-position" aria-label={`Player main position: ${mainPosition && mainPosition !== "—" ? mainPosition : "not available"}`}>
           <svg className="sr-position-pitch" viewBox="0 0 560 360" role="img" aria-label={`Football pitch showing ${mainPosition && mainPosition !== "—" ? `the main position ${mainPosition}` : "no main position set"}`}>
             <rect className="sr-position-pitch-surface" x="20" y="12" width="520" height="336" rx="16" />
             <rect className="sr-position-pitch-line" x="20" y="12" width="520" height="336" rx="16" />
