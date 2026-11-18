@@ -508,7 +508,10 @@ export default function ScoutingReportsPageFinal() {
     const fields = ["inPossession", "outPossession", "physical", "behaviour", "strengths", "weaknesses", "conclusion", "reasons"];
     fields.forEach((field) => {
       const raw = report[field];
-      const chunks = (Array.isArray(raw) ? raw : [raw]).flatMap((value) => String(value || "").replace(/([.!?])\s+/g, "$1\n").split(/[\n•]+/));
+      const chunks = (Array.isArray(raw) ? raw : [raw]).flatMap((value) => String(value || "")
+        .replace(/([.!?])\s+/g, "$1\n")
+        .replace(/\s+(although|however|while|but|yet|though)\s+/gi, "\n")
+        .split(/[\n•]+/));
       chunks.map((text) => text.replace(/^\s*(?:[-*]\s*|\d+[.)]\s*)/, "").trim()).filter(Boolean).forEach((text) => {
         const negative = negativeLanguage.test(text);
         const positive = positiveLanguage.test(text) && !negative;
