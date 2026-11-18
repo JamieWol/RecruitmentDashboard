@@ -483,25 +483,18 @@ export default function ScoutingReportsPageFinal() {
     counts: [1, 2, 3, 4, 5].map((performance) => profileGradeRows.filter((row) => row.potential === grade && row.performance === performance).length),
   }));
   const contradictionTraits = [
-    ["First touch and ball control", /\b(first touch|touch|control|receiv(?:e|es|ed|ing))\b/i],
-    ["Technical ability", /\b(techn(?:ical|ically)|technique|technical ability|tight situations)\b/i],
-    ["Attacking impact", /\b(impact|influence|threat|danger|decisive|productive|attacking|chance)\b/i],
-    ["Mobility and movement", /\b(mobil(?:e|ity)|movement|between lines|spaces between lines)\b/i],
-    ["Consistency and end product", /\b(consistent|inconsistent|clinical|participation|performance|end product)\b/i],
-    ["Pace", /\b(pace|speed|quick|quickness|fast|slow|acceleration)\b/i],
-    ["Passing and distribution", /\b(pass|passing|distribution|vision)\b/i],
-    ["Physical strength", /\b(physical|strength|strong|power)\b/i],
-    ["Aerial ability", /\b(aerial|heading|headers|head(?:ing)?)\b/i],
-    ["Defensive duels", /\b(defen[cs]ive|tackl(?:e|ing)|duel|marking|challenge)\b/i],
-    ["Work rate", /\b(work rate|work-rate|effort|engine|intensity|hard working)\b/i],
-    ["Decision-making", /\b(decision|decision making|awareness|judgement|judgment)\b/i],
-    ["Finishing", /\b(finish(?:ing)?|scoring|shot|shooting|clinical)\b/i],
-    ["Positioning and movement", /\b(positioning|movement|runs|running lanes)\b/i],
-    ["Dribbling and carrying", /\b(dribbl(?:e|ing)|carry|carrying|take[- ]ons)\b/i],
-    ["Possession security", /\b(possession|turnover|retain|retention|protect(?:s|ing)? the ball)\b/i],
+    { trait: "Directness in 1v1s", positive: /\b(?:is |remains |very )?direct in (?:1\s*v\s*1s?|one[- ]v[- ]one(?: situations?)?)\b|\b(?:direct|positive) when (?:taking on|attacking) (?:his )?(?:man|defender)\b|\b(?:regularly )?(?:takes on|beats) (?:his )?(?:man|defender)s?\b/i, negative: /\b(?:not|isn['’]?t|is not|rarely|reluctant to|struggles? to|fails? to|doesn['’]?t|does not)\b.{0,45}\b(?:direct|take on|beat|dribble|attack)\b|\bindirect in (?:1\s*v\s*1s?|one[- ]v[- ]one)\b|\b(?:poor|ineffective|weak) in (?:1\s*v\s*1s?|one[- ]v[- ]one)\b/i },
+    { trait: "First touch and ball control", positive: /\b(?:good|assured|clean|secure|excellent|confident|reliable)\b.{0,35}\b(?:first touch|touch|ball control|control|receiv\w*)\b|\b(?:first touch|touch|ball control|control|receiv\w*)\b.{0,35}\b(?:good|assured|clean|secure|excellent|confident|reliable)\b/i, negative: /\b(?:erratic|loose|poor|heavy|inconsistent|weak|unreliable)\b.{0,35}\b(?:first touch|touch|ball control|control|receiv\w*)\b|\b(?:first touch|touch|ball control|control)\b.{0,35}\b(?:erratic|loose|poor|heavy|inconsistent|weak|unreliable)\b/i },
+    { trait: "Possession security", positive: /\b(?:secure|assured|keeps?|retains?|protects?)\b.{0,35}\b(?:possession|the ball|under pressure)\b|\b(?:keeps?|retains?|protects?) possession\b/i, negative: /\b(?:loose|careless|erratic|gives? away|loses?|turns? over)\b.{0,35}\b(?:possession|the ball|touches?)\b|\b(?:poor|weak) ball retention\b/i },
+    { trait: "Technical ability", positive: /\b(?:technically good|good technique|quality (?:on the ball|in his actions)|technically gifted|excellent technical ability)\b/i, negative: /\b(?:not outstanding|not the specialist technically|average in tight situations|technically limited|poor technique|lacks? technical quality)\b/i },
+    { trait: "Attacking impact", positive: /\b(?:always a threat|constant threat|decisive|match[- ]winning|productive|has (?:a )?good influence|influential|creates? (?:danger|chances)|generates? attacking danger|caus(?:e|es|ed) problems)\b/i, negative: /\b(?:not great influence|no particular impact|little impact|limited influence|could not generate attacking danger|doesn['’]?t generate (?:attacking )?danger|needs? to influence (?:the )?game more|not a threat|rarely influences?)\b/i },
+    { trait: "Mobility and movement", positive: /\b(?:good|excellent|strong) mobility\b|\bmobile between lines\b|\bmobility to cover ground\b|\b(?:good|intelligent) movement between lines\b/i, negative: /\b(?:not great|poor|limited|lacks?) mobility\b|\bnot mobile\b|\b(?:poor|limited) movement between lines\b|\bstationary between lines\b/i },
+    { trait: "Consistency and end product", positive: /\b(?:consistent|clinical|decisive|productive with (?:the )?(?:few )?chances|consistent end product)\b/i, negative: /\b(?:inconsistent|not clinical enough|lacks? consistency|inconsistent participation|inconsistent end product)\b/i },
+    { trait: "Pace", positive: /\b(?:quick|fast|explosive pace|good pace|excellent acceleration)\b/i, negative: /\b(?:slow|lacks? pace|poor acceleration|not quick enough)\b/i },
+    { trait: "Work rate and pressing", positive: /\b(?:works? hard|high work rate|good work rate|presses? with intent|energetic pressing|hard working)\b/i, negative: /\b(?:doesn['’]?t work hard|low work rate|poor work rate|reluctant to press|doesn['’]?t press|lacks? effort)\b/i },
+    { trait: "Decision-making", positive: /\b(?:good|strong|smart|excellent) decision[- ]making\b|\bmakes? (?:good|smart|strong) decisions\b/i, negative: /\b(?:poor|rash|questionable|inconsistent) decision[- ]making\b|\bneeds? to make better decisions\b|\bdecision[- ]making can improve\b/i },
+    { trait: "Defensive duels", positive: /\b(?:strong|dominant|wins?)\b.{0,25}\b(?:defensive )?duels?\b|\bstrong in (?:the )?(?:tackle|challenge)s?\b/i, negative: /\b(?:weak|poor|loses?)\b.{0,25}\b(?:defensive )?duels?\b|\b(?:rash|poor) in (?:the )?(?:tackle|challenge)s?\b/i },
   ];
-  const positiveLanguage = /\b(assured|good|great|strong|effective|quick|fast|confident|consistent|excellent|dominant|comfortable|quality|impressive|mobile|decisive|composed|well|positive|capable|threat|productive|clinical|outstanding|specialist|influence|impact|participation|generated|problems|works hard)\b/i;
-  const negativeLanguage = /\b(erratic|loose|not outstanding|not the specialist|average|no particular impact|not great|could not|cannot|inconsistent|not clinical|rash|poor|weak|slow|struggl(?:e|es|ed)|lack(?:s|ing)?|unable|careless|limited|below|ineffective|not|doesn['’]?t|rarely|fail(?:s|ed)?|overly|needs? to improve|needs? to be tidier)\b/i;
   const contradictionClaims = [];
   summaryReports.forEach((item, reportIndex) => {
     const report = item.report || item;
@@ -513,17 +506,15 @@ export default function ScoutingReportsPageFinal() {
         .replace(/\s+(although|however|while|but|yet|though)\s+/gi, "\n")
         .split(/[\n•]+/));
       chunks.map((text) => text.replace(/^\s*(?:[-*]\s*|\d+[.)]\s*)/, "").trim()).filter(Boolean).forEach((text) => {
-        const negative = negativeLanguage.test(text);
-        const positive = positiveLanguage.test(text) && !negative;
-        if (positive === negative) return;
-        const sentiment = positive ? "positive" : "negative";
-        contradictionTraits.forEach(([trait, pattern]) => {
-          if (pattern.test(text)) contradictionClaims.push({ trait, sentiment, text, reportIndex });
+        contradictionTraits.forEach(({ trait, positive: positivePattern, negative: negativePattern }) => {
+          const negative = negativePattern.test(text);
+          const positive = positivePattern.test(text) && !negative;
+          if (positive !== negative) contradictionClaims.push({ trait, sentiment: positive ? "positive" : "negative", text, reportIndex });
         });
       });
     });
   });
-  const contradictions = [...new Set(contradictionTraits.map(([trait]) => trait))].map((trait) => {
+  const contradictions = contradictionTraits.map(({ trait }) => {
     const claims = contradictionClaims.filter((claim) => claim.trait === trait);
     const positive = [...new Map(claims.filter((claim) => claim.sentiment === "positive").map((claim) => [claim.text.toLowerCase(), claim])).values()];
     const negative = [...new Map(claims.filter((claim) => claim.sentiment === "negative").map((claim) => [claim.text.toLowerCase(), claim])).values()];
