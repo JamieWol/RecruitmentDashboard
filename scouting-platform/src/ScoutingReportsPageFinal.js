@@ -1826,13 +1826,13 @@ export default function ScoutingReportsPageFinal() {
             </div>
             <div className="sr-summary-observations">
               {profileSummarySections.filter((section) => section.observations.length).map((section) => <section className="sr-summary-card" key={section.key}>
-                <h3>{section.title}</h3><ul>{section.observations.map((observation, index) => <li key={`${section.key}-${index}`}><span>{observation.text}</span>{observation.sources.size > 0 && <small>Source: {[...observation.sources].join("; ")}</small>}</li>)}</ul>
+                <h3>{section.title}</h3><ul>{section.observations.map((observation, index) => <li key={`${section.key}-${index}`}><span>{observation.text}</span></li>)}</ul>
               </section>)}
               {!summaryReports.length && <p className="sr-summary-empty">Published reports will appear here once available.</p>}
             </div>
             <section className="sr-summary-card sr-contradictions">
-              <h3>Different Scout Views</h3><p className="sr-summary-caption">Possible contradictions are flagged when reports use clearly opposing language about the same attribute.</p>
-              {contradictions.length ? <ul>{contradictions.map(({ trait, positive, negative }) => <li key={trait}><strong>{trait}</strong><div><span>Positive: “{positive.text}”</span><small>{positive.source || "Scout not listed"}</small></div><div><span>Concern: “{negative.text}”</span><small>{negative.source || "Scout not listed"}</small></div></li>)}</ul> : <p>{summaryReports.length ? "No clear differences between reports were detected." : "No reports to compare yet."}</p>}
+              <h3>Contradictions</h3><p className="sr-summary-caption">Reports may differ in how they assess the same attribute.</p>
+              {contradictions.length ? <ul>{contradictions.map(({ trait, positive, negative }) => <li key={trait}><strong>{trait}</strong><div><span>Positive: “{positive.text}”</span></div><div><span>Concern: “{negative.text}”</span></div></li>)}</ul> : <p>{summaryReports.length ? "No clear contradictions were detected." : "No reports to compare yet."}</p>}
             </section>
           </div>}
           </section>
