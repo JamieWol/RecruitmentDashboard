@@ -483,44 +483,53 @@ export default function ScoutingReportsPageFinal() {
     counts: [1, 2, 3, 4, 5].map((performance) => profileGradeRows.filter((row) => row.potential === grade && row.performance === performance).length),
   }));
   const contradictionTraits = [
+    ["First touch and ball control", /\b(first touch|touch|control|receiv(?:e|es|ed|ing))\b/i],
+    ["Technical ability", /\b(techn(?:ical|ically)|technique|technical ability|tight situations)\b/i],
+    ["Attacking impact", /\b(impact|influence|threat|danger|decisive|productive|attacking|chance)\b/i],
+    ["Mobility and movement", /\b(mobil(?:e|ity)|movement|between lines|spaces between lines)\b/i],
+    ["Consistency and end product", /\b(consistent|inconsistent|clinical|participation|performance|end product)\b/i],
     ["Pace", /\b(pace|speed|quick|quickness|fast|slow|acceleration)\b/i],
-    ["First touch and control", /\b(first touch|touch|control)\b/i],
     ["Passing and distribution", /\b(pass|passing|distribution|vision)\b/i],
     ["Physical strength", /\b(physical|strength|strong|power)\b/i],
     ["Aerial ability", /\b(aerial|heading|headers|head(?:ing)?)\b/i],
-    ["Defensive duels", /\b(defen[cs]ive|tackl(?:e|ing)|duel|marking)\b/i],
+    ["Defensive duels", /\b(defen[cs]ive|tackl(?:e|ing)|duel|marking|challenge)\b/i],
     ["Work rate", /\b(work rate|work-rate|effort|engine|intensity|hard working)\b/i],
     ["Decision-making", /\b(decision|decision making|awareness|judgement|judgment)\b/i],
-    ["Finishing", /\b(finish(?:ing)?|scoring|shot|shooting)\b/i],
+    ["Finishing", /\b(finish(?:ing)?|scoring|shot|shooting|clinical)\b/i],
     ["Positioning and movement", /\b(positioning|movement|runs|running lanes)\b/i],
     ["Dribbling and carrying", /\b(dribbl(?:e|ing)|carry|carrying|take[- ]ons)\b/i],
     ["Possession security", /\b(possession|turnover|retain|retention|protect(?:s|ing)? the ball)\b/i],
   ];
-  const positiveLanguage = /\b(strong|good|effective|quick|fast|confident|consistent|excellent|dominant|comfortable|quality|impressive|mobile|decisive|composed|well|positive|capable)\b/i;
-  const negativeLanguage = /\b(weak|poor|slow|inconsistent|struggl(?:e|es|ed)|lack(?:s|ing)?|unable|loose|careless|limited|below|ineffective|not|doesn['’]?t|rarely|fail(?:s|ed)?|overly)\b/i;
+  const positiveLanguage = /\b(assured|good|great|strong|effective|quick|fast|confident|consistent|excellent|dominant|comfortable|quality|impressive|mobile|decisive|composed|well|positive|capable|threat|productive|clinical|outstanding|specialist|influence|impact|participation|generated|problems|works hard)\b/i;
+  const negativeLanguage = /\b(erratic|loose|not outstanding|not the specialist|average|no particular impact|not great|could not|cannot|inconsistent|not clinical|rash|poor|weak|slow|struggl(?:e|es|ed)|lack(?:s|ing)?|unable|careless|limited|below|ineffective|not|doesn['’]?t|rarely|fail(?:s|ed)?|overly|needs? to improve|needs? to be tidier)\b/i;
   const contradictionClaims = [];
   summaryReports.forEach((item, reportIndex) => {
     const report = item.report || item;
-    const scout = item.scout || item.scout_name || report.scout || "Scout not listed";
-    const fixture = fixtureLabel(item);
-    const date = item.completed_at || item.completedAt || item.date || "";
-    const source = [scout, fixture && fixture !== "Fixture not added" ? fixture : date].filter(Boolean).join(" · ");
     const fields = ["inPossession", "outPossession", "physical", "behaviour", "strengths", "weaknesses", "conclusion", "reasons"];
-    fields.forEach((field) => reportSummaryPhrases([report[field]], 20).forEach((text) => {
-      const positive = positiveLanguage.test(text);
-      const negative = negativeLanguage.test(text);
-      if (positive === negative) return;
-      const sentiment = positive ? "positive" : "negative";
-      contradictionTraits.forEach(([trait, pattern]) => {
-        if (pattern.test(text)) contradictionClaims.push({ trait, sentiment, text, source, reportIndex });
+    fields.forEach((field) => {
+      const raw = report[field];
+      const chunks = (Array.isArray(raw) ? raw : [raw]).flatMap((value) => String(value || "").replace(/([.!?])\s+/g, "$1\n").split(/[\n•]+/));
+      chunks.map((text) => text.replace(/^\s*(?:[-*]\s*|\d+[.)]\s*)/, "").trim()).filter(Boolean).forEach((text) => {
+        const negative = negativeLanguage.test(text);
+        const positive = positiveLanguage.test(text) && !negative;
+        if (positive === negative) return;
+        const sentiment = positive ? "positive" : "negative";
+        contradictionTraits.forEach(([trait, pattern]) => {
+          if (pattern.test(text)) contradictionClaims.push({ trait, sentiment, text, reportIndex });
+        });
       });
-    }));
+    });
   });
   const contradictions = [...new Set(contradictionTraits.map(([trait]) => trait))].map((trait) => {
     const claims = contradictionClaims.filter((claim) => claim.trait === trait);
-    const positive = claims.find((claim) => claim.sentiment === "positive");
-    const negative = claims.find((claim) => claim.sentiment === "negative" && claim.reportIndex !== positive?.reportIndex);
-    return positive && negative ? { trait, positive, negative } : null;
+    const positive = [...new Map(claims.filter((claim) => claim.sentiment === "positive").map((claim) => [claim.text.toLowerCase(), claim])).values()];
+    const negative = [...new Map(claims.filter((claim) => claim.sentiment === "negative").map((claim) => [claim.text.toLowerCase(), claim])).values()];
+    const hasCrossReportConflict = positive.some((good) => negative.some((concern) => good.reportIndex !== concern.reportIndex));
+    return hasCrossReportConflict ? {
+      trait,
+      positive: positive.slice(0, 3).map((claim) => claim.text.replace(/[.!?]+$/, "")),
+      negative: negative.slice(0, 3).map((claim) => claim.text.replace(/[.!?]+$/, "")),
+    } : null;
   }).filter(Boolean);
   const generatedPlayerSummary = playerSummaryText(playerData, profile, summaryReports);
   const shownPlayerSummary = typeof savedPlayerSummary === "string" ? savedPlayerSummary : generatedPlayerSummary;
@@ -1845,8 +1854,8 @@ export default function ScoutingReportsPageFinal() {
               {!summaryReports.length && <p className="sr-summary-empty">Published reports will appear here once available.</p>}
             </div>
             <section className="sr-summary-card sr-contradictions">
-              <h3>Contradictions</h3><p className="sr-summary-caption">Reports may differ in how they assess the same attribute.</p>
-              {contradictions.length ? <ul>{contradictions.map(({ trait, positive, negative }) => <li key={trait}><strong>{trait}</strong><div><span>Positive: “{positive.text}”</span></div><div><span>Concern: “{negative.text}”</span></div></li>)}</ul> : <p>{summaryReports.length ? "No clear contradictions were detected." : "No reports to compare yet."}</p>}
+              <h3>Contradiction</h3>
+              {contradictions.length ? <ul>{contradictions.map(({ trait, positive, negative }) => <li key={trait}><span className="sr-contradiction-text">{`Reports differ on ${trait.toLowerCase()}: concerns include ${negative.map((text) => `“${text}”`).join(" and ")}, while positive assessments include ${positive.map((text) => `“${text}”`).join(" and ")}.`}</span></li>)}</ul> : <p>{summaryReports.length ? "No clear contradictions were detected." : "No reports to compare yet."}</p>}
             </section>
           </div>}
           </section>
