@@ -384,7 +384,7 @@ export default function ScoutingReportsPageFinal() {
     } catch { return null; }
   });
   const [profileReturnReport, setProfileReturnReport] = useState(null);
-  const [profileContentTab, setProfileContentTab] = useState("reports");
+  const [profileContentTab, setProfileContentTab] = useState(() => sessionStorage.getItem("scoutingProfileContentTab") === "summary" ? "summary" : "reports");
   const [sharedReports, setSharedReports] = useState([]);
   const [sharedAssignments, setSharedAssignments] = useState([]);
   const [deleteError, setDeleteError] = useState("");
@@ -411,6 +411,9 @@ export default function ScoutingReportsPageFinal() {
   const [importNotice, setImportNotice] = useState("");
   const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
   const actionsMenuRef = useRef(null);
+  useEffect(() => {
+    sessionStorage.setItem("scoutingProfileContentTab", profileContentTab);
+  }, [profileContentTab]);
   const [profileFilters, setProfileFilters] = useState(readProfileCheckerFilters);
   const profileFiltersActive = Object.entries(profileFilters).some(([key, value]) => ["performance", "potential"].includes(key) ? value.length > 0 : Boolean(value));
   const summaryKey = String(playerData?.id || playerData?.player_id || profile?.playerId || normalizePlayerName(profile?.player));
@@ -1802,7 +1805,6 @@ export default function ScoutingReportsPageFinal() {
           </div> : <div className="sr-profile-player-summary" role="tabpanel">
             <div className="sr-summary-heading">
               <div><h2>Player Summary</h2><p>Combined view of published scouting reports</p></div>
-              {!summaryEditing && <button className="sr-outline" type="button" onClick={() => setSummaryEditing(true)}>Edit Overview</button>}
             </div>
             <div className="sr-summary-kpis">
               <article><span>Most Common Potential Grade</span><strong>{commonPotentialGrade?.[0] || "—"}</strong><small>{commonPotentialGrade ? `${commonPotentialGrade[1]} of ${summaryReports.length} reports` : "No potential grades yet"}</small></article>
