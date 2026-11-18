@@ -411,4 +411,4 @@ header{z-index:1000!important}.sr-page{position:relative;z-index:1}.sr-pitch{z-i
 .sr-profile-info-column{min-width:0;width:100%}
 .sr-profile-info-column>.sr-player-details{box-sizing:border-box;width:100%}
 .sr-profile-info-column>.sr-profile-position{width:100%;max-width:none;margin:14px 0 0;padding:0;background:transparent;border:0;border-radius:0}
-.sr-profile-info-column .sr-position-pitch{width:min(100%,520px)}
+.sr-profile-info-column .sr-position-pitch{width:min(100%,440px)}

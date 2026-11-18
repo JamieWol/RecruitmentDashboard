@@ -7,13 +7,24 @@ import { createMasterPlayer } from "./playerDatabase";
 
 export default function CreateAssignmentPage() {
   const { appState, updateAppState, profile, user } = useAuth();
+  const [profilePrefill] = useState(() => {
+    try {
+      const value = JSON.parse(sessionStorage.getItem("scoutingCreateAssignmentPlayer") || "null");
+      return value?.name ? value : null;
+    } catch {
+      return null;
+    }
+  });
   const [databasePlayers, setDatabasePlayers] = useState([]);
   const [scouts, setScouts] = useState([]);
-  const [mode, setMode] = useState(() => localStorage.getItem("editingAssignment") ? "player" : ""),
+  const [mode, setMode] = useState(() => (localStorage.getItem("editingAssignment") || profilePrefill) ? "player" : ""),
     [query, setQuery] = useState(""),
-    [selected, setSelected] = useState(""),
+    [selected, setSelected] = useState(() => profilePrefill?.name || ""),
     [selectedPlayers, setSelectedPlayers] = useState([]),
     [newPlayer, setNewPlayer] = useState(false);
+  useEffect(() => {
+    if (profilePrefill) sessionStorage.removeItem("scoutingCreateAssignmentPlayer");
+  }, [profilePrefill]);
   useEffect(() => {
     if (!profile?.club) return;
     supabase.from("profiles").select("id,full_name,club").eq("club", profile.club).eq("approved", true).then(({ data }) => setScouts(data || []));
@@ -59,9 +70,10 @@ export default function CreateAssignmentPage() {
     ]).values(),
   ];
   const [details, setDetails] = useState({
-      name: "",
-      club: "",
-      position: "",
+      name: profilePrefill?.name || "",
+      playerId: profilePrefill?.playerId || null,
+      club: profilePrefill?.club || "",
+      position: profilePrefill?.position || "",
       dob: "",
       nationality: "",
       foot: "",
@@ -77,7 +89,7 @@ export default function CreateAssignmentPage() {
     const editing = JSON.parse(
       localStorage.getItem("editingAssignment") || "null",
     );
-    if (!editing) return;
+    if (!editing || profilePrefill) return;
     setSelected(editing.player);
     setQuery(editing.player);
     setDetails({
@@ -98,7 +110,7 @@ export default function CreateAssignmentPage() {
     setScout(editing.scoutId || user?.id || "");
     setDate(editing.date || "");
     setViewing(editing.viewing || "Live");
-  }, [user?.id]);
+  }, [user?.id, profilePrefill]);
   const matches = players.filter((p) =>
     p.name.toLowerCase().includes(query.toLowerCase()) &&
     (mode !== "fixture" || !selectedPlayers.some((chosen) => String(chosen.id || chosen.name).toLowerCase() === String(p.id || p.name).toLowerCase())),
@@ -143,7 +155,7 @@ export default function CreateAssignmentPage() {
       }
     }
     const old = appState?.assignments || JSON.parse(localStorage.getItem("scoutingAssignments") || "[]");
-    const editing = JSON.parse(
+    const editing = profilePrefill ? null : JSON.parse(
       localStorage.getItem("editingAssignment") || "null",
     );
     const existing = editing
@@ -154,7 +166,7 @@ export default function CreateAssignmentPage() {
     const assignment = {
       id: existing?.id || editing?.id || Date.now(),
       player,
-      playerId: chosen?.id || chosen?.player_id || chosen?.["Player Id"] || null,
+      playerId: chosen?.id || chosen?.player_id || chosen?.["Player Id"] || details.playerId || null,
       club: details.club || chosen?.club || "",
       position: details.position || chosen?.position || "",
       games: fixtures,
@@ -235,13 +247,13 @@ export default function CreateAssignmentPage() {
         </div>
       ) : (
         <form className="sr-form sr-wizard-form" onSubmit={save}>
-          <button type="button" className="sr-back" onClick={() => setMode("")}>
+          {!profilePrefill && <button type="button" className="sr-back" onClick={() => setMode("")}>
             ‹ Change assignment type
-          </button>
+          </button>}
           <h2>
             {mode === "player" ? "Assign by Player" : "Assign by Fixture"}
           </h2>
-          <label className="sr-field">
+          {!profilePrefill && <label className="sr-field">
             <span>Search Player</span>
             <input
               value={query}
@@ -255,7 +267,7 @@ export default function CreateAssignmentPage() {
               }}
               placeholder="Type player name..."
             />
-          </label>
+          </label>}
           {query && !newPlayer && (
             <div className="sr-player-results">
               {matches.map((p) => (

@@ -1452,7 +1452,7 @@
 @media (max-width: 768px) {
   .sr-profile-info-column { min-width: 0; width: 100%; }
   .sr-profile-info-column > .sr-profile-position { margin-top: 12px; padding: 0; background: transparent; border: 0; border-radius: 0; }
-  .sr-profile-info-column .sr-position-pitch { width: min(100%, 440px); }
+  .sr-profile-info-column .sr-position-pitch { width: min(100%, 360px); }
 }
 
 /* Scout analysis dashboard: stack its desktop panels on phone screens. */

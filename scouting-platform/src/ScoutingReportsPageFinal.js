@@ -1551,7 +1551,17 @@ export default function ScoutingReportsPageFinal() {
               {dataValue("Playing Position", "Primary Position", "Position", "playing_position", "primary_position", "position")}
             </p>
           </div>
-          <button className="sr-cyan" onClick={() => nav("/create-assignment")}>
+          <button className="sr-cyan" onClick={() => {
+            try {
+              sessionStorage.setItem("scoutingCreateAssignmentPlayer", JSON.stringify({
+                name: profile.player,
+                playerId: profile.playerId || profile.player_id || profile["Player Id"] || null,
+                club: clubName === "—" ? "" : clubName,
+                position: mainPosition === "—" ? "" : mainPosition,
+              }));
+            } catch {}
+            nav("/create-assignment");
+          }}>
             Create Assignment
           </button>
         </section>
