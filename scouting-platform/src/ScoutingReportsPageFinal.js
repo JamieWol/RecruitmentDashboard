@@ -709,7 +709,7 @@ export default function ScoutingReportsPageFinal() {
           scoutId: row.assigned_to || row.assignment?.scoutId,
           status: row.status || row.assignment?.status || "Not Started",
         }));
-        setSharedAssignments([...new Map(loadedAssignments.map((assignment) => [String(assignment.player || assignment.id).trim().toLowerCase(), assignment])).values()]);
+        setSharedAssignments([...new Map(loadedAssignments.map((assignment) => [String(assignment.sharedAssignmentId || assignment.id), assignment])).values()]);
       });
   }, [user, accountProfile?.club]);
   useEffect(() => {

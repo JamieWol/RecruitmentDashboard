@@ -163,8 +163,14 @@ export default function CreateAssignmentPage() {
       : null;
     const selectedScout = scouts.find((member) => String(member.id) === String(scout));
     const currentScoutName = profile?.full_name || user?.user_metadata?.full_name || user?.email || "";
+    const newAssignmentId = () => {
+      const usedIds = new Set(old.map((item) => String(item.id)));
+      let candidate = Date.now();
+      while (usedIds.has(String(candidate))) candidate += 1;
+      return candidate;
+    };
     const assignment = {
-      id: existing?.id || editing?.id || Date.now(),
+      id: existing?.id || editing?.id || newAssignmentId(),
       player,
       playerId: chosen?.id || chosen?.player_id || chosen?.["Player Id"] || details.playerId || null,
       club: details.club || chosen?.club || "",
@@ -183,9 +189,22 @@ export default function CreateAssignmentPage() {
     };
     let nextAssignments;
     if (mode === "fixture") {
-      const groupId = String(Date.now());
+      const usedIds = new Set(old.map((item) => String(item.id)));
+      let firstId = Date.now();
+      let idRangeConflicts = true;
+      while (idRangeConflicts) {
+        idRangeConflicts = false;
+        for (let index = 0; index < selectedPlayers.length; index += 1) {
+          if (usedIds.has(String(firstId + index))) {
+            firstId += 1;
+            idRangeConflicts = true;
+            break;
+          }
+        }
+      }
+      const groupId = String(firstId);
       const groupPlayers = selectedPlayers.map((person, index) => ({
-        assignmentId: Number(groupId) + index,
+        assignmentId: firstId + index,
         player: person.name,
         playerId: person.id || person.player_id || person["Player Id"] || null,
         club: person.club || "",
@@ -208,9 +227,7 @@ export default function CreateAssignmentPage() {
       ];
     } else {
       nextAssignments = editing
-        ? old
-          .map((x) => String(x.id) === String(editing.id) ? { ...x, ...assignment, id: x.id } : x)
-          .filter((x) => String(x.id) === String(editing.id) || String(x.player || "").trim().toLowerCase() !== String(player).trim().toLowerCase())
+        ? old.map((x) => String(x.id) === String(editing.id) ? { ...x, ...assignment, id: x.id } : x)
         : [...old, assignment];
     }
     updateAppState({ ...appState, assignments: nextAssignments });
