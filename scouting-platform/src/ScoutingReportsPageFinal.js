@@ -284,6 +284,34 @@ const reportSummaryPhrases = (values, limit = 3) => {
     })
     .slice(0, limit);
 };
+const summarizeReportSection = (values, limit = 5) => {
+  const phrases = reportSummaryPhrases(values, 40);
+  const stopWords = new Set(["a", "an", "and", "are", "as", "at", "be", "been", "but", "can", "for", "from", "he", "her", "him", "his", "in", "is", "it", "of", "on", "or", "the", "they", "to", "very", "with", "who"]);
+  const canonicalTokens = (text) => text.toLowerCase()
+    .replace(/1\s*v\s*1|one[- ]v[- ]one/g, "onevone")
+    .replace(/carrying|carrier|carries/g, "carry")
+    .replace(/dribbling|dribbles/g, "dribble")
+    .replace(/decisions|decision[- ]making/g, "decision")
+    .replace(/\b(well|good|strong|effective|ability|able|player|sometimes|often|can|needs|need|improve|improving|more|less|very|quite|his|he|him|the|and|but|with|for|from|that|this|when|while|who|is|are|was|were|to|in|on|of|a|an)\b/g, " ")
+    .replace(/[^a-z0-9]+/g, " ").trim().split(/\s+/).filter((token) => token && !stopWords.has(token));
+  const polarity = (text) => /\b(needs?|poor|weak|loose|rash|inconsistent|struggles?|can be|too long|must improve|decision making can improve)\b/i.test(text) ? "negative" : /\b(good|strong|effective|excellent|comfortable|quick|direct|works hard|technically|mobile|capable)\b/i.test(text) ? "positive" : "neutral";
+  const groups = [];
+  phrases.forEach((text) => {
+    const tokens = new Set(canonicalTokens(text));
+    const sentiment = polarity(text);
+    const match = groups.find((group) => {
+      if (sentiment !== group.sentiment || sentiment === "neutral") return false;
+      const shared = [...tokens].filter((token) => group.tokens.has(token)).length;
+      return shared / Math.max(1, Math.min(tokens.size, group.tokens.size)) >= 0.6;
+    });
+    if (match) {
+      match.items.push(text);
+      if (text.length > match.text.length) match.text = text;
+    } else groups.push({ text, tokens, sentiment, items: [text] });
+  });
+  const selected = groups.sort((a, b) => b.items.length - a.items.length || b.text.length - a.text.length).slice(0, limit).map((group) => group.text.replace(/[.;,]+$/, ""));
+  return selected.length ? `${selected.join("; ")}.` : "";
+};
 const playerSummaryText = (player, profile, reports = []) => {
   const source = player || profile || {};
   const reportRecords = reports.map((item) => item?.report || item || {});
@@ -432,27 +460,11 @@ export default function ScoutingReportsPageFinal() {
     ["Conclusions", "conclusion"],
     ["Reasons Why", "reasons"],
   ];
-  const profileSummarySections = reportSectionDefinitions.map(([title, key]) => {
-    const observations = new Map();
-    summaryReports.forEach((item, reportIndex) => {
-      const sourceReport = item.report || item;
-      reportSummaryPhrases([sourceReport[key]], 12).forEach((text) => {
-        const normalized = text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-        if (!normalized) return;
-        const scout = item.scout || item.scout_name || sourceReport.scout || "Scout not listed";
-        const fixture = fixtureLabel(item);
-        const date = item.completed_at || item.completedAt || item.date || "";
-        const source = [scout, fixture && fixture !== "Fixture not added" ? fixture : date].filter(Boolean).join(" · ");
-        const existing = observations.get(normalized);
-        if (existing) {
-          existing.sources.add(source);
-        } else {
-          observations.set(normalized, { text, sources: new Set([source]), reportIndex });
-        }
-      });
-    });
-    return { title, key, observations: [...observations.values()].slice(0, 8) };
-  });
+  const profileSummarySections = reportSectionDefinitions.map(([title, key]) => ({
+    title,
+    key,
+    summary: summarizeReportSection(summaryReports.map((item) => (item.report || item)[key])),
+  }));
   const profileGradeRows = summaryReports.map((item) => {
     const report = item.report || item;
     const performanceValue = Number.parseFloat(String(report.performance ?? item.performance ?? "").match(/[1-5](?:\.\d+)?/)?.[0]);
@@ -1827,8 +1839,8 @@ export default function ScoutingReportsPageFinal() {
               </section> : <section className="sr-summary-card sr-summary-overview"><h3>Overview</h3><p>{shownPlayerSummary || "No summary yet. Use Edit Overview to add one."}</p></section>}
             </div>
             <div className="sr-summary-observations">
-              {profileSummarySections.filter((section) => section.observations.length).map((section) => <section className="sr-summary-card" key={section.key}>
-                <h3>{section.title}</h3><ul>{section.observations.map((observation, index) => <li key={`${section.key}-${index}`}><span>{observation.text}</span></li>)}</ul>
+              {profileSummarySections.filter((section) => section.summary).map((section) => <section className="sr-summary-card" key={section.key}>
+                <h3>{section.title}</h3><p>{section.summary}</p>
               </section>)}
               {!summaryReports.length && <p className="sr-summary-empty">Published reports will appear here once available.</p>}
             </div>
