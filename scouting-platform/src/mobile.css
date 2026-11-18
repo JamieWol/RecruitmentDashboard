@@ -1448,3 +1448,146 @@
     white-space: normal;
   }
 }
+
+@media (max-width: 768px) {
+  .sr-profile-info-column { min-width: 0; width: 100%; }
+  .sr-profile-info-column > .sr-profile-position { margin-top: 12px; padding: 14px; }
+  .sr-profile-info-column .sr-position-pitch { width: min(100%, 440px); }
+}
+
+/* Scout analysis dashboard: stack its desktop panels on phone screens. */
+@media (max-width: 768px) {
+  .sr-scout-dashboard {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    margin-top: 16px;
+    padding: 18px calc(14px + env(safe-area-inset-right)) calc(28px + env(safe-area-inset-bottom)) calc(14px + env(safe-area-inset-left)) !important;
+    overflow-x: clip;
+  }
+
+  .sr-scout-dashboard > h1 {
+    margin: 4px 0 18px;
+    font-size: clamp(27px, 7.5vw, 36px) !important;
+    line-height: 1.08;
+    overflow-wrap: anywhere;
+  }
+
+  .sr-scout-dashboard > input[type="file"] {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    font-size: 14px;
+  }
+
+  .sr-scout-dashboard-grid {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    width: 100%;
+    max-width: 100% !important;
+    min-width: 0;
+    gap: 14px !important;
+    margin: 18px auto 0 !important;
+  }
+
+  .sr-scout-filter-panel,
+  .sr-scout-side-panels,
+  .sr-scout-side-panels > div {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .sr-scout-filter-panel {
+    padding: 15px !important;
+  }
+
+  .sr-scout-filter-panel h3,
+  .sr-scout-side-panels h3 {
+    font-size: 22px;
+    line-height: 1.2;
+  }
+
+  .sr-scout-filter-panel label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 15px !important;
+    line-height: 1.3;
+  }
+
+  .sr-scout-filter-panel input,
+  .sr-scout-filter-panel select {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 44px;
+    box-sizing: border-box;
+    font-size: 16px;
+  }
+
+  .sr-scout-filter-panel select[multiple] {
+    height: 88px !important;
+    min-height: 88px;
+    padding: 6px 10px;
+  }
+
+  .sr-scout-filter-panel button {
+    width: 100%;
+    min-height: 46px;
+    font-size: 16px;
+  }
+
+  .sr-scout-side-panels {
+    gap: 14px !important;
+  }
+
+  .sr-scout-side-panels > div {
+    padding: 15px !important;
+    overflow-wrap: anywhere;
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+  }
+
+  .sr-scout-side-panels ul {
+    padding-left: 20px !important;
+  }
+
+  .sr-scout-dashboard > div[style*="text-align: center"] {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .sr-scout-dashboard select,
+  .sr-scout-dashboard button {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .sr-scout-player-info-grid,
+  .sr-scout-charts-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 16px !important;
+    min-width: 0;
+  }
+
+  .sr-scout-player-info-grid > div,
+  .sr-scout-charts-grid > div {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 14px !important;
+  }
+
+  .sr-scout-charts-grid > div:first-child > div:first-child {
+    flex-wrap: wrap;
+    justify-content: flex-start !important;
+  }
+
+  .sr-scout-dashboard [role="img"],
+  .sr-scout-dashboard svg {
+    max-width: 100%;
+  }
+}

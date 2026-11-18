@@ -1007,7 +1007,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
   return (
     <>
       {shortlistModal}
-      <div style={{
+      <div className="sr-scout-dashboard" style={{
       padding: 24,
       fontFamily: "Arial",
       background: "url('/scouting-world.png') center/cover no-repeat, linear-gradient(to bottom, #cceeff, #ffffff)",
@@ -1017,9 +1017,9 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
       <input type="file" accept=".csv,.xlsx,.xls" onChange={handleUpload} style={{ marginTop: 10 }} />
 
       {/* Filters + Right Column */}
-      <div style={{ marginTop: 20, display:"grid", gridTemplateColumns:"260px 1fr", gap:24, maxWidth:1400, margin:"auto" }}>
+      <div className="sr-scout-dashboard-grid" style={{ marginTop: 20, display:"grid", gridTemplateColumns:"260px 1fr", gap:24, maxWidth:1400, margin:"auto" }}>
         {/* Filter Panel */}
-        <div style={{ background:"rgba(255,255,255,0.95)", padding:16, borderRadius:12, boxShadow:"0 4px 12px rgba(0,0,0,0.08)", height:"fit-content" }}>
+        <div className="sr-scout-filter-panel" style={{ background:"rgba(255,255,255,0.95)", padding:16, borderRadius:12, boxShadow:"0 4px 12px rgba(0,0,0,0.08)", height:"fit-content" }}>
           <h3 style={{ marginTop:0, marginBottom:12, color:"#1f77b4" }}>Filters</h3>
           <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
             <div><label style={{ fontSize:12, fontWeight:600 }}>Min Minutes</label><input type="number" onChange={e => setFilters({...filters, minMinutes:Number(e.target.value)})} /></div>
@@ -1053,7 +1053,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
         </div>
 
         {/* Right Column: Explanation + Shortlist */}
-        <div style={{ display:"flex", flexDirection:"column", gap:20 }}>
+        <div className="sr-scout-side-panels" style={{ display:"flex", flexDirection:"column", gap:20 }}>
           {/* Explanation */}
           <div style={{ background:"rgba(255,255,255,0.95)", padding:16, borderRadius:12, boxShadow:"0 4px 12px rgba(0,0,0,0.08)", fontSize:13, lineHeight:1.6 }}>
             <h3 style={{ color:"#1f77b4", marginTop:0 }}>How Ratings Work</h3>
@@ -1233,7 +1233,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
           </div>
 
           {/* Info Panel + Pie Charts */}
-          <div style={{ marginTop:20, display:"grid", gridTemplateColumns:"300px 1fr", gap:40 }}>
+          <div className="sr-scout-player-info-grid" style={{ marginTop:20, display:"grid", gridTemplateColumns:"300px 1fr", gap:40 }}>
             <div style={{ background:"rgba(255,255,255,0.9)", padding:20, borderRadius:12, lineHeight:2.8, border:"2px solid #1f77b4" }}>
           
               <div>Team: <strong><ClubName club={selectedPlayer.Team || selectedPlayer.Club || selectedPlayer.club} size={18} /></strong></div>
@@ -1331,7 +1331,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
           </div>
 
           {/* Charts */}
-          <div
+          <div className="sr-scout-charts-grid"
             style={{
               marginTop: 32,
               display: "grid",

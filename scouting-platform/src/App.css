@@ -407,3 +407,8 @@ header{z-index:1000!important}.sr-page{position:relative;z-index:1}.sr-pitch{z-i
 .sr-position-pitch-spot{fill:#d7edff}
 .sr-position-marker-halo{fill:#00ff25;fill-opacity:.14;stroke:#08ff18;stroke-width:2.5;vector-effect:non-scaling-stroke}
 .sr-position-marker-core{fill:#00ed20;stroke:#00ff19;stroke-width:2;vector-effect:non-scaling-stroke}
+
+.sr-profile-info-column{min-width:0;width:100%}
+.sr-profile-info-column>.sr-player-details{box-sizing:border-box;width:100%}
+.sr-profile-info-column>.sr-profile-position{width:100%;max-width:none;margin:14px 0 0;padding:18px 20px}
+.sr-profile-info-column .sr-position-pitch{width:min(100%,520px)}

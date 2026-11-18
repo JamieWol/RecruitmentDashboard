@@ -1593,32 +1593,6 @@ export default function ScoutingReportsPageFinal() {
             Add to Shortlist
           </button>
         </section>
-        <section className="sr-profile-position" aria-labelledby="sr-main-position-heading">
-          <div className="sr-profile-position-heading">
-            <div>
-              <div className="sr-kicker">PLAYER ROLE</div>
-              <h2 id="sr-main-position-heading">Main position</h2>
-            </div>
-            <strong>{mainPosition && mainPosition !== "—" ? mainPosition : "Position not available"}</strong>
-          </div>
-          <svg className="sr-position-pitch" viewBox="0 0 560 360" role="img" aria-label={`Football pitch showing ${mainPosition && mainPosition !== "—" ? `the main position ${mainPosition}` : "no main position set"}`}>
-            <rect className="sr-position-pitch-surface" x="20" y="12" width="520" height="336" rx="16" />
-            <rect className="sr-position-pitch-line" x="20" y="12" width="520" height="336" rx="16" />
-            <line className="sr-position-pitch-line" x1="280" y1="12" x2="280" y2="348" />
-            <circle className="sr-position-pitch-line" cx="280" cy="180" r="47" />
-            <circle className="sr-position-pitch-spot" cx="280" cy="180" r="3" />
-            <rect className="sr-position-pitch-line" x="20" y="86" width="82" height="188" />
-            <rect className="sr-position-pitch-line" x="20" y="133" width="38" height="94" />
-            <path className="sr-position-pitch-line" d="M102 143 A38 38 0 0 1 102 217" />
-            <rect className="sr-position-pitch-line" x="458" y="86" width="82" height="188" />
-            <rect className="sr-position-pitch-line" x="502" y="133" width="38" height="94" />
-            <path className="sr-position-pitch-line" d="M458 143 A38 38 0 0 0 458 217" />
-            {mainPositionPoint && <g className="sr-position-marker" transform={`translate(${mainPositionPoint[0]} ${mainPositionPoint[1]})`}>
-              <circle className="sr-position-marker-halo" r="23" />
-              <circle className="sr-position-marker-core" r="16" />
-            </g>}
-          </svg>
-        </section>
         <section
           className="sr-player-details sr-player-summary-editor"
           style={{ width: "100%", boxSizing: "border-box", border: "1px solid #2f84c5", borderRadius: 12, padding: 20, marginBottom: 20 }}
@@ -1647,7 +1621,8 @@ export default function ScoutingReportsPageFinal() {
           )}
         </section>
         <section className="sr-profile-layout">
-          <section className="sr-player-details">
+          <div className="sr-profile-info-column">
+            <section className="sr-player-details">
             <h2>Player Information</h2>
             <div className="sr-detail-list">
               {[
@@ -1696,7 +1671,34 @@ export default function ScoutingReportsPageFinal() {
             {playerDataLoading && <p className="sr-player-data-notice" role="status">Loading player details…</p>}
             {!playerDataLoading && playerDataError && <p className="sr-player-data-notice error" role="alert">Could not load player details: {playerDataError}</p>}
             {!playerDataLoading && !playerDataError && !playerData && <div className="sr-player-data-notice"><p>The report is available, but no matching player record was found in the master player database. Add their missing details below so their DOB and age can appear on the profile.</p><button type="button" className="sr-outline" onClick={() => setProfilePlayerFormOpen((open) => !open)} disabled={addingProfilePlayer}>{profilePlayerFormOpen ? "Close player details" : "Add this player to the database"}</button>{profilePlayerFormOpen && <><div className="sr-form-grid" style={{ marginTop: 14 }}><label className="sr-field"><span>Date of birth</span><input type="date" value={missingPlayerDob} onChange={(event) => setMissingPlayerDob(event.target.value)} /></label><label className="sr-field"><span>Nationality</span><input value={missingPlayerNationality} onChange={(event) => setMissingPlayerNationality(event.target.value)} /></label><label className="sr-field"><span>Preferred foot</span><select value={missingPlayerFoot} onChange={(event) => setMissingPlayerFoot(event.target.value)}><option value="">Select</option><option>Right</option><option>Left</option><option>Both</option></select></label></div><button type="button" className="sr-cyan" onClick={addProfilePlayerToMaster} disabled={addingProfilePlayer}>{addingProfilePlayer ? "Adding player…" : "Save player to database"}</button></>}{profilePlayerSaveMessage && <p role="status">{profilePlayerSaveMessage}</p>}</div>}
-          </section>
+            </section>
+        <section className="sr-profile-position" aria-labelledby="sr-main-position-heading">
+          <div className="sr-profile-position-heading">
+            <div>
+              <div className="sr-kicker">PLAYER ROLE</div>
+              <h2 id="sr-main-position-heading">Main position</h2>
+            </div>
+            <strong>{mainPosition && mainPosition !== "—" ? mainPosition : "Position not available"}</strong>
+          </div>
+          <svg className="sr-position-pitch" viewBox="0 0 560 360" role="img" aria-label={`Football pitch showing ${mainPosition && mainPosition !== "—" ? `the main position ${mainPosition}` : "no main position set"}`}>
+            <rect className="sr-position-pitch-surface" x="20" y="12" width="520" height="336" rx="16" />
+            <rect className="sr-position-pitch-line" x="20" y="12" width="520" height="336" rx="16" />
+            <line className="sr-position-pitch-line" x1="280" y1="12" x2="280" y2="348" />
+            <circle className="sr-position-pitch-line" cx="280" cy="180" r="47" />
+            <circle className="sr-position-pitch-spot" cx="280" cy="180" r="3" />
+            <rect className="sr-position-pitch-line" x="20" y="86" width="82" height="188" />
+            <rect className="sr-position-pitch-line" x="20" y="133" width="38" height="94" />
+            <path className="sr-position-pitch-line" d="M102 143 A38 38 0 0 1 102 217" />
+            <rect className="sr-position-pitch-line" x="458" y="86" width="82" height="188" />
+            <rect className="sr-position-pitch-line" x="502" y="133" width="38" height="94" />
+            <path className="sr-position-pitch-line" d="M458 143 A38 38 0 0 0 458 217" />
+            {mainPositionPoint && <g className="sr-position-marker" transform={`translate(${mainPositionPoint[0]} ${mainPositionPoint[1]})`}>
+              <circle className="sr-position-marker-halo" r="23" />
+              <circle className="sr-position-marker-core" r="16" />
+            </g>}
+          </svg>
+        </section>
+          </div>
           <section className="sr-profile-reports">
             <h2>Reports</h2>
             <div className="sr-report-table">
