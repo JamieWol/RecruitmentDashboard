@@ -174,12 +174,29 @@ function PublicLanding({ onSignIn, onRequestAccess, onOwnPlatform }) {
           </div>
           <small>Choose A Club Workspace Or Request An Independent Setup.</small>
         </div>
-        <div className="sr-public-visual" aria-hidden="true">
-        <div className="sr-public-visual-top"><span>SCOUTING WORKSPACE</span><span className="sr-public-live-dot" /></div>
-          <div className="sr-public-visual-title">Player Overview</div>
-          <div className="sr-public-player-card"><span className="sr-public-avatar">JW</span><div><strong>Player Assessment</strong><small>Reports · Performance · Potential</small></div><b>✓</b></div>
-          <div className="sr-public-bars"><span /><span /><span /><span /><span /><span /><span /><span /><span /><span /><span /><span /></div>
-          <div className="sr-public-visual-footer"><span>Reports</span><span>Shortlists</span><span>Squad Plans</span></div>
+        <div className="sr-public-showcase" aria-label="Examples of ScoutPro screens">
+          <article className="sr-product-window sr-product-report">
+            <div className="sr-product-window-bar"><span className="sr-product-window-dots"><i /><i /><i /></span><span>PLAYER REPORT</span><span className="sr-product-preview-tag">PREVIEW</span></div>
+            <div className="sr-product-player"><span className="sr-product-player-avatar">EP</span><div><strong>Example Player</strong><small>Position · Club</small></div><span className="sr-product-status">Reviewed</span></div>
+            <div className="sr-product-grades"><div><small>Potential</small><strong>B</strong></div><div><small>Performance</small><strong>4 / 5</strong></div><div><small>Reports</small><strong>3</strong></div></div>
+            <div className="sr-product-report-text"><strong>Player Summary</strong><span>Reports, observations and scout assessments in one profile.</span></div>
+          </article>
+          <div className="sr-product-window-row">
+            <article className="sr-product-window sr-product-shortlist">
+              <div className="sr-product-window-bar"><span className="sr-product-window-dots"><i /><i /><i /></span><span>SHORTLIST</span></div>
+              <strong className="sr-product-window-heading">Summer Targets</strong>
+              <div className="sr-product-list-row"><b>LW</b><span>Example Player</span><em>Added</em></div>
+              <div className="sr-product-list-row"><b>CM</b><span>Example Player</span><em>Added</em></div>
+              <div className="sr-product-list-row"><b>CB</b><span>Example Player</span><em>Added</em></div>
+            </article>
+            <article className="sr-product-window sr-product-squad">
+              <div className="sr-product-window-bar"><span className="sr-product-window-dots"><i /><i /><i /></span><span>SQUAD PLAN</span></div>
+              <strong className="sr-product-window-heading">4-3-3 Formation</strong>
+              <div className="sr-product-pitch">
+                <div><i>ST</i></div><div><i>LW</i><i>CF</i><i>RW</i></div><div><i>CM</i><i>CM</i><i>CM</i></div><div><i>LB</i><i>CB</i><i>CB</i><i>RB</i></div><div><i>GK</i></div>
+              </div>
+            </article>
+          </div>
         </div>
       </section>
       <section className="sr-public-features" aria-labelledby="public-features-title">
