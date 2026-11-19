@@ -5,15 +5,15 @@ import { ClubBadge } from "./ClubBadge";
 
 const workspaceLinks = [
   {
-    title: "Scout a player",
+    title: "Scout a Player",
     description: "Create a player report and record your assessment.",
-    icon: "◎",
+    icon: "search",
     path: "/scout-report",
     action: "Start a report",
     featured: true,
   },
   {
-    title: "Reports & assignments",
+    title: "Reports & Assignments",
     description: "Review scouting reports and manage your team's assignments.",
     icon: "▤",
     path: "/scouting-reports",
@@ -27,20 +27,33 @@ const workspaceLinks = [
     action: "View shortlists",
   },
   {
-    title: "Squad plans",
+    title: "Squad Plans",
     description: "Build and review position-by-position squad plans.",
-    icon: "♧",
+    icon: "jersey",
     path: "/squad-plans",
     action: "Open squad plans",
   },
   {
-    title: "Team analysis",
+    title: "Team Analysis",
     description: "Explore player metrics and compare performances.",
-    icon: "▥",
+    icon: "chart",
     path: "/team-analysis",
     action: "Analyse a team",
   },
 ];
+
+function ToolIcon({ type }) {
+  if (type === "search") {
+    return <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8" /><path d="m16 16 5 5" /></svg>;
+  }
+  if (type === "chart") {
+    return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V11h4v9M10 20V4h4v16M16 20v-7h4v7M2 20h20" /></svg>;
+  }
+  if (type === "jersey") {
+    return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 3-5 3 2 5 3-1v11h8V10l3 1 2-5-5-3c-.7 1.5-2 2.2-4 2.2S8.7 4.5 8 3Z" /><path d="M9 3.5c.5 1.2 1.5 1.8 3 1.8s2.5-.6 3-1.8" /></svg>;
+  }
+  return <span aria-hidden="true">{type}</span>;
+}
 
 function LandingPage() {
   const navigate = useNavigate();
@@ -69,7 +82,7 @@ function LandingPage() {
               onClick={() => navigate(item.path)}
               type="button"
             >
-              <span className="sr-home-tool-icon" aria-hidden="true">{item.icon}</span>
+              <span className={`sr-home-tool-icon${["search", "chart", "jersey"].includes(item.icon) ? " graphic" : ""}`}><ToolIcon type={item.icon} /></span>
               <span className="sr-home-tool-title">{item.title}</span>
               <span className="sr-home-tool-description">{item.description}</span>
               <span className="sr-home-tool-action">{item.action}<span aria-hidden="true"> →</span></span>
