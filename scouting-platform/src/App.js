@@ -18,7 +18,7 @@ import "./mobile.css";
 
 function LoginGate() {
   const { user, profile, profileError, loading, refreshProfile } = useAuth();
-  const [signup, setSignup] = useState(false), [showAuth, setShowAuth] = useState(false), [email, setEmail] = useState(""), [password, setPassword] = useState(""), [name, setName] = useState(""), [club, setClub] = useState(""), [clubs, setClubs] = useState([]), [clubsLoading, setClubsLoading] = useState(false), [clubMenuOpen, setClubMenuOpen] = useState(false), [clubActiveIndex, setClubActiveIndex] = useState(-1), [error, setError] = useState("");
+  const [signup, setSignup] = useState(false), [showAuth, setShowAuth] = useState(false), [workspaceType, setWorkspaceType] = useState("club"), [email, setEmail] = useState(""), [password, setPassword] = useState(""), [name, setName] = useState(""), [club, setClub] = useState(""), [clubs, setClubs] = useState([]), [clubsLoading, setClubsLoading] = useState(false), [clubMenuOpen, setClubMenuOpen] = useState(false), [clubActiveIndex, setClubActiveIndex] = useState(-1), [error, setError] = useState("");
   const matchingClubs = useMemo(() => {
     const query = club.trim().toLocaleLowerCase();
     if (!query) return [];
@@ -32,7 +32,7 @@ function LoginGate() {
       .slice(0, 8);
   }, [club, clubs]);
   useEffect(() => {
-    if (!signup) return;
+    if (!signup || workspaceType !== "club") return;
     let active = true;
     const loadClubs = async () => {
       setClubsLoading(true);
@@ -78,11 +78,14 @@ function LoginGate() {
     };
     loadClubs();
     return () => { active = false; };
-  }, [signup]);
+  }, [signup, workspaceType]);
   if (loading) return <div className="sr-auth-screen">Loading…</div>;
   if (user && profile?.approved) return <AppRoutes />;
-  if (user) return <div className="sr-auth-screen"><div className="sr-pending-card"><h1>{profile?.approval_status === "rejected" ? "Access request declined" : "Awaiting admin approval"}</h1><p>{profileError || (profile?.approval_status === "rejected" ? "Your club has declined this account request. Contact your club administrator if you think this is a mistake." : "Your account has been created. An administrator must assign your club before you can access the platform.")}</p><button className="sr-cyan" onClick={refreshProfile}>Check approval status</button><button className="sr-outline" onClick={() => supabase.auth.signOut()}>Sign out</button></div></div>;
-  if (!showAuth) return <PublicLanding onSignIn={() => { setSignup(false); setError(""); setShowAuth(true); }} onRequestAccess={() => { setSignup(true); setError(""); setShowAuth(true); }} />;
+  if (user) {
+    const independent = user.user_metadata?.workspace_type === "independent";
+    return <div className="sr-auth-screen"><div className="sr-pending-card"><h1>{profile?.approval_status === "rejected" ? "Access Request Declined" : independent ? "Your Platform Request Is Being Reviewed" : "Awaiting Admin Approval"}</h1><p>{profileError || (profile?.approval_status === "rejected" ? "Your access request was declined. Contact your administrator if you think this is a mistake." : independent ? "Your independent workspace request has been received. The ScoutPro team will review the setup and subscription details with you." : "Your account has been created. A club administrator must approve your access before you can use the platform.")}</p><button className="sr-cyan" onClick={refreshProfile}>Check Approval Status</button><button className="sr-outline" onClick={() => supabase.auth.signOut()}>Sign Out</button></div></div>;
+  }
+  if (!showAuth) return <PublicLanding onSignIn={() => { setSignup(false); setError(""); setShowAuth(true); }} onRequestAccess={() => { setSignup(true); setWorkspaceType("club"); setError(""); setShowAuth(true); }} onOwnPlatform={() => { setSignup(true); setWorkspaceType("independent"); setClub(""); setError(""); setShowAuth(true); }} />;
   const selectClub = (clubName) => { setClub(clubName); setClubMenuOpen(false); setClubActiveIndex(-1); };
   const handleClubKeyDown = (event) => {
     if (event.key === "ArrowDown" && matchingClubs.length) {
@@ -95,16 +98,56 @@ function LoginGate() {
   };
   const submit = async (e) => {
     e.preventDefault(); setError("");
-    if (signup && !clubs.some((item) => item.toLocaleLowerCase() === club.trim().toLocaleLowerCase())) {
+    if (signup && workspaceType === "club" && !clubs.some((item) => item.toLocaleLowerCase() === club.trim().toLocaleLowerCase())) {
       setError("Choose your club from the suggestions so its badge and club name match."); setClubMenuOpen(true); return;
     }
-    const result = signup ? await supabase.auth.signUp({ email, password, options: { data: { full_name: name, club } } }) : await supabase.auth.signInWithPassword({ email, password });
+    if (signup && workspaceType === "independent" && !club.trim()) {
+      setError("Enter a name for your platform."); return;
+    }
+    const result = signup ? await supabase.auth.signUp({ email, password, options: { data: { full_name: name, club, workspace_type: workspaceType, requested_role: workspaceType === "independent" ? "club_admin" : "member" } } }) : await supabase.auth.signInWithPassword({ email, password });
     if (result.error) setError(result.error.message);
   };
-  return <main className="sr-auth-screen"><button type="button" className="sr-auth-back" onClick={() => setShowAuth(false)}>← Back to ScoutPro</button><section className="sr-auth-landing"><div className="sr-auth-copy"><div className="sr-auth-brand">⚽ ScoutPro</div><h1>Football Scouting,<br />Made Clear.</h1><p>Manage assignments, reports and shortlists securely with your scouting team.</p></div><form className="sr-form sr-auth-form" onSubmit={submit}><h2>{signup ? "Request access" : "Welcome back"}</h2>{signup && <><input placeholder="Full name" value={name} onChange={e => setName(e.target.value)} required /><div className="sr-club-picker"><input role="combobox" aria-autocomplete="list" aria-expanded={clubMenuOpen && Boolean(club.trim())} aria-controls="signup-clubs" aria-activedescendant={clubActiveIndex >= 0 ? `signup-club-${clubActiveIndex}` : undefined} autoComplete="off" placeholder="Start typing your club" value={club} onFocus={() => setClubMenuOpen(true)} onBlur={() => window.setTimeout(() => setClubMenuOpen(false), 180)} onChange={e => { setClub(e.target.value); setClubMenuOpen(true); setClubActiveIndex(-1); }} onKeyDown={handleClubKeyDown} required />{clubMenuOpen && club.trim() && <div className="sr-club-options" id="signup-clubs" role="listbox">{matchingClubs.length ? matchingClubs.map((clubName, index) => <button id={`signup-club-${index}`} className={`sr-club-option${index === clubActiveIndex ? " active" : ""}`} type="button" role="option" aria-selected={clubName === club} key={clubName} onPointerDown={(event) => event.preventDefault()} onMouseDown={(event) => event.preventDefault()} onClick={() => selectClub(clubName)}><ClubBadge club={clubName} size={30} /><span>{clubName}</span></button>) : <div className="sr-club-no-results">{clubsLoading ? "Loading clubs…" : clubs.length ? "No matching clubs found" : "Could not load the club list"}</div>}</div>}</div><small className="sr-auth-note">Your club admin will review your request.</small></>}<input type="email" placeholder="Email address" value={email} onChange={e => setEmail(e.target.value)} required /><input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />{error && <p className="sr-auth-error">{error}</p>}<button className="sr-cyan">{signup ? "Request account" : "Sign in"}</button><button type="button" className="sr-outline" onClick={() => { setSignup(!signup); setClubMenuOpen(false); setError(""); }}>{signup ? "Already have an account? Sign in" : "Create an account"}</button></form></section></main>;
+  return (
+    <main className="sr-auth-screen">
+      <button type="button" className="sr-auth-back" onClick={() => setShowAuth(false)}>← Back To ScoutPro</button>
+      <section className="sr-auth-landing">
+        <div className="sr-auth-copy">
+          <div className="sr-auth-brand">⚽ ScoutPro</div>
+          <h1>Football Scouting,<br />Made Clear.</h1>
+          <p>Manage Assignments, Reports And Shortlists For Your Club Or Independent Scouting Platform.</p>
+        </div>
+        <form className="sr-form sr-auth-form" onSubmit={submit}>
+          <h2>{signup ? (workspaceType === "independent" ? "Set Up Your Own Platform" : "Request Club Access") : "Welcome Back"}</h2>
+          {signup && <>
+            <div className="sr-workspace-choice" role="group" aria-label="Choose your workspace type">
+              <button type="button" className={workspaceType === "club" ? "active" : ""} onClick={() => { setWorkspaceType("club"); setClub(""); setError(""); }}>Joining A Club</button>
+              <button type="button" className={workspaceType === "independent" ? "active" : ""} onClick={() => { setWorkspaceType("independent"); setClub(""); setClubMenuOpen(false); setError(""); }}>My Own Platform</button>
+            </div>
+            <input placeholder="Full Name" value={name} onChange={e => setName(e.target.value)} required />
+            {workspaceType === "independent" ? <>
+              <label className="sr-independent-workspace-label" htmlFor="independent-workspace-name">Platform Or Workspace Name</label>
+              <input id="independent-workspace-name" placeholder="For example, Jamie Scouting" value={club} onChange={e => setClub(e.target.value)} required />
+              <small className="sr-auth-note">For Individual Scouts Or Organisations Looking To Run Their Own Platform.</small>
+            </> : <>
+              <div className="sr-club-picker">
+                <input role="combobox" aria-autocomplete="list" aria-expanded={clubMenuOpen && Boolean(club.trim())} aria-controls="signup-clubs" aria-activedescendant={clubActiveIndex >= 0 ? `signup-club-${clubActiveIndex}` : undefined} autoComplete="off" placeholder="Start Typing Your Club" value={club} onFocus={() => setClubMenuOpen(true)} onBlur={() => window.setTimeout(() => setClubMenuOpen(false), 180)} onChange={e => { setClub(e.target.value); setClubMenuOpen(true); setClubActiveIndex(-1); }} onKeyDown={handleClubKeyDown} required />
+                {clubMenuOpen && club.trim() && <div className="sr-club-options" id="signup-clubs" role="listbox">{matchingClubs.length ? matchingClubs.map((clubName, index) => <button id={`signup-club-${index}`} className={`sr-club-option${index === clubActiveIndex ? " active" : ""}`} type="button" role="option" aria-selected={clubName === club} key={clubName} onPointerDown={event => event.preventDefault()} onMouseDown={event => event.preventDefault()} onClick={() => selectClub(clubName)}><ClubBadge club={clubName} size={30} /><span>{clubName}</span></button>) : <div className="sr-club-no-results">{clubsLoading ? "Loading Clubs…" : clubs.length ? "No Matching Clubs Found" : "Could Not Load The Club List"}</div>}</div>}
+              </div>
+              <small className="sr-auth-note">Your Club Administrator Will Review Your Request.</small>
+            </>}
+          </>}
+          <input type="email" placeholder="Email Address" value={email} onChange={e => setEmail(e.target.value)} required />
+          <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />
+          {error && <p className="sr-auth-error">{error}</p>}
+          <button className="sr-cyan">{signup ? (workspaceType === "independent" ? "Request Platform Setup" : "Request Account") : "Sign In"}</button>
+          <button type="button" className="sr-outline" onClick={() => { setSignup(!signup); setWorkspaceType("club"); setClubMenuOpen(false); setError(""); }}>{signup ? "Already Have An Account? Sign In" : "Create An Account"}</button>
+        </form>
+      </section>
+    </main>
+  );
 }
 
-function PublicLanding({ onSignIn, onRequestAccess }) {
+function PublicLanding({ onSignIn, onRequestAccess, onOwnPlatform }) {
   const features = [
     { icon: "◎", title: "Player Reports", text: "Create consistent reports and bring scouting observations together." },
     { icon: "▤", title: "Assignments", text: "Coordinate fixtures, players and work across your scouting team." },
@@ -122,17 +165,17 @@ function PublicLanding({ onSignIn, onRequestAccess }) {
       </header>
       <section className="sr-public-hero">
         <div className="sr-public-hero-copy">
-          <span className="sr-public-kicker">A CLEARER WAY TO SCOUT</span>
-          <h1>Turn scouting into a <em>team process.</em></h1>
-          <p>ScoutPro brings player reports, assignments, shortlists and squad planning together in one secure workspace for your club.</p>
+          <span className="sr-public-kicker">A Clearer Way To Scout</span>
+          <h1>Turn Scouting Into A <em>Team Process.</em></h1>
+          <p>ScoutPro Brings Player Reports, Assignments, Shortlists And Squad Planning Together In One Secure Workspace For Clubs, Teams And Independent Scouts.</p>
           <div className="sr-public-hero-actions">
-            <button type="button" className="sr-public-request" onClick={onRequestAccess}>Request Access <span aria-hidden="true">→</span></button>
-            <button type="button" className="sr-public-signin" onClick={onSignIn}>Sign In</button>
+            <button type="button" className="sr-public-request" onClick={onOwnPlatform}>Get Your Own Platform <span aria-hidden="true">→</span></button>
+            <button type="button" className="sr-public-signin" onClick={onRequestAccess}>Request Club Access</button>
           </div>
-          <small>Access is managed by your club administrator.</small>
+          <small>Choose A Club Workspace Or Request An Independent Setup.</small>
         </div>
         <div className="sr-public-visual" aria-hidden="true">
-          <div className="sr-public-visual-top"><span>SCOUTING WORKSPACE</span><span className="sr-public-live-dot" /></div>
+        <div className="sr-public-visual-top"><span>SCOUTING WORKSPACE</span><span className="sr-public-live-dot" /></div>
           <div className="sr-public-visual-title">Player Overview</div>
           <div className="sr-public-player-card"><span className="sr-public-avatar">JW</span><div><strong>Player Assessment</strong><small>Reports · Performance · Potential</small></div><b>✓</b></div>
           <div className="sr-public-bars"><span /><span /><span /><span /><span /><span /><span /><span /><span /><span /><span /><span /></div>
@@ -140,10 +183,14 @@ function PublicLanding({ onSignIn, onRequestAccess }) {
         </div>
       </section>
       <section className="sr-public-features" aria-labelledby="public-features-title">
-        <div className="sr-public-section-heading"><span className="sr-public-kicker">BUILT FOR YOUR WORKFLOW</span><h2 id="public-features-title">Everything your scouting team needs to stay organised.</h2></div>
+        <div className="sr-public-section-heading"><span className="sr-public-kicker">Built For Your Workflow</span><h2 id="public-features-title">Everything Your Scouting Team Needs To Stay Organised.</h2></div>
         <div className="sr-public-feature-grid">{features.map((feature) => <article className="sr-public-feature" key={feature.title}><span className="sr-public-feature-icon" aria-hidden="true">{feature.icon}</span><h3>{feature.title}</h3><p>{feature.text}</p></article>)}</div>
       </section>
-      <footer className="sr-public-footer"><span>ScoutPro · Football Scouting Workspace</span><button type="button" onClick={onSignIn}>Sign In</button><button type="button" onClick={onRequestAccess}>Request Access</button></footer>
+      <section className="sr-public-own-platform">
+        <div><span className="sr-public-kicker">FOR INDEPENDENT SCOUTS AND ORGANISATIONS</span><h2>Your Own Scouting Platform.</h2><p>Set up a workspace under your own name, manage your scouting team and keep your reports and player targets together.</p></div>
+        <button type="button" className="sr-public-request" onClick={onOwnPlatform}>Request Your Own Platform <span aria-hidden="true">→</span></button>
+      </section>
+      <footer className="sr-public-footer"><span>ScoutPro · Football Scouting Workspace</span><button type="button" onClick={onSignIn}>Sign In</button><button type="button" onClick={onRequestAccess}>Request Club Access</button><button type="button" onClick={onOwnPlatform}>Get Your Own Platform</button></footer>
     </main>
   );
 }
