@@ -46,6 +46,7 @@ function LandingPage() {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const clubName = profile?.club?.trim();
+  const userName = profile?.full_name?.trim();
 
   return (
     <main className="sr-home">
@@ -55,9 +56,7 @@ function LandingPage() {
           {clubName && <ClubBadge club={clubName} size={68} />}
           <span>{clubName || "Your scouting workspace"}</span>
         </h1>
-        <p>
-          Find and assess players, share reports, organise targets and plan your squad.
-        </p>
+        <p>{userName ? `Welcome back, ${userName}` : "Welcome back"}</p>
       </section>
 
       <section className="sr-home-tools" aria-labelledby="home-tools-title">
