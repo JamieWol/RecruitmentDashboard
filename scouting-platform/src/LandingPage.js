@@ -1,5 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "./AuthContext";
+import { ClubBadge } from "./ClubBadge";
 
 const workspaceLinks = [
   {
@@ -42,24 +44,24 @@ const workspaceLinks = [
 
 function LandingPage() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
+  const clubName = profile?.club?.trim();
 
   return (
     <main className="sr-home">
       <section className="sr-home-hero" aria-labelledby="home-title">
         <span className="sr-home-eyebrow">SCOUTPRO WORKSPACE</span>
-        <h1 id="home-title">Your scouting work, all in one place.</h1>
+        <h1 id="home-title" className="sr-home-club-title">
+          {clubName && <ClubBadge club={clubName} size={68} />}
+          <span>{clubName || "Your scouting workspace"}</span>
+        </h1>
         <p>
           Find and assess players, share reports, organise targets and plan your squad.
         </p>
       </section>
 
       <section className="sr-home-tools" aria-labelledby="home-tools-title">
-        <div className="sr-home-section-heading">
-          <div>
-            <h2 id="home-tools-title">What would you like to do?</h2>
-            <p>Pick up where your scouting work needs you.</p>
-          </div>
-        </div>
+        <h2 id="home-tools-title" className="sr-home-visually-hidden">Scouting tools</h2>
         <div className="sr-home-tools-grid">
           {workspaceLinks.map((item) => (
             <button
