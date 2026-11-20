@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, useNavigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, useNavigate, useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { AuthProvider, useAuth } from "./AuthContext";
 import { supabase } from "./supabaseClient";
@@ -32,7 +32,13 @@ function FullToolsGate({ children }) {
 
 function LoginGate() {
   const { user, profile, profileError, loading, refreshProfile } = useAuth();
+  const [searchParams] = useSearchParams();
   const [signup, setSignup] = useState(false), [showAuth, setShowAuth] = useState(false), [workspaceType, setWorkspaceType] = useState("club"), [preferredPlan, setPreferredPlan] = useState(""), [email, setEmail] = useState(""), [password, setPassword] = useState(""), [name, setName] = useState(""), [club, setClub] = useState(""), [clubs, setClubs] = useState([]), [clubsLoading, setClubsLoading] = useState(false), [clubMenuOpen, setClubMenuOpen] = useState(false), [clubActiveIndex, setClubActiveIndex] = useState(-1), [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const paidIndependentRequest = profile?.workspace_type === "independent"
+    && ["Independent Scout", "Independent Scout + Full Tools Bundle"].includes(profile?.requested_plan)
+    && profile?.approval_status !== "rejected";
   const matchingClubs = useMemo(() => {
     const query = club.trim().toLocaleLowerCase();
     if (!query) return [];
@@ -93,11 +99,37 @@ function LoginGate() {
     loadClubs();
     return () => { active = false; };
   }, [signup, workspaceType]);
+  const startPendingCheckout = async (interval = "monthly") => {
+    setCheckoutBusy(true);
+    setError("");
+    const plan = profile?.requested_plan === "Independent Scout + Full Tools Bundle" ? "independent_bundle" : "independent";
+    const { data, error: invokeError } = await supabase.functions.invoke("create-checkout-session", { body: { plan, interval: plan === "independent_bundle" ? "monthly" : interval } });
+    setCheckoutBusy(false);
+    if (invokeError || !data?.url) {
+      setError(data?.error || invokeError?.message || "Could not open secure checkout. Please try again.");
+      return;
+    }
+    window.location.assign(data.url);
+  };
+  usePendingCheckoutRefresh(searchParams.get("checkout"), refreshProfile, paidIndependentRequest);
   if (loading) return <div className="sr-auth-screen">Loading…</div>;
   if (user && profile?.approved) return <AppRoutes />;
   if (user) {
     const ownerSetup = ["independent", "organization"].includes(user.user_metadata?.workspace_type);
     const trialRequest = user.user_metadata?.requested_plan === "Independent Scout Free Trial";
+    if (paidIndependentRequest) return <div className="sr-auth-screen"><div className="sr-pending-card">
+      <h1>{searchParams.get("checkout") === "success" ? "Confirming Your Subscription" : "Finish Setting Up Your Independent Account"}</h1>
+      <p>{searchParams.get("checkout") === "success"
+        ? "Payment completed. Stripe is confirming your subscription and activating your workspace. This usually takes a few seconds."
+        : searchParams.get("checkout") === "canceled"
+          ? "Checkout was canceled, so no subscription was started. You can try again whenever you’re ready."
+          : "Your account is ready. Choose a billing option to continue to secure Stripe Checkout. Your workspace will activate when Stripe confirms the subscription."}</p>
+      {error && <p className="sr-auth-error" role="alert">{error}</p>}
+      <button className="sr-cyan" type="button" disabled={checkoutBusy} onClick={() => startPendingCheckout("monthly")}>{checkoutBusy ? "Opening Checkout…" : profile.requested_plan === "Independent Scout + Full Tools Bundle" ? "Subscribe To Full Tools · £17.98 / Month" : "Subscribe Monthly · £9.99"}</button>
+      {profile.requested_plan !== "Independent Scout + Full Tools Bundle" && <button className="sr-outline" type="button" disabled={checkoutBusy} onClick={() => startPendingCheckout("yearly")}>Subscribe Yearly · £99</button>}
+      <button className="sr-outline" type="button" onClick={refreshProfile}>Check Subscription Status</button>
+      <button className="sr-outline" type="button" onClick={() => supabase.auth.signOut()}>Sign Out</button>
+    </div></div>;
     const pendingTitle = profile?.approval_status === "rejected" ? "Access Request Declined" : trialRequest ? "Your Free Trial Request Is Being Reviewed" : ownerSetup ? "Your Platform Request Is Being Reviewed" : "Awaiting Admin Approval";
     const pendingMessage = profileError || (profile?.approval_status === "rejected"
       ? "Your access request was declined. Contact your administrator if you think this is a mistake."
@@ -106,7 +138,7 @@ function LoginGate() {
         : ownerSetup
           ? "Your workspace and pricing request has been received. The ScoutPro team will review the setup details with you."
           : "Your account has been created. A club administrator must approve your access before you can use the platform.");
-    return <div className="sr-auth-screen"><div className="sr-pending-card"><h1>{pendingTitle}</h1><p>{pendingMessage}</p><button className="sr-cyan" onClick={refreshProfile}>Check Approval Status</button><button className="sr-outline" onClick={() => supabase.auth.signOut()}>Sign Out</button></div></div>;
+    return <div className="sr-auth-screen"><div className="sr-pending-card"><h1>{pendingTitle}</h1><p>{pendingMessage}</p>{notice && <p role="status">{notice}</p>}<button className="sr-cyan" onClick={refreshProfile}>Check Approval Status</button><button className="sr-outline" onClick={() => supabase.auth.signOut()}>Sign Out</button></div></div>;
   }
   if (!showAuth) return <PublicLanding onSignIn={() => { setSignup(false); setError(""); setShowAuth(true); }} onRequestAccess={() => { setSignup(true); setWorkspaceType("club"); setPreferredPlan(""); setError(""); setShowAuth(true); }} onChoosePlan={(plan, type) => { setSignup(true); setPreferredPlan(plan); setWorkspaceType(type); setClub(""); setError(""); setShowAuth(true); }} />;
   const selectClub = (clubName) => { setClub(clubName); setClubMenuOpen(false); setClubActiveIndex(-1); };
@@ -129,6 +161,7 @@ function LoginGate() {
     }
     const result = signup ? await supabase.auth.signUp({ email, password, options: { data: { full_name: name, club, workspace_type: workspaceType, requested_role: workspaceType === "club" ? "member" : "club_admin", requested_plan: preferredPlan } } }) : await supabase.auth.signInWithPassword({ email, password });
     if (result.error) setError(result.error.message);
+    else if (signup && !result.data?.session) setNotice("Account created. Check your email to confirm it, then sign in to complete your subscription.");
   };
   return (
     <main className="sr-auth-screen">
@@ -140,7 +173,7 @@ function LoginGate() {
           <p>Manage Assignments, Reports And Shortlists For Your Club Or Independent Scouting Platform.</p>
         </div>
         <form className="sr-form sr-auth-form" onSubmit={submit}>
-          <h2>{signup ? (workspaceType === "club" ? "Request Club Access" : workspaceType === "organization" ? "Request Club Workspace Setup" : "Request Independent Setup") : "Welcome Back"}</h2>
+          <h2>{signup ? (workspaceType === "club" ? "Request Club Access" : workspaceType === "organization" ? "Request Club Workspace Setup" : preferredPlan === "Independent Scout Free Trial" ? "Request Free Trial" : "Create Independent Account") : "Welcome Back"}</h2>
           {signup && <>
             {preferredPlan && <div className="sr-selected-plan"><small>Requested Setup</small><strong>{preferredPlan}</strong></div>}
             <div className="sr-workspace-choice" role="group" aria-label="Choose your workspace type">
@@ -152,7 +185,7 @@ function LoginGate() {
             {workspaceType !== "club" ? <>
               <label className="sr-independent-workspace-label" htmlFor="independent-workspace-name">{workspaceType === "organization" ? "Club Or Organisation Name" : "Platform Or Workspace Name"}</label>
               <input id="independent-workspace-name" placeholder={workspaceType === "organization" ? "Enter Your Club Or Organisation" : "For Example, Jamie Scouting"} value={club} onChange={e => setClub(e.target.value)} required />
-              <small className="sr-auth-note">We’ll Review Your Workspace Setup And Requested Plan With You.</small>
+              <small className="sr-auth-note">{workspaceType === "independent" && preferredPlan !== "Independent Scout Free Trial" ? "You’ll Choose Your Billing Option And Complete Secure Checkout After Creating Your Account." : "We’ll Review Your Workspace Setup And Requested Plan With You."}</small>
             </> : <>
               <div className="sr-club-picker">
                 <input role="combobox" aria-autocomplete="list" aria-expanded={clubMenuOpen && Boolean(club.trim())} aria-controls="signup-clubs" aria-activedescendant={clubActiveIndex >= 0 ? `signup-club-${clubActiveIndex}` : undefined} autoComplete="off" placeholder="Start Typing Your Club" value={club} onFocus={() => setClubMenuOpen(true)} onBlur={() => window.setTimeout(() => setClubMenuOpen(false), 180)} onChange={e => { setClub(e.target.value); setClubMenuOpen(true); setClubActiveIndex(-1); }} onKeyDown={handleClubKeyDown} required />
@@ -163,13 +196,27 @@ function LoginGate() {
           </>}
           <input type="email" placeholder="Email Address" value={email} onChange={e => setEmail(e.target.value)} required />
           <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />
-          {error && <p className="sr-auth-error">{error}</p>}
-          <button className="sr-cyan">{signup ? (workspaceType === "club" ? "Request Account" : "Request Setup And Pricing") : "Sign In"}</button>
+          {error && <p className="sr-auth-error" role="alert">{error}</p>}
+          {notice && <p className="sr-auth-note" role="status">{notice}</p>}
+          <button className="sr-cyan">{signup ? (workspaceType === "club" ? "Request Account" : workspaceType === "independent" && preferredPlan === "Independent Scout Free Trial" ? "Request Free Trial" : workspaceType === "independent" ? "Create Account & Continue" : "Request Setup And Pricing") : "Sign In"}</button>
           <button type="button" className="sr-outline" onClick={() => { setSignup(!signup); setWorkspaceType("club"); setClubMenuOpen(false); setError(""); }}>{signup ? "Already Have An Account? Sign In" : "Create An Account"}</button>
         </form>
       </section>
     </main>
   );
+}
+
+function usePendingCheckoutRefresh(checkoutState, refreshProfile, shouldRefresh) {
+  useEffect(() => {
+    if (checkoutState !== "success" || !shouldRefresh) return undefined;
+    let checks = 0;
+    const timer = window.setInterval(() => {
+      checks += 1;
+      refreshProfile().catch(() => {});
+      if (checks >= 12) window.clearInterval(timer);
+    }, 2500);
+    return () => window.clearInterval(timer);
+  }, [checkoutState, refreshProfile, shouldRefresh]);
 }
 
 function PublicLanding({ onSignIn, onRequestAccess, onChoosePlan }) {
@@ -229,16 +276,16 @@ function PublicLanding({ onSignIn, onRequestAccess, onChoosePlan }) {
         <div className="sr-public-feature-grid">{features.map((feature) => <article className="sr-public-feature" key={feature.title}><span className="sr-public-feature-icon" aria-hidden="true">{feature.icon}</span><h3>{feature.title}</h3><p>{feature.text}</p></article>)}</div>
       </section>
       <section className="sr-public-pricing" aria-labelledby="public-pricing-title">
-        <div className="sr-public-section-heading"><span className="sr-public-kicker">Plans For Different Scouting Setups</span><h2 id="public-pricing-title">Choose The Workspace That Fits Your Team.</h2><p>Club workspaces include the full ScoutPro toolkit. Independent scouts can start with the core tools and add more as needed. These are proposed launch prices; online checkout is not connected yet. Free trials begin after account approval.</p></div>
+        <div className="sr-public-section-heading"><span className="sr-public-kicker">Plans For Different Scouting Setups</span><h2 id="public-pricing-title">Choose The Workspace That Fits Your Team.</h2><p>Club workspaces include the full ScoutPro toolkit. Independent scouts can subscribe securely online, starting with the core tools and adding more when they need them. Free trial and club access requests are reviewed before activation.</p></div>
         <div className="sr-public-plan-grid">
           <article className="sr-public-plan-card">
             <span className="sr-public-plan-label">TRY SCOUTPRO</span><h3>Free Trial</h3><p>Try the core scouting workflow before choosing a plan.</p><div className="sr-public-plan-price">Free</div><small className="sr-public-plan-term">30 days or 4 completed reports, whichever comes first</small><ul><li>Player reports</li><li>Reports and assignments</li><li>No payment details requested</li></ul><button type="button" className="sr-public-outline-button" onClick={() => onChoosePlan("Independent Scout Free Trial", "independent")}>Request Free Trial</button>
           </article>
           <article className="sr-public-plan-card">
-            <span className="sr-public-plan-label">FOR INDIVIDUAL SCOUTS</span><h3>Independent Scout</h3><p>Your own workspace with the essential tools to scout and track players.</p><div className="sr-public-plan-price">£9.99 <small>/ month</small></div><small className="sr-public-plan-term">Or £99 per year</small><ul><li>Player reports and summaries</li><li>Reports and assignments</li><li>One scout workspace</li></ul><button type="button" className="sr-public-request" onClick={() => onChoosePlan("Independent Scout", "independent")}>Request This Plan</button>
+            <span className="sr-public-plan-label">FOR INDIVIDUAL SCOUTS</span><h3>Independent Scout</h3><p>Your own workspace with the essential tools to scout and track players.</p><div className="sr-public-plan-price">£9.99 <small>/ month</small></div><small className="sr-public-plan-term">Or £99 per year</small><ul><li>Player reports and summaries</li><li>Reports and assignments</li><li>One scout workspace</li></ul><button type="button" className="sr-public-request" onClick={() => onChoosePlan("Independent Scout", "independent")}>Choose Independent Scout</button>
           </article>
           <article className="sr-public-plan-card">
-            <span className="sr-public-plan-label">OPTIONAL ADD-ON</span><h3>Full Tools Bundle</h3><p>Expand your Independent Scout workspace with more ways to organise and analyse targets.</p><div className="sr-public-plan-price">+£7.99 <small>/ month</small></div><small className="sr-public-plan-term">Add to the Independent Scout plan</small><ul><li>Shortlists</li><li>Squad plans</li><li>Team analysis</li></ul><button type="button" className="sr-public-outline-button" onClick={() => onChoosePlan("Independent Scout + Full Tools Bundle", "independent")}>Request Add-On</button>
+            <span className="sr-public-plan-label">OPTIONAL ADD-ON</span><h3>Full Tools Bundle</h3><p>Expand your Independent Scout workspace with more ways to organise and analyse targets.</p><div className="sr-public-plan-price">+£7.99 <small>/ month</small></div><small className="sr-public-plan-term">Add to the Independent Scout plan</small><ul><li>Shortlists</li><li>Squad plans</li><li>Team analysis</li></ul><button type="button" className="sr-public-outline-button" onClick={() => onChoosePlan("Independent Scout + Full Tools Bundle", "independent")}>Choose Full Tools Bundle</button>
           </article>
           <article className="sr-public-plan-card sr-public-plan-card-featured">
             <span className="sr-public-plan-label">FOR CLUBS · ALL CORE FEATURES</span><h3>Club Workspace</h3><p>A shared platform for scouts and recruitment staff at one club, with the full ScoutPro toolkit.</p><div className="sr-public-plan-price">From £49 <small>/ month</small></div><small className="sr-public-plan-term">Includes up to 7 users</small><ul><li>Reports, summaries and assignments</li><li>Shared shortlists and squad plans</li><li>Team analysis tools</li></ul><button type="button" className="sr-public-request" onClick={() => onChoosePlan("Club Workspace", "organization")}>Request This Plan</button>
