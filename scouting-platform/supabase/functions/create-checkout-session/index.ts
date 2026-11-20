@@ -26,7 +26,10 @@ Deno.serve(async (request) => {
   };
   if (request.method === "OPTIONS") return new Response("ok", { headers });
   if (request.method !== "POST") return Response.json({ error: "Method not allowed." }, { status: 405, headers });
-  if (!origin || !allowedOrigins.includes(origin)) return Response.json({ error: "This app origin is not allowed." }, { status: 403, headers });
+  if (!origin || !allowedOrigins.includes(origin)) {
+    console.warn("Checkout blocked: app origin is not allowed", { origin, allowedOrigins });
+    return Response.json({ error: "This app origin is not allowed." }, { status: 403, headers });
+  }
   if (!stripe || !admin || !appBaseUrl) {
     return Response.json({ error: "Billing is not fully configured. Ask the platform administrator." }, { status: 503, headers });
   }
@@ -42,12 +45,23 @@ Deno.serve(async (request) => {
   const plan = requested.plan;
   const interval = requested.interval;
   const { data: profile, error: profileError } = await admin.from("profiles").select("id,email,full_name,club,workspace_type,requested_plan,approved,role").eq("id", user.id).maybeSingle();
-  if (profileError || !profile) return Response.json({ error: "Your ScoutPro profile could not be found." }, { status: 403, headers });
+  if (profileError || !profile) {
+    console.warn("Checkout blocked: profile lookup failed", { userId: user.id, profileError: profileError?.message || null });
+    return Response.json({ error: "Your ScoutPro profile could not be found." }, { status: 403, headers });
+  }
   const pendingPaidIndependentSignup = !profile.approved
     && profile.workspace_type === "independent"
     && ((profile.requested_plan === "Independent Scout" && plan === "independent" && ["monthly", "yearly"].includes(interval || ""))
       || (profile.requested_plan === "Independent Scout + Full Tools Bundle" && plan === "independent_bundle" && interval === "monthly"));
   if (!profile.approved && !pendingPaidIndependentSignup) {
+    console.warn("Checkout blocked: account approval or requested plan does not match", {
+      userId: user.id,
+      workspaceType: profile.workspace_type,
+      requestedPlan: profile.requested_plan,
+      approved: profile.approved,
+      plan,
+      interval,
+    });
     return Response.json({ error: "Your account must be approved before checkout." }, { status: 403, headers });
   }
 
@@ -88,6 +102,13 @@ Deno.serve(async (request) => {
       existingSubscriptionId = current?.stripe_subscription_id && ["active", "pending"].includes(current.status) ? current.stripe_subscription_id : null;
       lineItems = [{ price: price("STRIPE_PRICE_CLUB_MONTHLY"), quantity: 1 }];
     } else {
+      console.warn("Checkout blocked: unsupported workspace or plan", {
+        userId: user.id,
+        workspaceType: profile.workspace_type,
+        role: profile.role,
+        plan,
+        interval,
+      });
       return Response.json({ error: "Checkout is available to approved Independent Scout and Club Workspace accounts." }, { status: 403, headers });
     }
 
