@@ -1285,7 +1285,7 @@ export default function ScoutingReportsPageFinal() {
         id: Number(active.id), assignment_id: Number(active.id), player_id: active.playerId || null,
         player: active.player, club: accountProfile.club, player_club: active.club || "", author_id: user.id,
         report: reportWithFixtures, status: "Published", updated_at: new Date().toISOString(), completed_at: completedAt,
-        scout: active.scout || "", viewing,
+        scout: active.scout || "",
         fixture_summary: preservedFixtures.length > 1 ? "Multiple" : (preservedFixtures[0] ? `${preservedFixtures[0].date || ""} · ${preservedFixtures[0].name || preservedFixtures[0]}` : isFixtureName(active.game) ? active.game : ""),
       };
       const { error: trialPublishError } = await supabase.from("club_reports").upsert(trialReport, { onConflict: "id" });
@@ -1305,7 +1305,7 @@ export default function ScoutingReportsPageFinal() {
         id: Number(active.id), assignment_id: Number(active.id), player_id: active.playerId || null,
         player: active.player, club: accountProfile.club, player_club: active.club || "", author_id: user.id,
         report: reportWithFixtures, status: "Published", updated_at: new Date().toISOString(), completed_at: completedAt,
-        scout: active.scout || "", viewing,
+        scout: active.scout || "",
         fixture_summary: preservedFixtures.length > 1 ? "Multiple" : (preservedFixtures[0] ? `${preservedFixtures[0].date || ""} · ${preservedFixtures[0].name || preservedFixtures[0]}` : isFixtureName(active.game) ? active.game : ""),
       }, { onConflict: "id" });
       if (publishError) {
