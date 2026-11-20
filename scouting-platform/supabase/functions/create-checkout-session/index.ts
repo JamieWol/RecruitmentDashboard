@@ -44,7 +44,7 @@ Deno.serve(async (request) => {
   try { requested = await request.json(); } catch { return Response.json({ error: "Invalid checkout request." }, { status: 400, headers }); }
   const plan = requested.plan;
   const interval = requested.interval;
-  const { data: profile, error: profileError } = await admin.from("profiles").select("id,email,full_name,club,workspace_type,requested_plan,approved,role").eq("id", user.id).maybeSingle();
+  const { data: profile, error: profileError } = await admin.from("profiles").select("id,full_name,club,workspace_type,requested_plan,approved,role").eq("id", user.id).maybeSingle();
   if (profileError || !profile) {
     console.warn("Checkout blocked: profile lookup failed", { userId: user.id, profileError: profileError?.message || null });
     return Response.json({ error: "Your ScoutPro profile could not be found." }, { status: 403, headers });
