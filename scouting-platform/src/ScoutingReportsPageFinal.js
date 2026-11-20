@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "./supabaseClient";
 import { useAuth } from "./AuthContext";
+import { hasFullToolAccess } from "./planAccess";
 import { removeBackground } from "@imgly/background-removal";
 import ReportImportModal from "./ReportImportModal";
 import { normalizeImportedViewing, parseScoutNotesFile, scoutNotesFieldLabels, splitImportedFixtures } from "./reportImport";
@@ -364,7 +365,8 @@ const playerSummaryText = (player, profile, reports = []) => {
 };
 export default function ScoutingReportsPageFinal() {
   const nav = useNavigate();
-  const { appState, updateAppState, user, profile: accountProfile } = useAuth();
+  const { appState, updateAppState, user, profile: accountProfile, entitlement } = useAuth();
+  const canUseFullTools = hasFullToolAccess(accountProfile, entitlement);
   const isIndependentTrialAccount = accountProfile?.workspace_type === "independent"
     && accountProfile?.requested_plan === "Independent Scout Free Trial";
   const reportViewStorageKey = `scoutingReportsView:${user?.id || user?.email || "guest"}`;
@@ -1766,7 +1768,7 @@ export default function ScoutingReportsPageFinal() {
             </span>
           </div>
           {photoStatus && <small className="sr-photo-status">{photoStatus}</small>}
-          <button
+          {canUseFullTools && <button
             className="sr-outline"
             onClick={() => {
               const lists = appState?.shortlists || [];
@@ -1775,7 +1777,7 @@ export default function ScoutingReportsPageFinal() {
             }}
           >
             Add to Shortlist
-          </button>
+          </button>}
         </section>
         <section className="sr-profile-layout">
           <div className="sr-profile-info-column">

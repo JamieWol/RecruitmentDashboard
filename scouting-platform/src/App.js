@@ -13,8 +13,21 @@ import TeamAnalysisPage from "./TeamAnalysisPage";
 import ApprovalRequestsPage from "./ApprovalRequestsPage";
 import ReportManagementPage from "./ReportManagementPage";
 import { ClubBadge } from "./ClubBadge";
+import { hasFullToolAccess } from "./planAccess";
 import "./App.css";
 import "./mobile.css";
+
+function FullToolsGate({ children }) {
+  const navigate = useNavigate();
+  const { profile, entitlement } = useAuth();
+  if (hasFullToolAccess(profile, entitlement)) return children;
+  return <main className="sr-page sr-plan-locked"><section className="sr-plan-locked-card">
+    <span className="sr-kicker">FULL TOOLS BUNDLE</span>
+    <h1>Unlock Shortlists, Squad Plans And Team Analysis</h1>
+    <p>Your current plan includes player reports and assignments. The Full Tools Bundle adds shortlists, squad plans and team analysis to an Independent Scout workspace. Ask the platform administrator to enable the bundle for your account.</p>
+    <button type="button" className="sr-cyan" onClick={() => navigate("/scouting-reports")}>Back To Reports And Assignments</button>
+  </section></main>;
+}
 
 function LoginGate() {
   const { user, profile, profileError, loading, refreshProfile } = useAuth();
@@ -241,7 +254,7 @@ function PublicLanding({ onSignIn, onRequestAccess, onChoosePlan }) {
 
 function AppRoutes() {
   const [shadowSquad, setShadowSquad] = useState([]);
-  return <><Header /><div className="sr-app-shell" style={{ paddingTop: 80 }}><Routes><Route path="/" element={<LandingPage />} /><Route path="/scout-report" element={<ScoutReportPage shadowSquad={shadowSquad} setShadowSquad={setShadowSquad} />} /><Route path="/scouting-reports" element={<ScoutingReportsPage />} /><Route path="/shortlists" element={<ShortlistsPage />} /><Route path="/squad-plans" element={<SquadPlansPage />} /><Route path="/squad-plan" element={<SquadPlanPage />} /><Route path="/create-assignment" element={<CreateAssignmentPage />} /><Route path="/team-analysis" element={<TeamAnalysisPage />} /><Route path="/approval-requests" element={<ApprovalRequestsPage />} /><Route path="/report-management" element={<ReportManagementPage />} /></Routes></div></>;
+  return <><Header /><div className="sr-app-shell" style={{ paddingTop: 80 }}><Routes><Route path="/" element={<LandingPage />} /><Route path="/scout-report" element={<ScoutReportPage shadowSquad={shadowSquad} setShadowSquad={setShadowSquad} />} /><Route path="/scouting-reports" element={<ScoutingReportsPage />} /><Route path="/shortlists" element={<FullToolsGate><ShortlistsPage /></FullToolsGate>} /><Route path="/squad-plans" element={<FullToolsGate><SquadPlansPage /></FullToolsGate>} /><Route path="/squad-plan" element={<FullToolsGate><SquadPlanPage /></FullToolsGate>} /><Route path="/create-assignment" element={<CreateAssignmentPage />} /><Route path="/team-analysis" element={<FullToolsGate><TeamAnalysisPage /></FullToolsGate>} /><Route path="/approval-requests" element={<ApprovalRequestsPage />} /><Route path="/report-management" element={<ReportManagementPage />} /></Routes></div></>;
 }
 
 // ------------------- HEADER COMPONENT -------------------

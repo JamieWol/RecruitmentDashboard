@@ -7,6 +7,7 @@ import jsPDF from "jspdf";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "./supabaseClient";
 import { useAuth } from "./AuthContext";
+import { hasFullToolAccess } from "./planAccess";
 import {
   RadarChart,
   Radar,
@@ -30,7 +31,8 @@ import {
 
 function ScoutReportPage({ shadowSquad, setShadowSquad }) {
   const navigate = useNavigate();
-  const { profile, appState, updateAppState, user } = useAuth();
+  const { profile, appState, updateAppState, user, entitlement } = useAuth();
+  const canUseFullTools = hasFullToolAccess(profile, entitlement);
   const [players, setPlayers] = useState([]);
   const [publishedReports, setPublishedReports] = useState([]);
   const exportRef = useRef(null);
@@ -1097,6 +1099,8 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
       </div>}
           
           <button
+            disabled={!canUseFullTools}
+            title={!canUseFullTools ? "The Full Tools Bundle is required to use shortlists." : undefined}
             style={{
               marginLeft: 10,
               padding: "8px 14px",
@@ -1119,7 +1123,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 
             }}
           >
-            ➕ Add to Shortlist
+            {canUseFullTools ? "➕ Add to Shortlist" : "🔒 Shortlists Require Full Tools Bundle"}
           </button>
 
       {/* Player Report */}
