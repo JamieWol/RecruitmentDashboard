@@ -37,13 +37,20 @@ Deno.serve(async (request) => {
   const { data: authData, error: authError } = await admin.auth.getUser(accessToken);
   if (authError || !authData.user) return Response.json({ error: "Your sign-in has expired. Sign in again." }, { status: 401, headers });
   const user = authData.user;
-  const { data: profile, error: profileError } = await admin.from("profiles").select("id,email,full_name,club,workspace_type,requested_plan,approved,role").eq("id", user.id).maybeSingle();
-  if (profileError || !profile?.approved) return Response.json({ error: "Your account must be approved before checkout." }, { status: 403, headers });
-
   let requested: { plan?: string; interval?: string };
   try { requested = await request.json(); } catch { return Response.json({ error: "Invalid checkout request." }, { status: 400, headers }); }
   const plan = requested.plan;
   const interval = requested.interval;
+  const { data: profile, error: profileError } = await admin.from("profiles").select("id,email,full_name,club,workspace_type,requested_plan,approved,role").eq("id", user.id).maybeSingle();
+  if (profileError || !profile) return Response.json({ error: "Your ScoutPro profile could not be found." }, { status: 403, headers });
+  const pendingPaidIndependentSignup = !profile.approved
+    && profile.workspace_type === "independent"
+    && ((profile.requested_plan === "Independent Scout" && plan === "independent" && ["monthly", "yearly"].includes(interval || ""))
+      || (profile.requested_plan === "Independent Scout + Full Tools Bundle" && plan === "independent_bundle" && interval === "monthly"));
+  if (!profile.approved && !pendingPaidIndependentSignup) {
+    return Response.json({ error: "Your account must be approved before checkout." }, { status: 403, headers });
+  }
+
   let planCode = "";
   let lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
   let workspaceKey = "";

@@ -92,5 +92,15 @@ Deno.serve(async (request) => {
     console.error("Could not update subscription entitlement", event.id, result.error);
     return new Response("Could not update plan access", { status: 500 });
   }
+  if (["independent", "independent_bundle"].includes(planCode) && metadata.user_id && status === "active") {
+    const { error: approvalError } = await admin.from("profiles")
+      .update({ approved: true })
+      .eq("id", metadata.user_id)
+      .eq("workspace_type", "independent");
+    if (approvalError) {
+      console.error("Could not activate paid Independent Scout account", event.id, approvalError);
+      return new Response("Could not activate Independent Scout account", { status: 500 });
+    }
+  }
   return Response.json({ received: true });
 });
