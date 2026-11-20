@@ -370,6 +370,7 @@ export default function ScoutingReportsPageFinal() {
   const reportViewStorageKey = `scoutingReportsView:${user?.id || user?.email || "guest"}`;
   const reportImportStorageKey = `scoutingReportImport:${user?.id || user?.email || "guest"}`;
   const openPlayerProfileStorageKey = `scoutingOpenPlayerProfile:${user?.id || user?.email || "guest"}`;
+  const profileContentTabStorageKey = `scoutingProfileContentTab:${user?.id || user?.email || "guest"}`;
   const [items, setItems] = useState(() => JSON.parse(localStorage.getItem("scoutingAssignments") || "[]"));
   const [tab, setTab] = useState(() => localStorage.getItem(`${reportViewStorageKey}:tab`) || sessionStorage.getItem("scoutingReportsTab") || "My Assignments");
   const [query, setQuery] = useState("");
@@ -377,7 +378,7 @@ export default function ScoutingReportsPageFinal() {
   const [playerMatches, setPlayerMatches] = useState([]);
   const [profile, setProfile] = useState(() => {
     try {
-      const savedProfile = JSON.parse(sessionStorage.getItem(openPlayerProfileStorageKey) || "null");
+      const savedProfile = JSON.parse(localStorage.getItem(openPlayerProfileStorageKey) || sessionStorage.getItem(openPlayerProfileStorageKey) || "null");
       if (savedProfile?.profile?.player) {
         if (savedProfile.origin) localStorage.setItem("scoutingProfileOrigin", savedProfile.origin);
         return savedProfile.profile;
@@ -398,12 +399,15 @@ export default function ScoutingReportsPageFinal() {
   useEffect(() => {
     try {
       if (profile?.player) {
-        sessionStorage.setItem(openPlayerProfileStorageKey, JSON.stringify({
+        const savedProfile = JSON.stringify({
           profile,
           origin: localStorage.getItem("scoutingProfileOrigin") || "assignments",
-        }));
+        });
+        sessionStorage.setItem(openPlayerProfileStorageKey, savedProfile);
+        localStorage.setItem(openPlayerProfileStorageKey, savedProfile);
       } else {
         sessionStorage.removeItem(openPlayerProfileStorageKey);
+        localStorage.removeItem(openPlayerProfileStorageKey);
       }
     } catch {}
   }, [profile, openPlayerProfileStorageKey]);
@@ -414,7 +418,10 @@ export default function ScoutingReportsPageFinal() {
     } catch { return null; }
   });
   const [profileReturnReport, setProfileReturnReport] = useState(null);
-  const [profileContentTab, setProfileContentTab] = useState(() => sessionStorage.getItem("scoutingProfileContentTab") === "summary" ? "summary" : "reports");
+  const [profileContentTab, setProfileContentTab] = useState(() => {
+    const savedTab = localStorage.getItem(profileContentTabStorageKey) || sessionStorage.getItem(profileContentTabStorageKey) || sessionStorage.getItem("scoutingProfileContentTab");
+    return savedTab === "summary" ? "summary" : "reports";
+  });
   const [sharedReports, setSharedReports] = useState([]);
   const [sharedAssignments, setSharedAssignments] = useState([]);
   const [accountEntitlement, setAccountEntitlement] = useState(null);
@@ -458,8 +465,9 @@ export default function ScoutingReportsPageFinal() {
     return () => { activeRequest = false; };
   }, [user?.id]);
   useEffect(() => {
-    sessionStorage.setItem("scoutingProfileContentTab", profileContentTab);
-  }, [profileContentTab]);
+    localStorage.setItem(profileContentTabStorageKey, profileContentTab);
+    sessionStorage.setItem(profileContentTabStorageKey, profileContentTab);
+  }, [profileContentTab, profileContentTabStorageKey]);
   const [profileFilters, setProfileFilters] = useState(readProfileCheckerFilters);
   const profileFiltersActive = Object.entries(profileFilters).some(([key, value]) => ["performance", "potential"].includes(key) ? value.length > 0 : Boolean(value));
   const summaryKey = String(playerData?.id || playerData?.player_id || profile?.playerId || normalizePlayerName(profile?.player));

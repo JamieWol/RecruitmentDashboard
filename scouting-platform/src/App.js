@@ -258,10 +258,6 @@ function Header() {
   </>;
 
   const goTo = (path) => {
-    if (path === "/scouting-reports") {
-      localStorage.removeItem("scoutingProfilePlayer");
-      localStorage.removeItem("scoutingProfileOrigin");
-    }
     navigate(path);
   };
 
