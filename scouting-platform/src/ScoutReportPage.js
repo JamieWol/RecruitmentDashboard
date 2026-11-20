@@ -30,7 +30,7 @@ import {
 
 function ScoutReportPage({ shadowSquad, setShadowSquad }) {
   const navigate = useNavigate();
-  const { profile, appState, updateAppState } = useAuth();
+  const { profile, appState, updateAppState, user } = useAuth();
   const [players, setPlayers] = useState([]);
   const [publishedReports, setPublishedReports] = useState([]);
   const exportRef = useRef(null);
@@ -47,9 +47,13 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
   const inactivityTimerRef = useRef(null);
   useEffect(() => {
     if (!profile?.club) return;
-    supabase.from("club_reports").select("player,report,status,scout,completed_at").eq("club", profile.club).eq("status", "Published")
+    let reportsQuery = supabase.from("club_reports").select("player,report,status,scout,completed_at").eq("club", profile.club).eq("status", "Published");
+    if (profile.workspace_type === "independent" && profile.requested_plan === "Independent Scout Free Trial") {
+      reportsQuery = reportsQuery.eq("author_id", user?.id);
+    }
+    reportsQuery
       .then(({ data }) => setPublishedReports(data || []));
-  }, [profile?.club]);
+  }, [profile?.club, profile?.workspace_type, profile?.requested_plan, user?.id]);
   const [metrics, setMetrics] = useState([]);
   const [scatterMetrics, setScatterMetrics] = useState({ x: "", y: "" });
   const [competitions, setCompetitions] = useState([]);

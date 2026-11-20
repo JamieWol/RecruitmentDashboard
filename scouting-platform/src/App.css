@@ -457,6 +457,7 @@ header{z-index:1000!important}.sr-page{position:relative;z-index:1}.sr-pitch{z-i
 .sr-auth-screen{position:relative}
 .sr-auth-back{position:absolute;top:24px;left:clamp(18px,4vw,48px);z-index:2;padding:9px 12px;border:1px solid #80b3d7;border-radius:8px;background:rgba(10,47,91,.48);color:#e7f5ff;font:700 14px Arial,sans-serif;cursor:pointer}
 .sr-auth-back:hover,.sr-auth-back:focus-visible{border-color:#62dcff;color:#62dcff}
+.sr-trial-usage{margin:8px 0 0;color:#c7eaff;font-size:13px;font-weight:700}
 .sr-public-site{min-height:100vh;box-sizing:border-box;padding:0 clamp(20px,6vw,92px);color:#fff;background:radial-gradient(ellipse at 80% 15%,rgba(32,126,173,.27),transparent 35%),linear-gradient(145deg,#062c63 0%,#064477 56%,#062e62 100%);font-family:Arial,sans-serif;overflow:hidden}
 .sr-public-nav{height:86px;max-width:1320px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(160,202,229,.18)}
 .sr-public-brand{display:flex;align-items:center;gap:10px;color:#62dcff;font-size:25px;font-weight:800;letter-spacing:-.03em}.sr-public-brand span{font-size:25px}

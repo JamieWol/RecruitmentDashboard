@@ -83,7 +83,16 @@ function LoginGate() {
   if (user && profile?.approved) return <AppRoutes />;
   if (user) {
     const ownerSetup = ["independent", "organization"].includes(user.user_metadata?.workspace_type);
-    return <div className="sr-auth-screen"><div className="sr-pending-card"><h1>{profile?.approval_status === "rejected" ? "Access Request Declined" : ownerSetup ? "Your Platform Request Is Being Reviewed" : "Awaiting Admin Approval"}</h1><p>{profileError || (profile?.approval_status === "rejected" ? "Your access request was declined. Contact your administrator if you think this is a mistake." : ownerSetup ? "Your workspace and pricing request has been received. The ScoutPro team will review the setup details with you." : "Your account has been created. A club administrator must approve your access before you can use the platform.")}</p><button className="sr-cyan" onClick={refreshProfile}>Check Approval Status</button><button className="sr-outline" onClick={() => supabase.auth.signOut()}>Sign Out</button></div></div>;
+    const trialRequest = user.user_metadata?.requested_plan === "Independent Scout Free Trial";
+    const pendingTitle = profile?.approval_status === "rejected" ? "Access Request Declined" : trialRequest ? "Your Free Trial Request Is Being Reviewed" : ownerSetup ? "Your Platform Request Is Being Reviewed" : "Awaiting Admin Approval";
+    const pendingMessage = profileError || (profile?.approval_status === "rejected"
+      ? "Your access request was declined. Contact your administrator if you think this is a mistake."
+      : trialRequest
+        ? "Once approved, your 30-day trial will begin. It includes up to 4 published reports and does not require payment details."
+        : ownerSetup
+          ? "Your workspace and pricing request has been received. The ScoutPro team will review the setup details with you."
+          : "Your account has been created. A club administrator must approve your access before you can use the platform.");
+    return <div className="sr-auth-screen"><div className="sr-pending-card"><h1>{pendingTitle}</h1><p>{pendingMessage}</p><button className="sr-cyan" onClick={refreshProfile}>Check Approval Status</button><button className="sr-outline" onClick={() => supabase.auth.signOut()}>Sign Out</button></div></div>;
   }
   if (!showAuth) return <PublicLanding onSignIn={() => { setSignup(false); setError(""); setShowAuth(true); }} onRequestAccess={() => { setSignup(true); setWorkspaceType("club"); setPreferredPlan(""); setError(""); setShowAuth(true); }} onChoosePlan={(plan, type) => { setSignup(true); setPreferredPlan(plan); setWorkspaceType(type); setClub(""); setError(""); setShowAuth(true); }} />;
   const selectClub = (clubName) => { setClub(clubName); setClubMenuOpen(false); setClubActiveIndex(-1); };
@@ -206,7 +215,7 @@ function PublicLanding({ onSignIn, onRequestAccess, onChoosePlan }) {
         <div className="sr-public-feature-grid">{features.map((feature) => <article className="sr-public-feature" key={feature.title}><span className="sr-public-feature-icon" aria-hidden="true">{feature.icon}</span><h3>{feature.title}</h3><p>{feature.text}</p></article>)}</div>
       </section>
       <section className="sr-public-pricing" aria-labelledby="public-pricing-title">
-        <div className="sr-public-section-heading"><span className="sr-public-kicker">Plans For Different Scouting Setups</span><h2 id="public-pricing-title">Choose The Workspace That Fits Your Team.</h2><p>Club workspaces include the full ScoutPro toolkit. Independent scouts can start with the core tools and add more as needed. These are proposed launch prices; checkout and trial limits still need to be connected.</p></div>
+        <div className="sr-public-section-heading"><span className="sr-public-kicker">Plans For Different Scouting Setups</span><h2 id="public-pricing-title">Choose The Workspace That Fits Your Team.</h2><p>Club workspaces include the full ScoutPro toolkit. Independent scouts can start with the core tools and add more as needed. These are proposed launch prices; online checkout is not connected yet. Free trials begin after account approval.</p></div>
         <div className="sr-public-plan-grid">
           <article className="sr-public-plan-card">
             <span className="sr-public-plan-label">TRY SCOUTPRO</span><h3>Free Trial</h3><p>Try the core scouting workflow before choosing a plan.</p><div className="sr-public-plan-price">Free</div><small className="sr-public-plan-term">30 days or 4 completed reports, whichever comes first</small><ul><li>Player reports</li><li>Reports and assignments</li><li>No payment details requested</li></ul><button type="button" className="sr-public-outline-button" onClick={() => onChoosePlan("Independent Scout Free Trial", "independent")}>Request Free Trial</button>

@@ -185,7 +185,14 @@ export default function ShortlistsPage() {
       }
     }
   }, [appState, folderCacheKey, folderCacheUserId, updateAppState]);
-  useEffect(() => { if (accountProfile?.club) supabase.from("club_reports").select("player").eq("status", "Published").then(({ data }) => setSharedReports(data || [])); }, [accountProfile?.club]);
+  useEffect(() => {
+    if (!accountProfile?.club) return;
+    let reportsQuery = supabase.from("club_reports").select("player").eq("status", "Published").eq("club", accountProfile.club);
+    if (accountProfile.workspace_type === "independent" && accountProfile.requested_plan === "Independent Scout Free Trial") {
+      reportsQuery = reportsQuery.eq("author_id", user?.id);
+    }
+    reportsQuery.then(({ data }) => setSharedReports(data || []));
+  }, [accountProfile?.club, accountProfile?.workspace_type, accountProfile?.requested_plan, user?.id]);
   useEffect(() => { if (accountProfile?.club) supabase.from("profiles").select("id,full_name").eq("club", accountProfile.club).eq("approved", true).then(({ data }) => setScouts((data || []).filter((x) => x.id !== user?.id))); }, [accountProfile?.club, user?.id]);
   useEffect(() => {
     if (!user) return;

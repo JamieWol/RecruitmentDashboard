@@ -42,8 +42,16 @@ export default function ApprovalRequestsPage() {
       setError(rpcError.message || "Could not update this request.");
       return;
     }
-    setNotice(`${request.full_name || request.email || "Account"} ${approve ? (makeClubAdmin ? "approved as club admin" : "approved") : "declined"}.`);
+    let trialSetupError = "";
+    let trialStarted = false;
+    if (approve && isPlatformAdmin && !makeClubAdmin) {
+      const { data: trialResult, error: trialError } = await supabase.rpc("start_independent_trial", { p_user_id: request.id });
+      if (trialError) trialSetupError = trialError.message || "Trial activation failed.";
+      else trialStarted = Boolean(trialResult?.started);
+    }
     await loadRequests();
+    setNotice(`${request.full_name || request.email || "Account"} ${approve ? (makeClubAdmin ? "approved as club admin" : "approved") : "declined"}.${trialStarted ? " Their 30-day Independent Scout trial is now active (up to 4 published reports)." : ""}`);
+    if (trialSetupError) setError(`The account was approved, but trial activation failed. Apply the Independent Trial migration and retry: ${trialSetupError}`);
   };
 
   if (!isPlatformAdmin && !isClubAdmin) {

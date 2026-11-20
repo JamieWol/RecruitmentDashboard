@@ -365,6 +365,8 @@ const playerSummaryText = (player, profile, reports = []) => {
 export default function ScoutingReportsPageFinal() {
   const nav = useNavigate();
   const { appState, updateAppState, user, profile: accountProfile } = useAuth();
+  const isIndependentTrialAccount = accountProfile?.workspace_type === "independent"
+    && accountProfile?.requested_plan === "Independent Scout Free Trial";
   const reportViewStorageKey = `scoutingReportsView:${user?.id || user?.email || "guest"}`;
   const reportImportStorageKey = `scoutingReportImport:${user?.id || user?.email || "guest"}`;
   const openPlayerProfileStorageKey = `scoutingOpenPlayerProfile:${user?.id || user?.email || "guest"}`;
@@ -415,6 +417,7 @@ export default function ScoutingReportsPageFinal() {
   const [profileContentTab, setProfileContentTab] = useState(() => sessionStorage.getItem("scoutingProfileContentTab") === "summary" ? "summary" : "reports");
   const [sharedReports, setSharedReports] = useState([]);
   const [sharedAssignments, setSharedAssignments] = useState([]);
+  const [accountEntitlement, setAccountEntitlement] = useState(null);
   const [deleteError, setDeleteError] = useState("");
   const [playerData, setPlayerData] = useState(null);
   const [playerDataLoading, setPlayerDataLoading] = useState(false);
@@ -439,6 +442,21 @@ export default function ScoutingReportsPageFinal() {
   const [importNotice, setImportNotice] = useState("");
   const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
   const actionsMenuRef = useRef(null);
+  useEffect(() => {
+    let activeRequest = true;
+    if (!user?.id) { setAccountEntitlement(null); return undefined; }
+    supabase.from("account_entitlements").select("plan_code,status,trial_started_at,trial_ends_at,trial_report_limit,published_reports_used")
+      .eq("user_id", user.id).maybeSingle()
+      .then(({ data, error }) => {
+        if (!activeRequest) return;
+        if (error) {
+          // Existing club accounts continue to work until the trial migration is installed.
+          if (!/account_entitlements|schema cache|does not exist/i.test(error.message || "")) console.error("Could not load plan status", error);
+          setAccountEntitlement(null);
+        } else setAccountEntitlement(data || null);
+      });
+    return () => { activeRequest = false; };
+  }, [user?.id]);
   useEffect(() => {
     sessionStorage.setItem("scoutingProfileContentTab", profileContentTab);
   }, [profileContentTab]);
@@ -696,6 +714,10 @@ export default function ScoutingReportsPageFinal() {
   }, [appState, sharedAssignments, publishedAssignmentIds]);
   useEffect(() => {
     if (!user || !accountProfile?.club) return;
+    if (isIndependentTrialAccount) {
+      setSharedAssignments([]);
+      return;
+    }
     supabase
       .from("club_assignments")
       .select("id, assigned_to, assignment, status")
@@ -714,10 +736,12 @@ export default function ScoutingReportsPageFinal() {
         }));
         setSharedAssignments([...new Map(loadedAssignments.map((assignment) => [String(assignment.sharedAssignmentId || assignment.id), assignment])).values()]);
       });
-  }, [user, accountProfile?.club]);
+  }, [user, accountProfile?.club, isIndependentTrialAccount]);
   useEffect(() => {
     if (!user || !accountProfile?.club) return;
-    supabase.from("club_reports").select("*").eq("club", accountProfile.club).eq("status", "Published").then(({ data, error }) => {
+    let reportQuery = supabase.from("club_reports").select("*").eq("club", accountProfile.club).eq("status", "Published");
+    if (isIndependentTrialAccount) reportQuery = reportQuery.eq("author_id", user.id);
+    reportQuery.then(({ data, error }) => {
       if (error) console.error("Could not load club reports", error);
       const published = (data || []).map((item) => {
         if (storedFixtures(item).length) return item;
@@ -748,7 +772,7 @@ export default function ScoutingReportsPageFinal() {
       });
       setSharedReports(published);
     });
-  }, [user, accountProfile?.club]);
+  }, [user, accountProfile?.club, isIndependentTrialAccount]);
   const [shortlistPicker, setShortlistPicker] = useState(false);
   const [selectedShortlist, setSelectedShortlist] = useState("");
   const [selectedPosition, setSelectedPosition] = useState("CF-0");
@@ -1207,7 +1231,7 @@ export default function ScoutingReportsPageFinal() {
       setQuery("");
     }
   };
-  const saveReport = () => {
+  const saveReport = async () => {
     const required = [
       ["Preferred foot", report.foot],
       ["Position played", report.playedPosition || active.position],
@@ -1235,6 +1259,35 @@ export default function ScoutingReportsPageFinal() {
       __fixtures: preservedFixtures,
       __fixtureDates: preservedFixtureDates,
     };
+    if (isIndependentTrialAccount) {
+      if (!accountEntitlement || accountEntitlement.plan_code !== "independent_trial" || accountEntitlement.status !== "trialing") {
+        setPublishError("Your free trial is not active. Ask the platform administrator to activate it before publishing reports.");
+        return;
+      }
+      if (!accountProfile?.club) {
+        setPublishError("Your workspace has not finished setting up. Contact the platform administrator before publishing.");
+        return;
+      }
+      const trialReport = {
+        id: Number(active.id), assignment_id: Number(active.id), player_id: active.playerId || null,
+        player: active.player, club: accountProfile.club, player_club: active.club || "", author_id: user.id,
+        report: reportWithFixtures, status: "Published", updated_at: new Date().toISOString(), completed_at: completedAt,
+        scout: active.scout || "", viewing,
+        fixture_summary: preservedFixtures.length > 1 ? "Multiple" : (preservedFixtures[0] ? `${preservedFixtures[0].date || ""} · ${preservedFixtures[0].name || preservedFixtures[0]}` : isFixtureName(active.game) ? active.game : ""),
+      };
+      const { error: trialPublishError } = await supabase.from("club_reports").upsert(trialReport, { onConflict: "id" });
+      if (trialPublishError) {
+        const isTrialLimit = /TRIAL_LIMIT_REACHED/i.test(trialPublishError.message || "");
+        setPublishError(isTrialLimit
+          ? "Your free trial has ended or you have reached the 4 published-report limit. Choose a paid plan to continue publishing."
+          : `The report could not be published: ${trialPublishError.message || "Please try again."}`);
+        return;
+      }
+      const { data: updatedEntitlement } = await supabase.from("account_entitlements")
+        .select("plan_code,status,trial_started_at,trial_ends_at,trial_report_limit,published_reports_used")
+        .eq("user_id", user.id).maybeSingle();
+      if (updatedEntitlement) setAccountEntitlement(updatedEntitlement);
+    }
     const n = items.map((x) =>
       x.id === active.id ? { ...x, report: reportWithFixtures, status: "Published", completedAt } : x,
     );
@@ -1259,7 +1312,7 @@ export default function ScoutingReportsPageFinal() {
       publishedImmediately,
     ]);
     setTab("Published");
-    if (user && accountProfile?.club) {
+    if (user && accountProfile?.club && !isIndependentTrialAccount) {
       supabase.from("club_reports").upsert({
         id: Number(active.id), assignment_id: Number(active.id), player_id: active.playerId || null,
         player: active.player, club: accountProfile.club, player_club: active.club || "", author_id: user.id, report: reportWithFixtures, status: "Published",
@@ -1446,6 +1499,12 @@ export default function ScoutingReportsPageFinal() {
             <button className="sr-cyan sr-banner-publish" onClick={saveReport}>
               {active.status === "Published" ? "Republish Report" : "Publish Report"}
             </button>
+          )}
+          {isIndependentTrialAccount && accountEntitlement?.plan_code === "independent_trial" && (
+            <p className="sr-trial-usage" role="status">
+              {Math.max(0, Number(accountEntitlement.trial_report_limit || 4) - Number(accountEntitlement.published_reports_used || 0))} of {accountEntitlement.trial_report_limit || 4} trial reports remaining
+              {accountEntitlement.trial_ends_at ? ` · Trial ends ${new Date(accountEntitlement.trial_ends_at).toLocaleDateString()}` : ""}
+            </p>
           )}
           {!editing && active.status !== "Published" && <p className="sr-readonly-note">Read-only: this assignment belongs to another scout.</p>}
           {publishError && <p className="sr-publish-error" role="alert">{publishError}</p>}
