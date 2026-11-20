@@ -117,13 +117,13 @@ function LoginGate() {
           <p>Manage Assignments, Reports And Shortlists For Your Club Or Independent Scouting Platform.</p>
         </div>
         <form className="sr-form sr-auth-form" onSubmit={submit}>
-          <h2>{signup ? (workspaceType === "club" ? "Request Club Access" : "Request Platform Setup") : "Welcome Back"}</h2>
+          <h2>{signup ? (workspaceType === "club" ? "Request Club Access" : workspaceType === "organization" ? "Request Club Workspace Setup" : "Request Independent Setup") : "Welcome Back"}</h2>
           {signup && <>
             {preferredPlan && <div className="sr-selected-plan"><small>Requested Setup</small><strong>{preferredPlan}</strong></div>}
             <div className="sr-workspace-choice" role="group" aria-label="Choose your workspace type">
               <button type="button" className={workspaceType === "club" ? "active" : ""} onClick={() => { setWorkspaceType("club"); setPreferredPlan(""); setClub(""); setError(""); }}>Joining A Club</button>
               <button type="button" className={workspaceType === "independent" ? "active" : ""} onClick={() => { setWorkspaceType("independent"); setPreferredPlan("Independent Scout"); setClub(""); setClubMenuOpen(false); setError(""); }}>Independent</button>
-              <button type="button" className={workspaceType === "organization" ? "active" : ""} onClick={() => { setWorkspaceType("organization"); setPreferredPlan(preferredPlan || "Club Workspace"); setClub(""); setClubMenuOpen(false); setError(""); }}>Own Club</button>
+              <button type="button" className={workspaceType === "organization" ? "active" : ""} onClick={() => { setWorkspaceType("organization"); setPreferredPlan("Club Workspace"); setClub(""); setClubMenuOpen(false); setError(""); }}>Own Club</button>
             </div>
             <input placeholder="Full Name" value={name} onChange={e => setName(e.target.value)} required />
             {workspaceType !== "club" ? <>
@@ -206,13 +206,13 @@ function PublicLanding({ onSignIn, onRequestAccess, onChoosePlan }) {
         <div className="sr-public-feature-grid">{features.map((feature) => <article className="sr-public-feature" key={feature.title}><span className="sr-public-feature-icon" aria-hidden="true">{feature.icon}</span><h3>{feature.title}</h3><p>{feature.text}</p></article>)}</div>
       </section>
       <section className="sr-public-pricing" aria-labelledby="public-pricing-title">
-        <div className="sr-public-section-heading"><span className="sr-public-kicker">Plans For Different Scouting Setups</span><h2 id="public-pricing-title">Choose The Workspace That Fits Your Team.</h2><p>Request pricing and setup details for the option that suits you. Subscription checkout is not live yet.</p></div>
+        <div className="sr-public-section-heading"><span className="sr-public-kicker">Plans For Different Scouting Setups</span><h2 id="public-pricing-title">Choose The Workspace That Fits Your Team.</h2><p>Club workspaces include the full ScoutPro toolkit. Independent scouts can start with the core tools and add more as needed. Request pricing and setup details; online checkout is not live yet.</p></div>
         <div className="sr-public-plan-grid">
           <article className="sr-public-plan-card">
-            <span className="sr-public-plan-label">FOR INDIVIDUALS</span><h3>Independent Scout</h3><p>Your own workspace for reports, player tracking and shortlists.</p><ul><li>Personal scouting workspace</li><li>Player reports and summaries</li><li>Shortlists and squad planning</li></ul><button type="button" className="sr-public-request" onClick={() => onChoosePlan("Independent Scout", "independent")}>Request Pricing</button>
+            <span className="sr-public-plan-label">FOR INDIVIDUALS</span><h3>Independent Scout</h3><p>Your own workspace with the essential tools to scout and track players.</p><ul><li>Personal player tracking</li><li>Player reports and summaries</li><li>Optional add-ons as you grow</li></ul><button type="button" className="sr-public-request" onClick={() => onChoosePlan("Independent Scout", "independent")}>Request Pricing</button>
           </article>
           <article className="sr-public-plan-card sr-public-plan-card-featured">
-            <span className="sr-public-plan-label">FOR CLUBS</span><h3>Club Workspace</h3><p>A shared platform for scouts and recruitment staff at one club.</p><ul><li>Shared reports and assignments</li><li>Club shortlists and squad plans</li><li>Team analysis tools</li></ul><button type="button" className="sr-public-request" onClick={() => onChoosePlan("Club Workspace", "organization")}>Request Pricing</button>
+            <span className="sr-public-plan-label">FOR CLUBS · ALL CORE FEATURES</span><h3>Club Workspace</h3><p>A shared platform for scouts and recruitment staff at one club, with the full ScoutPro toolkit.</p><ul><li>Reports, summaries and assignments</li><li>Shared shortlists and squad plans</li><li>Team analysis tools</li></ul><button type="button" className="sr-public-request" onClick={() => onChoosePlan("Club Workspace", "organization")}>Request Pricing</button>
           </article>
           <article className="sr-public-plan-card">
             <span className="sr-public-plan-label">FOR LARGER TEAMS</span><h3>Larger Organisation</h3><p>Discuss a setup for larger scouting departments or multiple teams.</p><ul><li>Workspace requirements review</li><li>Team access and setup discussion</li><li>Pricing based on your needs</li></ul><button type="button" className="sr-public-outline-button" onClick={() => onChoosePlan("Larger Organisation", "organization")}>Discuss Your Setup</button>
