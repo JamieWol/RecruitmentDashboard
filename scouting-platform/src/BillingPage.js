@@ -1,0 +1,105 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { supabase } from "./supabaseClient";
+import { useAuth } from "./AuthContext";
+
+export default function BillingPage() {
+  const { user, profile, entitlement, workspaceEntitlement, refreshEntitlements } = useAuth();
+  const [searchParams] = useSearchParams();
+  const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const checkoutState = searchParams.get("checkout");
+  const isIndependent = profile?.workspace_type === "independent";
+  const isWorkspaceOwner = profile?.workspace_type === "organization" || (profile?.workspace_type === "club" && profile?.role === "club_admin");
+  const workspaceName = profile?.club || "Your Workspace";
+  const currentSubscription = isIndependent ? entitlement : workspaceEntitlement;
+  const hasStripeSubscription = Boolean(currentSubscription?.stripe_subscription_id && ["active", "pending"].includes(currentSubscription.status));
+  const hasActiveIndependentSubscription = isIndependent && entitlement?.status === "active" && Boolean(entitlement?.stripe_subscription_id);
+  const independentBundleActive = isIndependent && entitlement?.plan_code === "independent_bundle" && entitlement?.status === "active";
+  const currentPlanName = useMemo(() => {
+    const plan = currentSubscription?.plan_code;
+    if (plan === "independent_trial") return "Free Trial";
+    if (plan === "independent") return "Independent Scout";
+    if (plan === "independent_bundle") return "Independent Scout + Full Tools Bundle";
+    if (plan === "club") return "Club Workspace";
+    if (plan === "organisation") return "Larger Organisation";
+    if (profile?.workspace_type === "club") return "Club Workspace";
+    return "No Paid Plan Active";
+  }, [currentSubscription?.plan_code, profile?.workspace_type]);
+
+  useEffect(() => {
+    if (checkoutState === "success") {
+      setNotice("Checkout completed. Stripe is confirming your subscription; your access will update automatically shortly.");
+      let checks = 0;
+      const timer = window.setInterval(() => {
+        checks += 1;
+        refreshEntitlements().catch(() => {});
+        if (checks >= 10) window.clearInterval(timer);
+      }, 2500);
+      return () => window.clearInterval(timer);
+    }
+    if (checkoutState === "canceled") setNotice("Checkout was canceled. No subscription was started.");
+    return undefined;
+  }, [checkoutState, refreshEntitlements]);
+
+  const beginCheckout = useCallback(async (plan, interval) => {
+    setBusy(`${plan}:${interval}`);
+    setError("");
+    setNotice("");
+    const { data, error: invokeError } = await supabase.functions.invoke("create-checkout-session", { body: { plan, interval } });
+    setBusy("");
+    if (invokeError || !data?.url) {
+      setError(data?.error || invokeError?.message || "Could not open secure checkout. Please try again.");
+      return;
+    }
+    window.location.assign(data.url);
+  }, []);
+
+  const openPortal = useCallback(async () => {
+    setBusy("portal");
+    setError("");
+    const { data, error: invokeError } = await supabase.functions.invoke("create-billing-portal-session", { body: {} });
+    setBusy("");
+    if (invokeError || !data?.url) {
+      setError(data?.error || invokeError?.message || "Could not open billing management.");
+      return;
+    }
+    window.location.assign(data.url);
+  }, []);
+
+  const addToolsBundle = useCallback(async () => {
+    if (!hasActiveIndependentSubscription || entitlement?.plan_code !== "independent") {
+      await beginCheckout("independent_bundle", "monthly");
+      return;
+    }
+    setBusy("bundle-upgrade");
+    setError("");
+    const { data, error: invokeError } = await supabase.functions.invoke("add-independent-tools-bundle", { body: {} });
+    setBusy("");
+    if (invokeError || (!data?.updated && !data?.already_enabled)) {
+      setError(data?.error || invokeError?.message || "Could not add the tools bundle.");
+      return;
+    }
+    setNotice("The bundle upgrade was sent to Stripe. Your extra tools will unlock after Stripe confirms it.");
+    window.setTimeout(() => refreshEntitlements().catch(() => {}), 2000);
+  }, [beginCheckout, entitlement?.plan_code, hasActiveIndependentSubscription, refreshEntitlements]);
+
+  if (!profile?.approved || !user) return <main className="sr-page"><p>Your account must be approved before billing is available.</p></main>;
+  return <main className="sr-page sr-billing-page">
+    <header className="sr-billing-heading"><div><span className="sr-kicker">ACCOUNT</span><h1>Plans And Billing</h1><p>Review your current plan, start a subscription or manage billing through Stripe.</p></div></header>
+    {error && <p className="sr-billing-alert" role="alert">{error}</p>}
+    {notice && <p className="sr-billing-notice" role="status">{notice}</p>}
+    <section className="sr-billing-current"><div><small>Current Plan</small><h2>{currentPlanName}</h2><p>{isWorkspaceOwner ? workspaceName : isIndependent ? "Independent Scout workspace" : `Managed by ${workspaceName}`}</p></div><div className="sr-billing-status"><strong>{currentSubscription?.status ? currentSubscription.status.replaceAll("_", " ") : profile.workspace_type === "club" ? "Club access" : "Not active"}</strong>{currentSubscription?.current_period_end && <small>Renews or ends {new Date(currentSubscription.current_period_end).toLocaleDateString()}</small>}</div></section>
+
+    {isIndependent ? <section className="sr-billing-plans" aria-label="Independent Scout plans">
+      <article className="sr-billing-plan"><span>CORE PLAN</span><h2>Independent Scout</h2><p>Player reports, assignments and summaries.</p><strong>£9.99 <small>/ month</small></strong><button type="button" className="sr-cyan" disabled={Boolean(busy) || hasStripeSubscription} onClick={() => beginCheckout("independent", "monthly")}>{busy === "independent:monthly" ? "Opening Checkout…" : hasStripeSubscription ? "Already Subscribed" : "Subscribe Monthly"}</button><button type="button" className="sr-outline" disabled={Boolean(busy) || hasStripeSubscription} onClick={() => beginCheckout("independent", "yearly")}>{busy === "independent:yearly" ? "Opening Checkout…" : hasStripeSubscription ? "Already Subscribed" : "Subscribe Yearly · £99"}</button></article>
+      <article className="sr-billing-plan featured"><span>ALL INDEPENDENT TOOLS</span><h2>Full Tools Bundle</h2><p>Independent Scout plus shortlists, squad plans and team analysis.</p><strong>£17.98 <small>/ month</small></strong><small className="sr-billing-plan-note">Includes the £9.99 Independent Scout plan and £7.99 tools add-on.</small><button type="button" className="sr-cyan" disabled={Boolean(busy) || independentBundleActive} onClick={addToolsBundle}>{busy === "bundle-upgrade" ? "Updating Subscription…" : busy === "independent_bundle:monthly" ? "Opening Checkout…" : independentBundleActive ? "Bundle Already Active" : entitlement?.plan_code === "independent" && hasActiveIndependentSubscription ? "Add Full Tools Bundle" : "Subscribe With Full Tools"}</button></article>
+      {currentSubscription?.stripe_customer_id && <button type="button" className="sr-outline sr-billing-manage" disabled={Boolean(busy)} onClick={openPortal}>{busy === "portal" ? "Opening Billing…" : "Manage Or Cancel Subscription"}</button>}
+    </section> : isWorkspaceOwner ? <section className="sr-billing-plans" aria-label="Club Workspace plans">
+      <article className="sr-billing-plan featured"><span>FOR {workspaceName.toUpperCase()}</span><h2>Club Workspace</h2><p>Shared reports, shortlists, squad plans and team analysis for up to seven users.</p><strong>£49 <small>/ month</small></strong><button type="button" className="sr-cyan" disabled={Boolean(busy) || hasStripeSubscription} onClick={() => beginCheckout("club", "monthly")}>{busy === "club:monthly" ? "Opening Checkout…" : hasStripeSubscription ? "Already Subscribed" : "Subscribe To Club Workspace"}</button></article>
+      {currentSubscription?.stripe_customer_id && <button type="button" className="sr-outline sr-billing-manage" disabled={Boolean(busy)} onClick={openPortal}>{busy === "portal" ? "Opening Billing…" : "Manage Or Cancel Subscription"}</button>}
+    </section> : <section className="sr-billing-current"><div><h2>Billing Is Managed By Your Club</h2><p>Ask your club administrator to manage the workspace subscription.</p></div></section>}
+    <p className="sr-billing-footnote">Payments are securely processed by Stripe. Your card details are not stored in ScoutPro. Workspace access updates after Stripe confirms the subscription.</p>
+  </main>;
+}

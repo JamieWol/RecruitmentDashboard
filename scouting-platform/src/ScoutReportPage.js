@@ -31,8 +31,8 @@ import {
 
 function ScoutReportPage({ shadowSquad, setShadowSquad }) {
   const navigate = useNavigate();
-  const { profile, appState, updateAppState, user, entitlement } = useAuth();
-  const canUseFullTools = hasFullToolAccess(profile, entitlement);
+  const { profile, appState, updateAppState, user, entitlement, workspaceEntitlement } = useAuth();
+  const canUseFullTools = hasFullToolAccess(profile, entitlement, workspaceEntitlement);
   const [players, setPlayers] = useState([]);
   const [publishedReports, setPublishedReports] = useState([]);
   const exportRef = useRef(null);

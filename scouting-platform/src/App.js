@@ -12,6 +12,7 @@ import CreateAssignmentPage from "./CreateAssignmentPage";
 import TeamAnalysisPage from "./TeamAnalysisPage";
 import ApprovalRequestsPage from "./ApprovalRequestsPage";
 import ReportManagementPage from "./ReportManagementPage";
+import BillingPage from "./BillingPage";
 import { ClubBadge } from "./ClubBadge";
 import { hasFullToolAccess } from "./planAccess";
 import "./App.css";
@@ -19,13 +20,13 @@ import "./mobile.css";
 
 function FullToolsGate({ children }) {
   const navigate = useNavigate();
-  const { profile, entitlement } = useAuth();
-  if (hasFullToolAccess(profile, entitlement)) return children;
+  const { profile, entitlement, workspaceEntitlement } = useAuth();
+  if (hasFullToolAccess(profile, entitlement, workspaceEntitlement)) return children;
   return <main className="sr-page sr-plan-locked"><section className="sr-plan-locked-card">
     <span className="sr-kicker">FULL TOOLS BUNDLE</span>
     <h1>Unlock Shortlists, Squad Plans And Team Analysis</h1>
-    <p>Your current plan includes player reports and assignments. The Full Tools Bundle adds shortlists, squad plans and team analysis to an Independent Scout workspace. Ask the platform administrator to enable the bundle for your account.</p>
-    <button type="button" className="sr-cyan" onClick={() => navigate("/scouting-reports")}>Back To Reports And Assignments</button>
+    <p>Your current plan includes player reports and assignments. Full Tools Bundle access includes shortlists, squad plans and team analysis. Start or manage a subscription to unlock these tools.</p>
+    <div className="sr-plan-locked-actions"><button type="button" className="sr-cyan" onClick={() => navigate("/billing")}>View Plans And Billing</button><button type="button" className="sr-outline" onClick={() => navigate("/scouting-reports")}>Back To Reports And Assignments</button></div>
   </section></main>;
 }
 
@@ -254,7 +255,7 @@ function PublicLanding({ onSignIn, onRequestAccess, onChoosePlan }) {
 
 function AppRoutes() {
   const [shadowSquad, setShadowSquad] = useState([]);
-  return <><Header /><div className="sr-app-shell" style={{ paddingTop: 80 }}><Routes><Route path="/" element={<LandingPage />} /><Route path="/scout-report" element={<ScoutReportPage shadowSquad={shadowSquad} setShadowSquad={setShadowSquad} />} /><Route path="/scouting-reports" element={<ScoutingReportsPage />} /><Route path="/shortlists" element={<FullToolsGate><ShortlistsPage /></FullToolsGate>} /><Route path="/squad-plans" element={<FullToolsGate><SquadPlansPage /></FullToolsGate>} /><Route path="/squad-plan" element={<FullToolsGate><SquadPlanPage /></FullToolsGate>} /><Route path="/create-assignment" element={<CreateAssignmentPage />} /><Route path="/team-analysis" element={<FullToolsGate><TeamAnalysisPage /></FullToolsGate>} /><Route path="/approval-requests" element={<ApprovalRequestsPage />} /><Route path="/report-management" element={<ReportManagementPage />} /></Routes></div></>;
+  return <><Header /><div className="sr-app-shell" style={{ paddingTop: 80 }}><Routes><Route path="/" element={<LandingPage />} /><Route path="/scout-report" element={<ScoutReportPage shadowSquad={shadowSquad} setShadowSquad={setShadowSquad} />} /><Route path="/scouting-reports" element={<ScoutingReportsPage />} /><Route path="/shortlists" element={<FullToolsGate><ShortlistsPage /></FullToolsGate>} /><Route path="/squad-plans" element={<FullToolsGate><SquadPlansPage /></FullToolsGate>} /><Route path="/squad-plan" element={<FullToolsGate><SquadPlanPage /></FullToolsGate>} /><Route path="/create-assignment" element={<CreateAssignmentPage />} /><Route path="/team-analysis" element={<FullToolsGate><TeamAnalysisPage /></FullToolsGate>} /><Route path="/billing" element={<BillingPage />} /><Route path="/approval-requests" element={<ApprovalRequestsPage />} /><Route path="/report-management" element={<ReportManagementPage />} /></Routes></div></>;
 }
 
 // ------------------- HEADER COMPONENT -------------------
@@ -267,6 +268,7 @@ function Header() {
 
   const settingsMenuItems = () => <>
     {canReviewAccess && <button type="button" onClick={() => { goTo("/approval-requests"); setSettingsOpen(false); }}>Access approvals</button>}
+    <button type="button" onClick={() => { goTo("/billing"); setSettingsOpen(false); }}>Plans & Billing</button>
     <button type="button" onClick={() => { goTo("/report-management"); setSettingsOpen(false); }}>Report Management</button>
   </>;
 

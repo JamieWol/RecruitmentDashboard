@@ -365,9 +365,9 @@ const playerSummaryText = (player, profile, reports = []) => {
 };
 export default function ScoutingReportsPageFinal() {
   const nav = useNavigate();
-  const { appState, updateAppState, user, profile: accountProfile, entitlement } = useAuth();
-  const canUseFullTools = hasFullToolAccess(accountProfile, entitlement);
-  const isIndependentTrialAccount = accountProfile?.workspace_type === "independent"
+  const { appState, updateAppState, user, profile: accountProfile, entitlement, workspaceEntitlement } = useAuth();
+  const canUseFullTools = hasFullToolAccess(accountProfile, entitlement, workspaceEntitlement);
+  const isIndependentTrialRequest = accountProfile?.workspace_type === "independent"
     && accountProfile?.requested_plan === "Independent Scout Free Trial";
   const reportViewStorageKey = `scoutingReportsView:${user?.id || user?.email || "guest"}`;
   const reportImportStorageKey = `scoutingReportImport:${user?.id || user?.email || "guest"}`;
@@ -427,6 +427,9 @@ export default function ScoutingReportsPageFinal() {
   const [sharedReports, setSharedReports] = useState([]);
   const [sharedAssignments, setSharedAssignments] = useState([]);
   const [accountEntitlement, setAccountEntitlement] = useState(null);
+  const currentAccountEntitlement = entitlement || accountEntitlement;
+  const isIndependentTrialAccount = isIndependentTrialRequest
+    && (!currentAccountEntitlement || currentAccountEntitlement.plan_code === "independent_trial");
   const [deleteError, setDeleteError] = useState("");
   const [playerData, setPlayerData] = useState(null);
   const [playerDataLoading, setPlayerDataLoading] = useState(false);
@@ -1297,6 +1300,21 @@ export default function ScoutingReportsPageFinal() {
         .select("plan_code,status,trial_started_at,trial_ends_at,trial_report_limit,published_reports_used")
         .eq("user_id", user.id).maybeSingle();
       if (updatedEntitlement) setAccountEntitlement(updatedEntitlement);
+    } else if (user && accountProfile?.club) {
+      const { error: publishError } = await supabase.from("club_reports").upsert({
+        id: Number(active.id), assignment_id: Number(active.id), player_id: active.playerId || null,
+        player: active.player, club: accountProfile.club, player_club: active.club || "", author_id: user.id,
+        report: reportWithFixtures, status: "Published", updated_at: new Date().toISOString(), completed_at: completedAt,
+        scout: active.scout || "", viewing,
+        fixture_summary: preservedFixtures.length > 1 ? "Multiple" : (preservedFixtures[0] ? `${preservedFixtures[0].date || ""} · ${preservedFixtures[0].name || preservedFixtures[0]}` : isFixtureName(active.game) ? active.game : ""),
+      }, { onConflict: "id" });
+      if (publishError) {
+        const planInactive = /PLAN_INACTIVE/i.test(publishError.message || "");
+        setPublishError(planInactive
+          ? "Your subscription is not active. Open Plans & Billing to continue publishing reports."
+          : `The report could not be published: ${publishError.message || "Please try again."}`);
+        return;
+      }
     }
     const n = items.map((x) =>
       x.id === active.id ? { ...x, report: reportWithFixtures, status: "Published", completedAt } : x,
@@ -1323,22 +1341,12 @@ export default function ScoutingReportsPageFinal() {
     ]);
     setTab("Published");
     if (user && accountProfile?.club && !isIndependentTrialAccount) {
-      supabase.from("club_reports").upsert({
-        id: Number(active.id), assignment_id: Number(active.id), player_id: active.playerId || null,
-        player: active.player, club: accountProfile.club, player_club: active.club || "", author_id: user.id, report: reportWithFixtures, status: "Published",
-        updated_at: new Date().toISOString(), completed_at: active.completedAt || active.date || new Date().toISOString().slice(0, 10), scout: active.scout || "", viewing, fixture_summary: preservedFixtures.length > 1 ? "Multiple" : (preservedFixtures[0] ? `${preservedFixtures[0].date || ""} · ${preservedFixtures[0].name || preservedFixtures[0]}` : isFixtureName(active.game) ? active.game : ""),
-      }, { onConflict: "id" }).then(async ({ error }) => {
-        if (error) {
-          console.error("Could not publish shared report", error);
-          return;
-        }
-        const { error: assignmentError } = await supabase
-          .from("club_assignments")
-          .update({ status: "Published", assignment: { ...active, report: reportWithFixtures, status: "Published", games: preservedFixtures, fixtureDates: preservedFixtureDates } })
-          .eq("club", accountProfile.club)
-          .eq("id", Number(active.id));
-        if (assignmentError) console.error("Could not mark shared assignment published", assignmentError);
-      });
+      const { error: assignmentError } = await supabase
+        .from("club_assignments")
+        .update({ status: "Published", assignment: { ...active, report: reportWithFixtures, status: "Published", games: preservedFixtures, fixtureDates: preservedFixtureDates } })
+        .eq("club", accountProfile.club)
+        .eq("id", Number(active.id));
+      if (assignmentError) console.error("Could not mark shared assignment published", assignmentError);
     }
     setActive(null);
     sessionStorage.removeItem("scoutingActiveReport");

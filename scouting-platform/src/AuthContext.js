@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { supabase } from "./supabaseClient";
 import { migrateAndLoadState, saveCloudState, syncPublishedReports } from "./cloudState";
+import { normalizeWorkspaceKey } from "./planAccess";
 
 const AuthContext = createContext(null);
 
@@ -8,38 +9,53 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [entitlement, setEntitlement] = useState(null);
+  const [workspaceEntitlement, setWorkspaceEntitlement] = useState(null);
   const [loading, setLoading] = useState(true);
   const [appState, setAppState] = useState(null);
   const [profileError, setProfileError] = useState("");
   const cloudSaveQueue = useRef(Promise.resolve());
-  const loadProfile = async (user) => {
-    if (!user) { setProfile(null); setEntitlement(null); setAppState(null); setProfileError(""); return; }
+  const loadEntitlements = useCallback(async (userId, profileData) => {
+    if (!userId) { setEntitlement(null); setWorkspaceEntitlement(null); return; }
+    const { data: planData, error: planError } = await supabase.from("account_entitlements")
+      .select("plan_code,status,trial_started_at,trial_ends_at,trial_report_limit,published_reports_used,stripe_customer_id,stripe_subscription_id,stripe_price_id,current_period_end,cancel_at_period_end")
+      .eq("user_id", userId).maybeSingle();
+    if (planError) {
+      if (!/account_entitlements|schema cache|does not exist/i.test(planError.message || "")) console.error("Could not load plan access", planError);
+      setEntitlement(null);
+    } else setEntitlement(planData || null);
+    if (profileData?.approved && ["club", "organization"].includes(profileData.workspace_type) && profileData.club) {
+      const workspaceKey = normalizeWorkspaceKey(profileData.club);
+      const { data, error } = await supabase.from("workspace_entitlements")
+        .select("workspace_key,workspace_name,plan_code,status,stripe_customer_id,stripe_subscription_id,stripe_price_id,current_period_end,cancel_at_period_end,seat_limit")
+        .eq("workspace_key", workspaceKey).maybeSingle();
+      if (error) {
+        if (!/workspace_entitlements|schema cache|does not exist/i.test(error.message || "")) console.error("Could not load workspace plan", error);
+        setWorkspaceEntitlement(null);
+      } else setWorkspaceEntitlement(data || null);
+    } else setWorkspaceEntitlement(null);
+  }, []);
+  const loadProfile = useCallback(async (user) => {
+    if (!user) { setProfile(null); setEntitlement(null); setWorkspaceEntitlement(null); setAppState(null); setProfileError(""); return; }
     const { data, error } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
     if (error) { console.error("Could not load account profile", error); setProfile(null); setProfileError(error.message || String(error)); return; }
     if (!data) { setProfile(null); setProfileError("No profile row was returned for this user."); return; }
     setProfileError("");
     setProfile(data || null);
-    const { data: planData, error: planError } = await supabase.from("account_entitlements")
-      .select("plan_code,status,trial_started_at,trial_ends_at,trial_report_limit,published_reports_used")
-      .eq("user_id", user.id).maybeSingle();
-    if (planError) {
-      if (!/account_entitlements|schema cache|does not exist/i.test(planError.message || "")) console.error("Could not load plan access", planError);
-      setEntitlement(null);
-    } else setEntitlement(planData || null);
+    await loadEntitlements(user.id, data);
     if (data?.approved) {
       try { const state = await migrateAndLoadState(user); setAppState(state); await syncPublishedReports(user, state, data.club); } catch (error) { console.error("Could not load cloud data", error); }
     }
-  };
+  }, [loadEntitlements]);
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
     const { data: listener } = supabase.auth.onAuthStateChange((_event, next) => setSession(next));
     return () => listener.subscription.unsubscribe();
   }, []);
   useEffect(() => {
-    if (!session?.user) { setProfile(null); setEntitlement(null); setAppState(null); setLoading(false); return; }
+    if (!session?.user) { setProfile(null); setEntitlement(null); setWorkspaceEntitlement(null); setAppState(null); setLoading(false); return; }
     setLoading(true);
     loadProfile(session.user).finally(() => setLoading(false));
-  }, [session]);
+  }, [session, loadProfile]);
   const updateAppState = (next) => {
     setAppState(next);
     const saveUser = session?.user;
@@ -70,6 +86,8 @@ export function AuthProvider({ children }) {
     setAppState(latest);
     return latest;
   }, [session?.user]);
-  return <AuthContext.Provider value={{ session, user: session?.user || null, profile, entitlement, profileError, appState, updateAppState, refreshAppState, loading, refreshProfile: () => loadProfile(session?.user) }}>{children}</AuthContext.Provider>;
+  const refreshProfile = useCallback(() => loadProfile(session?.user), [loadProfile, session?.user]);
+  const refreshEntitlements = useCallback(() => loadEntitlements(session?.user?.id, profile), [loadEntitlements, session?.user?.id, profile]);
+  return <AuthContext.Provider value={{ session, user: session?.user || null, profile, entitlement, workspaceEntitlement, refreshEntitlements, profileError, appState, updateAppState, refreshAppState, loading, refreshProfile }}>{children}</AuthContext.Provider>;
 }
 export const useAuth = () => useContext(AuthContext);
