@@ -545,23 +545,52 @@ export default function ShortlistsPage() {
       setSharingFolder(false);
     }
   };
+  const removeListFromSharedFolder = async (list, folderId) => {
+    if (!user || !folderId || !list.sharedFolderId) return list;
+    const folderShareId = `folder-share:${user.id}:${folderId}`;
+    if (String(list.sharedFolderId) !== folderShareId) return list;
+    const { data: folderShares, error: folderError } = await supabase.from("shortlist_shares").select("member_id").eq("shortlist_id", folderShareId).eq("owner_id", user.id);
+    if (folderError) throw folderError;
+    const inheritedMemberIds = (folderShares || []).map((share) => share.member_id);
+    if (inheritedMemberIds.length) {
+      const { error: removeError } = await supabase.from("shortlist_shares").delete().eq("shortlist_id", String(list.id)).eq("owner_id", user.id).in("member_id", inheritedMemberIds);
+      if (removeError) throw removeError;
+    }
+    const { data: remaining, error: remainingError } = await supabase.from("shortlist_shares").select("member_id").eq("shortlist_id", String(list.id)).eq("owner_id", user.id);
+    if (remainingError) throw remainingError;
+    const { sharedFolderId, sharedFolderName, shared, sharedPermission, owner_id, ...unfoldered } = list;
+    if (remaining?.length) {
+      const snapshot = { ...unfoldered, tags };
+      const { error: snapshotError } = await supabase.from("shared_shortlists").upsert({ shortlist_id: String(list.id), owner_id: user.id, club: accountProfile?.club, shortlist: snapshot, updated_at: new Date().toISOString() }, { onConflict: "shortlist_id" });
+      if (snapshotError) throw snapshotError;
+      return { ...unfoldered, shared: true, owner_id: user.id, sharedPermission: remaining[0].permission || "view" };
+    }
+    const { error: snapshotError } = await supabase.from("shared_shortlists").delete().eq("shortlist_id", String(list.id)).eq("owner_id", user.id);
+    if (snapshotError) throw snapshotError;
+    return unfoldered;
+  };
   const moveShortlist = async (listId, folderId) => {
-    const nextLists = lists.map((list) => String(list.id) === String(listId) ? { ...list, folderId: folderId || "" } : list);
-    persist(nextLists);
-    if (folderId) {
-      const moved = nextLists.find((list) => String(list.id) === String(listId));
-      try {
-        const inheritedShares = await syncListToSharedFolder(moved, folderId);
-        if (inheritedShares.length) {
-          const sharedMoved = { ...moved, shared: true, owner_id: user.id, sharedPermission: inheritedShares[0].permission, sharedFolderId: `folder-share:${user.id}:${folderId}`, sharedFolderName: folders.find((folder) => String(folder.id) === String(folderId))?.name || "Shared folder" };
-          const syncedLists = nextLists.map((list) => String(list.id) === String(listId) ? sharedMoved : list);
-          setLists(syncedLists);
-          await updateAppState({ ...appState, assignments: appState?.assignments || [], shortlists: syncedLists, shortlistFolders: folders, tags });
-        }
-      } catch (error) {
-        console.error("Could not sync shortlist to shared folder", error);
-        setFolderSaveMessage("The shortlist moved, but its shared-folder access could not be synced.");
+    const original = lists.find((list) => String(list.id) === String(listId));
+    if (!original) return;
+    let moved = { ...original, folderId: folderId || "" };
+    try {
+      if (original.folderId && String(original.folderId) !== String(folderId || "")) {
+        moved = await removeListFromSharedFolder(moved, original.folderId);
+        moved.folderId = folderId || "";
       }
+      const inheritedShares = folderId ? await syncListToSharedFolder(moved, folderId) : [];
+      if (inheritedShares.length) {
+        moved = { ...moved, shared: true, owner_id: user.id, sharedPermission: inheritedShares[0].permission, sharedFolderId: `folder-share:${user.id}:${folderId}`, sharedFolderName: folders.find((folder) => String(folder.id) === String(folderId))?.name || "Shared folder" };
+      }
+      const nextLists = lists.map((list) => String(list.id) === String(listId) ? moved : list);
+      setLists(nextLists);
+      await updateAppState({ ...appState, assignments: appState?.assignments || [], shortlists: nextLists, shortlistFolders: folders, tags });
+      if (current?.id === original.id) setCurrent(moved);
+      if (!folderId && activeFolderId === original.folderId) setActiveFolderId("all");
+      if (original.folderId && !folderId) setFolderSaveMessage(`“${original.name}” moved back to unfiled shortlists.`);
+    } catch (error) {
+      console.error("Could not move shortlist", error);
+      setFolderSaveMessage(`The shortlist could not be moved: ${error.message || "please try again."}`);
     }
   };
   const renameFolder = (folder) => {
@@ -1257,15 +1286,14 @@ export default function ShortlistsPage() {
   const sharedFolderCard = (folder) => <article className="sr-list-card sr-shortlist-folder-card" key={folder.id} style={{ "--folder-color": folder.color || "#3478e8" }}><button type="button" className="sr-folder-open" onClick={() => setActiveSharedFolderId(folder.id)}><span className="sr-folder-icon" aria-hidden="true"><svg viewBox="0 0 48 48" focusable="false"><path d="M5 12a4 4 0 0 1 4-4h10l5 5h15a4 4 0 0 1 4 4v18a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V12Z" /></svg></span><h2>{folder.name}</h2><p>Shared folder{folder.ownerName ? ` · ${folder.ownerName}` : ""}</p><span className="sr-folder-open-label">Open ›</span></button></article>;
   const shortlistCard = (list) => <article className="sr-list-card sr-shortlist-item" key={list.id}>
     <button type="button" className="sr-list-card-button" onClick={() => openShortlist(list)}>
-      <span className="sr-shortlist-icon" aria-hidden="true"><svg viewBox="0 0 48 48" focusable="false"><path d="M16 8h-4a4 4 0 0 0-4 4v27a3 3 0 0 0 3 3h26a3 3 0 0 0 3-3V12a4 4 0 0 0-4-4h-4" /><rect x="17" y="5" width="14" height="8" rx="3" /><path d="M16 21h16M16 28h16M16 35h10" /></svg></span>
       <h2>{list.name}</h2>
       <p>{list.type === "Flex" ? "Flex formation" : list.formation}</p>
       <span>{(list.players || []).length} players</span>
     </button>
-    {!showShared && !list.folderId && <div className="sr-shortlist-card-actions">
+    {!showShared && <div className="sr-shortlist-card-actions">
       {folderPickerListId === list.id ? <label className="sr-shortlist-folder-select"><span>Move to</span><select autoFocus aria-label={`Move ${list.name} to folder`} value={list.folderId || "__choose__"} onChange={(event) => { moveShortlist(list.id, event.target.value); setFolderPickerListId(null); }}><option value="__choose__" disabled>Choose a folder</option><option value="">Unfiled</option>{folders.map((folder) => <option key={folder.id} value={folder.id}>{folder.name}</option>)}</select><button type="button" aria-label="Close folder selector" onClick={() => setFolderPickerListId(null)}>Cancel</button></label> : <>
         <button type="button" className="sr-shortlist-icon-button" aria-label={`Share ${list.name}`} title="Share shortlist" onClick={() => { setShareShortlistTarget(list); setShareShortlistScout(""); }}><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="m8.7 10.6 6.6-4.1M8.7 13.4l6.6 4.1" /></svg></button>
-        <button type="button" className="sr-shortlist-icon-button" aria-label={`Move ${list.name} to a folder`} title={folders.length ? "Move to folder" : "Create a folder first"} disabled={!folders.length} onClick={() => setFolderPickerListId(list.id)}><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6.5A2.5 2.5 0 0 1 5.5 4H10l2 2h6.5A2.5 2.5 0 0 1 21 8.5v9a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z" /><path d="M3.5 9h17" /></svg></button>
+        {list.folderId ? <button type="button" className="sr-shortlist-icon-button" aria-label={`Remove ${list.name} from folder`} title="Remove from folder" onClick={() => moveShortlist(list.id, "")}><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><path d="M3.5 10h17M12 13H7m0 0 2.5-2.5M7 13l2.5 2.5" /></svg></button> : <button type="button" className="sr-shortlist-icon-button" aria-label={`Move ${list.name} to a folder`} title={folders.length ? "Move to folder" : "Create a folder first"} disabled={!folders.length} onClick={() => setFolderPickerListId(list.id)}><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6.5A2.5 2.5 0 0 1 5.5 4H10l2 2h6.5A2.5 2.5 0 0 1 21 8.5v9a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z" /><path d="M3.5 9h17" /></svg></button>}
         <button type="button" className="sr-shortlist-icon-button" aria-label={`Rename ${list.name}`} title="Rename shortlist" onClick={() => renameShortlist(list)}><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 20h9" /><path d="m16.5 3.5 4 4L8 20l-5 1 1-5Z" /></svg></button>
         <button type="button" className="sr-shortlist-icon-button" aria-label={`Delete ${list.name}`} title="Delete shortlist" onClick={() => del(list.id)}><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m4 4v6m6-6v6" /></svg></button>
       </>}
