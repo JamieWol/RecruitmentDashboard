@@ -411,7 +411,7 @@ export default function ShortlistsPage() {
     const { data: shares, error } = await supabase.from("shortlist_shares").select("member_id,permission").eq("shortlist_id", folderShareId).eq("owner_id", user.id);
     if (error) throw error;
     for (const share of shares || []) {
-      const snapshot = { ...list, sharedFolderId: folderShareId, sharedFolderName: folder.name };
+      const snapshot = { ...list, tags, sharedFolderId: folderShareId, sharedFolderName: folder.name };
       delete snapshot.shared;
       delete snapshot.sharedPermission;
       delete snapshot.owner_id;
@@ -470,7 +470,7 @@ export default function ShortlistsPage() {
       const folderLists = lists.filter((list) => String(list.folderId || "") === String(shareFolderTarget.id));
       for (const list of folderLists) {
         // Keep the owner's folderId in their saved shortlist, while sharedFolderId groups the copy for recipients.
-        const snapshot = { ...list, sharedFolderId: folderShareId, sharedFolderName: shareFolderTarget.name };
+        const snapshot = { ...list, tags, sharedFolderId: folderShareId, sharedFolderName: shareFolderTarget.name };
         delete snapshot.shared;
         delete snapshot.sharedPermission;
         delete snapshot.owner_id;
@@ -1144,8 +1144,10 @@ export default function ShortlistsPage() {
       </div>
     </article>;
   };
+  const sharedFolderCard = (folder) => <article className="sr-list-card sr-shortlist-folder-card" key={folder.id} style={{ "--folder-color": folder.color || "#3478e8" }}><button type="button" className="sr-folder-open" onClick={() => setActiveSharedFolderId(folder.id)}><span className="sr-folder-icon" aria-hidden="true"><svg viewBox="0 0 48 48" focusable="false"><path d="M5 12a4 4 0 0 1 4-4h10l5 5h15a4 4 0 0 1 4 4v18a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V12Z" /></svg></span><h2>{folder.name}</h2><p>Shared folder{folder.ownerName ? ` · ${folder.ownerName}` : ""}</p><span className="sr-folder-open-label">Open ›</span></button></article>;
   const shortlistCard = (list) => <article className="sr-list-card sr-shortlist-item" key={list.id}>
     <button type="button" className="sr-list-card-button" onClick={() => openShortlist(list)}>
+      <span className="sr-shortlist-icon" aria-hidden="true"><svg viewBox="0 0 48 48" focusable="false"><path d="M16 8h-4a4 4 0 0 0-4 4v27a3 3 0 0 0 3 3h26a3 3 0 0 0 3-3V12a4 4 0 0 0-4-4h-4" /><rect x="17" y="5" width="14" height="8" rx="3" /><path d="M16 21h16M16 28h16M16 35h10" /></svg></span>
       <h2>{list.name}</h2>
       <p>{list.type === "Flex" ? "Flex formation" : list.formation}</p>
       <span>{(list.players || []).length} players</span>
@@ -1172,8 +1174,7 @@ export default function ShortlistsPage() {
         {folders.length || visibleShortlists.length ? <div className="sr-list-grid sr-shortlist-folder-grid">{folders.map(folderCard)}{visibleShortlists.map(shortlistCard)}</div> : <div className="sr-empty">Create a folder for a team or project, or create a shortlist on its own.</div>}
       </section> : <section className="sr-shortlist-folder-section">
         <div className="sr-shortlist-section-heading"><h2>{showShared ? activeSharedFolder?.name || "Shared shortlists" : activeFolder?.name}</h2>{(showShared && activeSharedFolder) && <span>{visibleShortlists.length} shortlist{visibleShortlists.length === 1 ? "" : "s"}</span>}{!showShared && activeFolder && <span>{visibleShortlists.length} shortlist{visibleShortlists.length === 1 ? "" : "s"}</span>}</div>
-        {showShared && !activeSharedFolder && <div className="sr-list-grid sr-shortlist-folder-grid">{sharedFolders.map((folder) => <article className="sr-list-card sr-shortlist-folder-card" key={folder.id} style={{ "--folder-color": folder.color || "#3478e8" }}><button type="button" className="sr-folder-open" onClick={() => setActiveSharedFolderId(folder.id)}><span className="sr-folder-icon" aria-hidden="true"><svg viewBox="0 0 48 48" focusable="false"><path d="M5 12a4 4 0 0 1 4-4h10l5 5h15a4 4 0 0 1 4 4v18a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V12Z" /></svg></span><h2>{folder.name}</h2><p>Shared folder{folder.ownerName ? ` · ${folder.ownerName}` : ""}</p><span className="sr-folder-open-label">Open ›</span></button></article>)}</div>}
-        {visibleShortlists.length > 0 ? <div className="sr-list-grid sr-shortlist-list-grid">{visibleShortlists.map(shortlistCard)}</div> : <div className="sr-empty">{showShared ? (activeSharedFolder ? "This shared folder has no shortlists yet." : sharedFolders.length ? "No individual shortlists have been shared with you." : "No shortlists or folders have been shared with you yet.") : "This folder is empty. Create a shortlist here or move one into it."}</div>}
+        {showShared && !activeSharedFolder ? (sharedFolders.length || visibleShortlists.length ? <div className="sr-list-grid sr-shortlist-folder-grid">{sharedFolders.map(sharedFolderCard)}{visibleShortlists.map(shortlistCard)}</div> : <div className="sr-empty">No shortlists or folders have been shared with you yet.</div>) : visibleShortlists.length > 0 ? <div className="sr-list-grid sr-shortlist-list-grid">{visibleShortlists.map(shortlistCard)}</div> : <div className="sr-empty">{showShared ? "This shared folder has no shortlists yet." : "This folder is empty. Create a shortlist here or move one into it."}</div>}
       </section>}
       {folderModalOpen && <div className="sr-modal sr-shortlist-folder-modal" onClick={() => !folderSaving && setFolderModalOpen(false)}><form className="sr-form sr-shortlist-folder-form" onClick={(event) => event.stopPropagation()} onSubmit={saveFolder}><div className="sr-form-head"><div><div className="sr-kicker">SHORTLIST ORGANISATION</div><h2>Create Folder</h2></div><button type="button" className="sr-close" disabled={folderSaving} onClick={() => setFolderModalOpen(false)}>×</button></div><label className="sr-field"><span>Folder name</span><input autoFocus value={folderName} onChange={(event) => setFolderName(event.target.value)} placeholder="For example, Preston North End" /></label><label className="sr-field sr-folder-colour-field"><span>Folder colour</span><div className="sr-folder-colour-picker"><input aria-label="Choose folder colour" type="color" value={folderColor} onChange={(event) => setFolderColor(event.target.value)} /><output>{folderColor.toUpperCase()}</output><span className="sr-folder-colour-preview" style={{ background: folderColor }} /></div></label><div className="sr-actions"><button type="button" className="sr-outline" disabled={folderSaving} onClick={() => setFolderModalOpen(false)}>Cancel</button><button className="sr-cyan" disabled={!folderName.trim() || folderSaving}>{folderSaving ? "Saving…" : "Create Folder"}</button></div></form></div>}
       {shareFolderTarget && <div className="sr-modal" onClick={() => !sharingFolder && setShareFolderTarget(null)}><form className="sr-form" onClick={(event) => event.stopPropagation()} onSubmit={shareFolder}><div className="sr-form-head"><div><div className="sr-kicker">SHORTLIST SHARING</div><h2>Share “{shareFolderTarget.name}”</h2></div><button type="button" className="sr-close" disabled={sharingFolder} onClick={() => setShareFolderTarget(null)}>×</button></div><p>Sharing this folder also shares every shortlist inside it. New shortlists added to the folder will be shared automatically.</p>
