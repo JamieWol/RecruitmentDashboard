@@ -1100,7 +1100,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
           
           <button
             disabled={!canUseFullTools}
-            title={!canUseFullTools ? "The Full Tools Bundle is required to use shortlists." : undefined}
+            title={!canUseFullTools ? "Premium is required to use shortlists." : undefined}
             style={{
               marginLeft: 10,
               padding: "8px 14px",
@@ -1123,7 +1123,7 @@ function ScoutReportPage({ shadowSquad, setShadowSquad }) {
 
             }}
           >
-            {canUseFullTools ? "➕ Add to Shortlist" : "🔒 Shortlists Require Full Tools Bundle"}
+            {canUseFullTools ? "➕ Add to Shortlist" : "🔒 Shortlists Require Premium"}
           </button>
 
       {/* Player Report */}

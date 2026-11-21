@@ -23,9 +23,9 @@ function FullToolsGate({ children }) {
   const { profile, entitlement, workspaceEntitlement } = useAuth();
   if (hasFullToolAccess(profile, entitlement, workspaceEntitlement)) return children;
   return <main className="sr-page sr-plan-locked"><section className="sr-plan-locked-card">
-    <span className="sr-kicker">FULL TOOLS BUNDLE</span>
+    <span className="sr-kicker">PREMIUM</span>
     <h1>Unlock Shortlists, Squad Plans And Team Analysis</h1>
-    <p>Your current plan includes player reports and assignments. Full Tools Bundle access includes shortlists, squad plans and team analysis. Start or manage a subscription to unlock these tools.</p>
+    <p>Your current plan includes player reports and assignments. Premium adds shortlists, squad plans and team analysis. Start or manage a subscription to unlock these tools.</p>
     <div className="sr-plan-locked-actions"><button type="button" className="sr-cyan" onClick={() => navigate("/billing")}>View Plans And Billing</button><button type="button" className="sr-outline" onClick={() => navigate("/scouting-reports")}>Back To Reports And Assignments</button></div>
   </section></main>;
 }
@@ -125,7 +125,7 @@ function LoginGate() {
           ? "Checkout was canceled, so no subscription was started. You can try again whenever you’re ready."
           : "Your account is ready. Choose a billing option to continue to secure Stripe Checkout. Your workspace will activate when Stripe confirms the subscription."}</p>
       {error && <p className="sr-auth-error" role="alert">{error}</p>}
-      <button className="sr-cyan" type="button" disabled={checkoutBusy} onClick={() => startPendingCheckout("monthly")}>{checkoutBusy ? "Opening Checkout…" : profile.requested_plan === "Independent Scout + Full Tools Bundle" ? "Subscribe To Full Tools · £17.98 / Month" : "Subscribe Monthly · £9.99"}</button>
+      <button className="sr-cyan" type="button" disabled={checkoutBusy} onClick={() => startPendingCheckout("monthly")}>{checkoutBusy ? "Opening Checkout…" : profile.requested_plan === "Independent Scout + Full Tools Bundle" ? "Subscribe To Premium · £17.98 / Month" : "Subscribe Monthly · £9.99"}</button>
       {profile.requested_plan !== "Independent Scout + Full Tools Bundle" && <button className="sr-outline" type="button" disabled={checkoutBusy} onClick={() => startPendingCheckout("yearly")}>Subscribe Yearly · £99</button>}
       <button className="sr-outline" type="button" onClick={refreshProfile}>Check Subscription Status</button>
       <button className="sr-outline" type="button" onClick={() => supabase.auth.signOut()}>Sign Out</button>
@@ -285,7 +285,7 @@ function PublicLanding({ onSignIn, onRequestAccess, onChoosePlan }) {
             <span className="sr-public-plan-label">FOR INDIVIDUAL SCOUTS</span><h3>Independent Scout</h3><p>Your own workspace with the essential tools to scout and track players.</p><div className="sr-public-plan-price">£9.99 <small>/ month</small></div><small className="sr-public-plan-term">Or £99 per year</small><ul><li>Player reports and summaries</li><li>Reports and assignments</li><li>One scout workspace</li></ul><button type="button" className="sr-public-request" onClick={() => onChoosePlan("Independent Scout", "independent")}>Choose Independent Scout</button>
           </article>
           <article className="sr-public-plan-card">
-            <span className="sr-public-plan-label">OPTIONAL ADD-ON</span><h3>Full Tools Bundle</h3><p>Expand your Independent Scout workspace with more ways to organise and analyse targets.</p><div className="sr-public-plan-price">+£7.99 <small>/ month</small></div><small className="sr-public-plan-term">Add to the Independent Scout plan</small><ul><li>Shortlists</li><li>Squad plans</li><li>Team analysis</li></ul><button type="button" className="sr-public-outline-button" onClick={() => onChoosePlan("Independent Scout + Full Tools Bundle", "independent")}>Choose Full Tools Bundle</button>
+            <span className="sr-public-plan-label">OPTIONAL ADD-ON</span><h3>Premium</h3><p>Expand your Independent Scout workspace with more ways to organise and analyse targets.</p><div className="sr-public-plan-price">+£7.99 <small>/ month</small></div><small className="sr-public-plan-term">Add to the Independent Scout plan</small><ul><li>Shortlists</li><li>Squad plans</li><li>Team analysis</li></ul><button type="button" className="sr-public-outline-button" onClick={() => onChoosePlan("Independent Scout + Full Tools Bundle", "independent")}>Choose Premium</button>
           </article>
           <article className="sr-public-plan-card sr-public-plan-card-featured">
             <span className="sr-public-plan-label">FOR CLUBS · ALL CORE FEATURES</span><h3>Club Workspace</h3><p>A shared platform for scouts and recruitment staff at one club, with the full ScoutPro toolkit.</p><div className="sr-public-plan-price">From £49 <small>/ month</small></div><small className="sr-public-plan-term">Includes up to 7 users</small><ul><li>Reports, summaries and assignments</li><li>Shared shortlists and squad plans</li><li>Team analysis tools</li></ul><button type="button" className="sr-public-request" onClick={() => onChoosePlan("Club Workspace", "organization")}>Request This Plan</button>
