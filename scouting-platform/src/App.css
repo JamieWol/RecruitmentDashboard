@@ -506,3 +506,12 @@ header{z-index:1000!important}.sr-page{position:relative;z-index:1}.sr-pitch{z-i
 @media(max-width:390px){.sr-public-nav-actions{gap:5px}.sr-public-nav-actions button{padding:7px 8px;font-size:11px}.sr-public-hero-actions{gap:8px}.sr-public-hero-actions button{padding:11px 13px}.sr-public-feature-grid{grid-template-columns:1fr}.sr-public-visual{padding:16px}.sr-public-player-card small{font-size:10px}}
 @media(max-width:650px){.sr-public-showcase{justify-self:center;width:100%}}
 @media(max-width:390px){.sr-product-window-row{gap:8px}.sr-product-window-bar{gap:6px;padding:0 8px;font-size:7px}.sr-product-list-row{grid-template-columns:21px minmax(0,1fr);gap:5px;padding:6px}.sr-product-list-row em{display:none}.sr-product-grades{gap:5px;padding-right:10px;padding-left:10px}.sr-product-grades>div{padding:7px 6px}.sr-product-player{padding-right:10px;padding-left:10px}}
+
+.sr-billing-confirm-backdrop{position:fixed;inset:0;z-index:1200;display:grid;place-items:center;padding:20px;background:rgba(2,16,38,.78);backdrop-filter:blur(4px)}
+.sr-billing-confirm-dialog{box-sizing:border-box;width:min(100%,540px);padding:clamp(22px,4vw,34px);border:1px solid #58c9ed;border-radius:18px;background:linear-gradient(145deg,#123e70,#082d60);box-shadow:0 24px 80px rgba(0,0,0,.38);color:#fff}
+.sr-billing-confirm-dialog h2{margin:8px 0 12px;font-size:clamp(23px,4vw,30px)}
+.sr-billing-confirm-dialog p{margin:0;color:#d4e4f5;line-height:1.6}
+.sr-billing-confirm-dialog p strong{color:#fff}
+.sr-billing-confirm-actions{display:flex;justify-content:flex-end;gap:12px;margin-top:26px}
+.sr-billing-confirm-actions button{min-height:46px;padding:10px 18px}
+@media(max-width:520px){.sr-billing-confirm-actions{flex-direction:column-reverse}.sr-billing-confirm-actions button{width:100%}}
