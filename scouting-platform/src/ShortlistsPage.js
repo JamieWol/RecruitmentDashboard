@@ -259,7 +259,10 @@ export default function ShortlistsPage() {
       setLists((previous) => previous.map((list) => {
         const snapshot = data.find((item) => String(item.shortlist_id) === String(list.id));
         if (!snapshot) return list;
-        const next = { ...snapshot.shortlist, owner_id: user.id, shared: true, sharedPermission: list.sharedPermission || "edit" };
+        const snapshotFolderId = snapshot.shortlist?.sharedFolderId
+          ? folders.find((folder) => String(snapshot.shortlist.sharedFolderId).endsWith(`:${folder.id}`))?.id
+          : "";
+        const next = { ...snapshot.shortlist, folderId: list.folderId || snapshot.shortlist?.folderId || snapshotFolderId || "", owner_id: user.id, shared: true, sharedPermission: list.sharedPermission || "edit" };
         if (current?.id === list.id) setCurrent(next);
         return next;
       }));
@@ -267,7 +270,7 @@ export default function ShortlistsPage() {
     loadOwnedSharedLists();
     window.addEventListener("focus", loadOwnedSharedLists);
     return () => window.removeEventListener("focus", loadOwnedSharedLists);
-  }, [user, current?.id]);
+  }, [user, current?.id, folders]);
   const [show, setShow] = useState(false),
     [name, setName] = useState(""),
     [type, setType] = useState("Formation"),
@@ -409,7 +412,8 @@ export default function ShortlistsPage() {
       await shareOne(folderShareId, marker);
       const folderLists = lists.filter((list) => String(list.folderId || "") === String(shareFolderTarget.id));
       for (const list of folderLists) {
-        const snapshot = { ...list, folderId: "", sharedFolderId: folderShareId, sharedFolderName: shareFolderTarget.name };
+        // Keep the owner's folderId in their saved shortlist, while sharedFolderId groups the copy for recipients.
+        const snapshot = { ...list, sharedFolderId: folderShareId, sharedFolderName: shareFolderTarget.name };
         delete snapshot.shared;
         delete snapshot.sharedPermission;
         delete snapshot.owner_id;
