@@ -168,8 +168,9 @@ export default function ShortlistsPage() {
   const folderCacheKey = shortlistFolderCacheKey(folderCacheUserId);
   const [databasePlayers, setDatabasePlayers] = useState([]);
   const [sharedReports, setSharedReports] = useState([]);
-  const [sharedLists, setSharedLists] = useState([]), [showShared, setShowShared] = useState(false);
+  const [sharedLists, setSharedLists] = useState([]), [sharedFolders, setSharedFolders] = useState([]), [showShared, setShowShared] = useState(false), [activeSharedFolderId, setActiveSharedFolderId] = useState("");
   const [scouts, setScouts] = useState([]), [shareEnabled, setShareEnabled] = useState(false), [shareScout, setShareScout] = useState(""), [sharePermission, setSharePermission] = useState("view");
+  const [shareFolderTarget, setShareFolderTarget] = useState(null), [shareFolderScout, setShareFolderScout] = useState(""), [shareFolderPermission, setShareFolderPermission] = useState("view"), [sharingFolder, setSharingFolder] = useState(false);
   useEffect(() => {
     if (!appState) return;
     setLists(appState.shortlists || []);
@@ -197,12 +198,14 @@ export default function ShortlistsPage() {
   useEffect(() => {
     if (!user) return;
     const loadSharedLists = async () => {
-      const { data } = await supabase.from("shortlist_shares").select("shortlist_id,permission").eq("member_id", user.id);
+      const { data } = await supabase.from("shortlist_shares").select("shortlist_id,owner_id,permission").eq("member_id", user.id);
       const ids = (data || []).map((x) => String(x.shortlist_id));
-      if (!ids.length) return setSharedLists([]);
+      if (!ids.length) { setSharedLists([]); setSharedFolders([]); return; }
       const result = await supabase.from("shared_shortlists").select("*").in("shortlist_id", ids);
       const sharedItems = (result.data || []).filter((item) => item.shortlist?.kind !== "squad-plan");
-      setSharedLists(sharedItems.map((x) => ({ ...x.shortlist, owner_id: x.owner_id, sharedPermission: data.find((s) => String(s.shortlist_id) === String(x.shortlist_id))?.permission || "view", shared: true })));
+      const mappedItems = sharedItems.map((x) => ({ ...x.shortlist, owner_id: x.owner_id, sharedPermission: data.find((s) => String(s.shortlist_id) === String(x.shortlist_id))?.permission || "view", shared: true }));
+      setSharedFolders(mappedItems.filter((item) => item.kind === "shortlist-folder"));
+      setSharedLists(mappedItems.filter((item) => item.kind !== "shortlist-folder"));
       const sharedTags = sharedItems.flatMap((x) => x.shortlist?.tags || []);
       if (sharedTags.length) setTags((previous) => [...new Map([...previous, ...sharedTags].map((tag) => [tag.id, tag])).values()]);
     };
@@ -382,6 +385,54 @@ export default function ShortlistsPage() {
       setFolderName("");
       setFolderSaving(false);
       setFolderModalOpen(false);
+    }
+  };
+  const shareFolder = async (event) => {
+    event.preventDefault();
+    if (!shareFolderTarget || !shareFolderScout || sharingFolder) return;
+    setSharingFolder(true);
+    try {
+      if (!user || !accountProfile?.club) throw new Error("Sharing requires an approved workspace account.");
+      const folderShareId = `folder-share:${user.id}:${shareFolderTarget.id}`;
+      const shareOne = async (shortlistId, snapshot) => {
+        const { error: snapshotError } = await supabase.from("shared_shortlists").upsert({ shortlist_id: shortlistId, owner_id: user.id, club: accountProfile.club, shortlist: snapshot, updated_at: new Date().toISOString() }, { onConflict: "shortlist_id" });
+        if (snapshotError) throw snapshotError;
+        const { data: existing, error: lookupError } = await supabase.from("shortlist_shares").select("shortlist_id").eq("shortlist_id", shortlistId).eq("member_id", shareFolderScout).maybeSingle();
+        if (lookupError) throw lookupError;
+        const share = { owner_id: user.id, member_id: shareFolderScout, club: accountProfile.club, permission: shareFolderPermission };
+        const { error: shareError } = existing
+          ? await supabase.from("shortlist_shares").update({ permission: shareFolderPermission }).eq("shortlist_id", shortlistId).eq("member_id", shareFolderScout)
+          : await supabase.from("shortlist_shares").insert({ shortlist_id: shortlistId, ...share });
+        if (shareError) throw shareError;
+      };
+      const marker = { id: folderShareId, kind: "shortlist-folder", name: shareFolderTarget.name, color: shareFolderTarget.color || "#3478e8", ownerName: accountProfile.full_name || "A scout" };
+      await shareOne(folderShareId, marker);
+      const folderLists = lists.filter((list) => String(list.folderId || "") === String(shareFolderTarget.id));
+      for (const list of folderLists) {
+        const snapshot = { ...list, folderId: "", sharedFolderId: folderShareId, sharedFolderName: shareFolderTarget.name };
+        delete snapshot.shared;
+        delete snapshot.sharedPermission;
+        delete snapshot.owner_id;
+        await shareOne(String(list.id), snapshot);
+      }
+      const nextLists = lists.map((list) => String(list.folderId || "") === String(shareFolderTarget.id)
+        ? { ...list, shared: true, owner_id: user.id, sharedPermission: shareFolderPermission, sharedFolderId: folderShareId, sharedFolderName: shareFolderTarget.name }
+        : list);
+      setLists(nextLists);
+      await updateAppState({ ...appState, assignments: appState?.assignments || [], shortlists: nextLists, shortlistFolders: folders, tags });
+      if (current && folderLists.some((list) => String(list.id) === String(current.id))) {
+        const sharedCurrent = nextLists.find((list) => String(list.id) === String(current.id));
+        if (sharedCurrent) setCurrent(sharedCurrent);
+      }
+      setFolderSaveMessage(`“${shareFolderTarget.name}” and ${folderLists.length} shortlist${folderLists.length === 1 ? "" : "s"} shared successfully.`);
+      setShareFolderTarget(null);
+      setShareFolderScout("");
+      setShareFolderPermission("view");
+    } catch (error) {
+      console.error("Could not share shortlist folder", error);
+      setFolderSaveMessage(`Could not share the folder: ${error.message || "please try again."}`);
+    } finally {
+      setSharingFolder(false);
     }
   };
   const moveShortlist = (listId, folderId) => {
@@ -961,8 +1012,11 @@ export default function ShortlistsPage() {
     setCurrent({ ...list, players });
   };
   const activeFolder = folders.find((folder) => String(folder.id) === String(activeFolderId));
+  const activeSharedFolder = sharedFolders.find((folder) => String(folder.id) === String(activeSharedFolderId));
   const visibleShortlists = showShared
-    ? sharedLists
+    ? activeSharedFolder
+      ? sharedLists.filter((list) => String(list.sharedFolderId || "") === String(activeSharedFolder.id))
+      : sharedLists.filter((list) => !list.sharedFolderId)
     : activeFolder
       ? lists.filter((list) => String(list.folderId || "") === String(activeFolder.id))
       : activeFolderId === "all"
@@ -978,6 +1032,7 @@ export default function ShortlistsPage() {
         <span className="sr-folder-open-label">Open ›</span>
       </button>
       <div className="sr-folder-actions">
+        <button type="button" onClick={() => { setShareFolderTarget(folder); setShareFolderScout(""); }}>Share folder</button>
         <button type="button" onClick={() => renameFolder(folder)}>Rename</button>
         <button type="button" onClick={() => deleteFolder(folder)}>Delete folder</button>
       </div>
@@ -999,20 +1054,23 @@ export default function ShortlistsPage() {
         <div>
           <div className="sr-kicker">SCOUTING PLATFORM</div>
           <h1>Your Shortlists</h1>
-          <p>{showShared ? "Shortlists other scouts have shared with you." : activeFolder ? `Shortlists inside ${activeFolder.name}.` : "Group shortlists into folders for each team, squad or recruitment project."}</p>
+          <p>{showShared ? "Shortlists and folders other scouts have shared with you." : activeFolder ? `Shortlists inside ${activeFolder.name}.` : "Group shortlists into folders for each team, squad or recruitment project."}</p>
         </div>
-        <div className="sr-head-actions"><button className={!showShared ? "sr-cyan" : "sr-outline"} onClick={() => { setShowShared(false); setActiveFolderId("all"); }}>My Shortlists</button><button className={showShared ? "sr-cyan" : "sr-outline"} onClick={() => { setShowShared(true); setActiveFolderId("all"); }}>Shared Shortlists</button>{!showShared && <><button className="sr-outline" onClick={() => setFolderModalOpen(true)}>Create Folder</button><button className="sr-cyan" onClick={() => { setCreateFolderId(activeFolder?.id || ""); setShow(true); }}>Create New Shortlist</button></>}</div>
+        <div className="sr-head-actions"><button className={!showShared ? "sr-cyan" : "sr-outline"} onClick={() => { setShowShared(false); setActiveFolderId("all"); setActiveSharedFolderId(""); }}>My Shortlists</button><button className={showShared ? "sr-cyan" : "sr-outline"} onClick={() => { setShowShared(true); setActiveFolderId("all"); setActiveSharedFolderId(""); }}>Shared Shortlists</button>{!showShared && <><button className="sr-outline" onClick={() => setFolderModalOpen(true)}>Create Folder</button><button className="sr-cyan" onClick={() => { setCreateFolderId(activeFolder?.id || ""); setShow(true); }}>Create New Shortlist</button></>}</div>
       </section>
       {folderSaveMessage && <p className="sr-folder-save-message" role="status">{folderSaveMessage}</p>}
       {!showShared && activeFolder && <button type="button" className="sr-back sr-shortlist-folder-back" onClick={() => setActiveFolderId("all")}>‹ All folders and shortlists</button>}
+      {showShared && activeSharedFolder && <button type="button" className="sr-back sr-shortlist-folder-back" onClick={() => setActiveSharedFolderId("")}>‹ All shared folders and shortlists</button>}
       {!showShared && activeFolderId === "all" ? <section className="sr-shortlist-folder-section">
         <div className="sr-shortlist-section-heading"><h2>Folders &amp; unfiled shortlists</h2></div>
         {folders.length || visibleShortlists.length ? <div className="sr-list-grid sr-shortlist-folder-grid">{folders.map(folderCard)}{visibleShortlists.map(shortlistCard)}</div> : <div className="sr-empty">Create a folder for a team or project, or create a shortlist on its own.</div>}
       </section> : <section className="sr-shortlist-folder-section">
-        <div className="sr-shortlist-section-heading"><h2>{showShared ? "Shared shortlists" : activeFolder?.name}</h2>{!showShared && activeFolder && <span>{visibleShortlists.length} shortlist{visibleShortlists.length === 1 ? "" : "s"}</span>}</div>
-        {visibleShortlists.length > 0 ? <div className="sr-list-grid sr-shortlist-list-grid">{visibleShortlists.map(shortlistCard)}</div> : <div className="sr-empty">{showShared ? "No shortlists have been shared with you yet." : "This folder is empty. Create a shortlist here or move one into it."}</div>}
+        <div className="sr-shortlist-section-heading"><h2>{showShared ? activeSharedFolder?.name || "Shared shortlists" : activeFolder?.name}</h2>{(showShared && activeSharedFolder) && <span>{visibleShortlists.length} shortlist{visibleShortlists.length === 1 ? "" : "s"}</span>}{!showShared && activeFolder && <span>{visibleShortlists.length} shortlist{visibleShortlists.length === 1 ? "" : "s"}</span>}</div>
+        {showShared && !activeSharedFolder && <div className="sr-list-grid sr-shortlist-folder-grid">{sharedFolders.map((folder) => <article className="sr-list-card sr-shortlist-folder-card" key={folder.id} style={{ "--folder-color": folder.color || "#3478e8" }}><button type="button" className="sr-folder-open" onClick={() => setActiveSharedFolderId(folder.id)}><span className="sr-folder-icon" aria-hidden="true"><svg viewBox="0 0 48 48" focusable="false"><path d="M5 12a4 4 0 0 1 4-4h10l5 5h15a4 4 0 0 1 4 4v18a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V12Z" /></svg></span><h2>{folder.name}</h2><p>Shared folder{folder.ownerName ? ` · ${folder.ownerName}` : ""}</p><span className="sr-folder-open-label">Open ›</span></button></article>)}</div>}
+        {visibleShortlists.length > 0 ? <div className="sr-list-grid sr-shortlist-list-grid">{visibleShortlists.map(shortlistCard)}</div> : <div className="sr-empty">{showShared ? (activeSharedFolder ? "This shared folder has no shortlists yet." : sharedFolders.length ? "No individual shortlists have been shared with you." : "No shortlists or folders have been shared with you yet.") : "This folder is empty. Create a shortlist here or move one into it."}</div>}
       </section>}
       {folderModalOpen && <div className="sr-modal sr-shortlist-folder-modal" onClick={() => !folderSaving && setFolderModalOpen(false)}><form className="sr-form sr-shortlist-folder-form" onClick={(event) => event.stopPropagation()} onSubmit={saveFolder}><div className="sr-form-head"><div><div className="sr-kicker">SHORTLIST ORGANISATION</div><h2>Create Folder</h2></div><button type="button" className="sr-close" disabled={folderSaving} onClick={() => setFolderModalOpen(false)}>×</button></div><label className="sr-field"><span>Folder name</span><input autoFocus value={folderName} onChange={(event) => setFolderName(event.target.value)} placeholder="For example, Preston North End" /></label><label className="sr-field sr-folder-colour-field"><span>Folder colour</span><div className="sr-folder-colour-picker"><input aria-label="Choose folder colour" type="color" value={folderColor} onChange={(event) => setFolderColor(event.target.value)} /><output>{folderColor.toUpperCase()}</output><span className="sr-folder-colour-preview" style={{ background: folderColor }} /></div></label><div className="sr-actions"><button type="button" className="sr-outline" disabled={folderSaving} onClick={() => setFolderModalOpen(false)}>Cancel</button><button className="sr-cyan" disabled={!folderName.trim() || folderSaving}>{folderSaving ? "Saving…" : "Create Folder"}</button></div></form></div>}
+      {shareFolderTarget && <div className="sr-modal" onClick={() => !sharingFolder && setShareFolderTarget(null)}><form className="sr-form" onClick={(event) => event.stopPropagation()} onSubmit={shareFolder}><div className="sr-form-head"><div><div className="sr-kicker">SHORTLIST SHARING</div><h2>Share “{shareFolderTarget.name}”</h2></div><button type="button" className="sr-close" disabled={sharingFolder} onClick={() => setShareFolderTarget(null)}>×</button></div><p>The folder and its current shortlists will appear in the selected scout’s Shared Shortlists.</p><label className="sr-field"><span>Scout</span><select autoFocus value={shareFolderScout} onChange={(event) => setShareFolderScout(event.target.value)}><option value="">Select scout</option>{scouts.map((scout) => <option key={scout.id} value={scout.id}>{scout.full_name || scout.id}</option>)}</select></label><label className="sr-field"><span>Permission</span><select value={shareFolderPermission} onChange={(event) => setShareFolderPermission(event.target.value)}><option value="view">View only</option><option value="edit">View and edit</option></select></label><div className="sr-actions"><button type="button" className="sr-outline" disabled={sharingFolder} onClick={() => setShareFolderTarget(null)}>Cancel</button><button className="sr-cyan" disabled={!shareFolderScout || sharingFolder}>{sharingFolder ? "Sharing…" : "Share Folder"}</button></div></form></div>}
       {show && (
         <div className="sr-modal">
           <form className="sr-form sr-shortlist-create" onSubmit={create}>
