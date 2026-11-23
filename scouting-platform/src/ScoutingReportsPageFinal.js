@@ -2037,7 +2037,7 @@ export default function ScoutingReportsPageFinal() {
             {actionsMenuOpen && <div className="sr-page-actions-dropdown" role="menu">
               <button type="button" role="menuitem" onClick={() => { setDashboardView(dashboardView === "checker" ? "reports" : "checker"); setActionsMenuOpen(false); }}>{dashboardView === "checker" ? "Reports and Assignments" : "Profile Checker"}</button>
               <button type="button" role="menuitem" onClick={() => { setActionsMenuOpen(false); nav("/shortlists"); }}>View Shortlists</button>
-              <button type="button" role="menuitem" onClick={() => { setActionsMenuOpen(false); setReportImportOpen(true); }}>Import Old Reports</button>
+              <button type="button" role="menuitem" onClick={() => { setActionsMenuOpen(false); setReportImportOpen(true); }}>Import Reports</button>
             </div>}
           </div>
           <button className="sr-cyan" onClick={() => nav("/create-assignment")}>
