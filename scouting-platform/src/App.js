@@ -31,6 +31,7 @@ function FullToolsGate({ children }) {
 }
 
 function LoginGate() {
+  const navigate = useNavigate();
   const { user, profile, profileError, loading, refreshProfile } = useAuth();
   const [searchParams] = useSearchParams();
   const [signup, setSignup] = useState(false), [showAuth, setShowAuth] = useState(false), [workspaceType, setWorkspaceType] = useState("club"), [preferredPlan, setPreferredPlan] = useState(""), [email, setEmail] = useState(""), [password, setPassword] = useState(""), [name, setName] = useState(""), [club, setClub] = useState(""), [clubs, setClubs] = useState([]), [clubsLoading, setClubsLoading] = useState(false), [clubMenuOpen, setClubMenuOpen] = useState(false), [clubActiveIndex, setClubActiveIndex] = useState(-1), [error, setError] = useState("");
@@ -161,6 +162,7 @@ function LoginGate() {
     }
     const result = signup ? await supabase.auth.signUp({ email, password, options: { data: { full_name: name, club, workspace_type: workspaceType, requested_role: workspaceType === "club" ? "member" : "club_admin", requested_plan: preferredPlan } } }) : await supabase.auth.signInWithPassword({ email, password });
     if (result.error) setError(result.error.message);
+    else if (!signup && result.data?.session) navigate("/", { replace: true });
     else if (signup && !result.data?.session) setNotice("Account created. Check your email to confirm it, then sign in to complete your subscription.");
   };
   return (
