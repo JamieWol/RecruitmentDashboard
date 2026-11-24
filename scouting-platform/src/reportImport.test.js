@@ -12,6 +12,42 @@ describe("old report import parsing", () => {
     ]);
   });
 
+  test("keeps every fixture when an imported report contains more than three games", () => {
+    const games = [
+      "Alpha FC v Beta FC 01/09/2026",
+      "Gamma FC v Alpha FC 08/09/2026",
+      "Alpha FC v Delta FC 15/09/2026",
+      "Epsilon FC v Alpha FC 22/09/2026",
+      "Alpha FC v Zeta FC 29/09/2026",
+    ];
+    const fixtures = splitImportedFixtures(games.join("\n"));
+
+    expect(fixtures).toHaveLength(5);
+    expect(fixtures.map((fixture) => fixture.name)).toEqual(games.map((game) => game.replace(/\s+\d{2}\/\d{2}\/\d{4}$/, "")));
+    expect(fixtures.map((fixture) => fixture.date)).toEqual([
+      "2026-09-01", "2026-09-08", "2026-09-15", "2026-09-22", "2026-09-29",
+    ]);
+  });
+
+  test("scans every game cell in a Word report fixture table", () => {
+    const games = [
+      "Alpha FC v Beta FC 01/09/2026",
+      "Gamma FC v Alpha FC 08/09/2026",
+      "Alpha FC v Delta FC 15/09/2026",
+      "Epsilon FC v Alpha FC 22/09/2026",
+      "Alpha FC v Zeta FC 29/09/2026",
+    ];
+    const cells = games.map((game) => `<td><p>${game}</p></td>`).join("");
+    const [record] = parseWordHtml(`<table>
+      <tr><td><p>Player: Alex Example</p></td><td><p>Club: Alpha FC</p></td></tr>
+      <tr><td><p>Game(s):</p></td><td><table><tr>${cells}</tr></table></td></tr>
+      <tr><td><p>Conclusion:</p></td><td><p>Reliable midfielder.</p></td></tr>
+    </table>`);
+
+    expect(splitImportedFixtures(record.game, record.date)).toHaveLength(5);
+    expect(record.report.conclusion).toBe("Reliable midfielder.");
+  });
+
   test("matches a unique player despite an abbreviated first name and avoids ambiguous matches", () => {
     expect(findImportedPlayerMatch("Y. Ohashi", [
       { id: 7, Name: "Yuki Ohashi" },
