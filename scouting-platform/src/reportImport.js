@@ -494,6 +494,14 @@ const wordBlocksToRecords = (blocks, sourceFile) => {
       }
       const field = block.tableCell ? tableFieldFor(block.tableCell) : activeField;
       if (field) {
+        // Word reports often put a "Game(s)" label in the first fixture row
+        // and continue the fixtures in later rows with that cell left blank.
+        // Carry the resolved label forward per table column so those cells
+        // remain fixture data instead of falling through into club/position.
+        if (block.tableCell) {
+          const { tableId, columnIndex } = block.tableCell;
+          tableActiveFields.set(`${tableId}:${columnIndex}`, field);
+        }
         appendFieldValue(field, text);
         if (!block.tableCell && field === "player") activeField = "";
         return;

@@ -234,6 +234,36 @@ describe("old report import parsing", () => {
     ]);
   });
 
+  test("keeps fixtures across later Word table rows without repeating Game(s)", () => {
+    const fixtures = [
+      ["BARNSLEY v CREWE ALEXANDRA", "25/08/2026"],
+      ["BARNSLEY v CAMBRIDGE UNITED", "17/10/2026"],
+      ["BARNSLEY v LEEDS UNITED U21", "22/09/2026"],
+      ["BARNSLEY v OLDHAM ATHLETIC", "11/11/2026"],
+      ["BARNSLEY v LEICESTER CITY", "19/09/2026"],
+      ["FLEETWOOD TOWN v BARNSLEY", "06/10/2026"],
+      ["PETERBOROUGH UNITED v BARNSLEY", "15/09/2026"],
+    ];
+    const fixtureCell = ([name, date]) => `<td><p>${name}<br />${date}</p></td>`;
+    const fixtureRows = [
+      `<tr><td><p>Game(s):</p></td>${fixtures.slice(0, 3).map(fixtureCell).join("")}</tr>`,
+      `<tr><td></td>${fixtures.slice(3, 6).map(fixtureCell).join("")}</tr>`,
+      `<tr><td></td>${fixtureCell(fixtures[6])}<td></td><td></td></tr>`,
+    ].join("");
+    const [record] = parseWordHtml(`<table>
+      <tr><td><p>Name: C. TAYLOR</p></td><td><p>Club: Barnsley</p></td><td><p>Position: Winger</p></td></tr>
+      ${fixtureRows}
+      <tr><td><p>Viewing:</p></td><td><p>Video</p></td></tr>
+      <tr><td><p>Conclusion:</p></td><td><p>Steady winger.</p></td></tr>
+    </table>`);
+
+    expect(record).toMatchObject({ player: "C. TAYLOR", club: "Barnsley", position: "Winger", viewing: "Video" });
+    expect(splitImportedFixtures(record.game, record.date)).toEqual(fixtures.map(([name, date]) => ({
+      name,
+      date: date.split("/").reverse().join("-").replace(/-(\d{4})$/, "-$1"),
+    })));
+  });
+
   test("recognises decorated section titles and keeps each section in its own field", () => {
     const [record] = parseWordHtml([
       "<p><strong>Yuki Ohashi</strong></p><p>Lommel</p>",
