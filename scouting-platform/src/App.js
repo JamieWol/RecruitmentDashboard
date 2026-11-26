@@ -58,6 +58,17 @@ function LoginGate() {
     const loadClubs = async () => {
       setClubsLoading(true);
       try {
+        // A club can be registered by its admin before any player records
+        // exist. Include club names already present on profiles so new
+        // members can request access to those workspaces straight away.
+        let registeredClubs = [];
+        const { data: registeredData, error: registeredError } = await supabase.rpc("get_signup_clubs");
+        if (!registeredError) {
+          registeredClubs = (registeredData || [])
+            .map((item) => String(item.club || "").trim())
+            .filter(Boolean);
+        }
+
         // Imported player datasets use different names for the team column.
         // Probe one candidate at a time so one missing column cannot break the
         // whole signup club list, and only download the club field.
@@ -86,6 +97,7 @@ function LoginGate() {
           }
         }
         if (!active) return;
+        names = [...new Set([...registeredClubs, ...names])];
         names.sort((a, b) => a.localeCompare(b));
         setClubs(names);
         if (!names.length && lastError) console.error("Could not load club options", lastError);
