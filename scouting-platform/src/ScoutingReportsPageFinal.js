@@ -426,6 +426,8 @@ export default function ScoutingReportsPageFinal() {
   });
   const [sharedReports, setSharedReports] = useState([]);
   const [sharedAssignments, setSharedAssignments] = useState([]);
+  const [deletedSharedAssignmentIds, setDeletedSharedAssignmentIds] = useState([]);
+  const [sharedAssignmentsLoaded, setSharedAssignmentsLoaded] = useState(false);
   const [accountEntitlement, setAccountEntitlement] = useState(null);
   const currentAccountEntitlement = entitlement || accountEntitlement;
   const isIndependentTrialAccount = isIndependentTrialRequest
@@ -727,29 +729,60 @@ export default function ScoutingReportsPageFinal() {
   }, [appState, sharedAssignments, publishedAssignmentIds]);
   useEffect(() => {
     if (!user || !accountProfile?.club) return;
+    setSharedAssignmentsLoaded(false);
     if (isIndependentTrialAccount) {
       setSharedAssignments([]);
+      setDeletedSharedAssignmentIds([]);
+      setSharedAssignmentsLoaded(true);
       return;
     }
     supabase
       .from("club_assignments")
-      .select("id, assigned_to, assignment, status")
+      .select("id, assigned_to, created_by, assignment, status, deleted_at")
       .eq("club", accountProfile.club)
       .then(({ data, error }) => {
         if (error) {
           console.error("Could not load shared assignments", error);
           return;
         }
-        const loadedAssignments = (data || []).map((row) => ({
+        const rows = data || [];
+        setDeletedSharedAssignmentIds(rows.filter((row) => row.deleted_at).map((row) => String(row.id)));
+        const loadedAssignments = rows.filter((row) => !row.deleted_at).map((row) => ({
           ...(row.assignment || {}),
           id: row.assignment?.id || row.id,
           sharedAssignmentId: row.id,
           scoutId: row.assigned_to || row.assignment?.scoutId,
+          createdById: row.created_by || row.assignment?.createdById,
           status: row.status || row.assignment?.status || "Not Started",
         }));
         setSharedAssignments([...new Map(loadedAssignments.map((assignment) => [String(assignment.sharedAssignmentId || assignment.id), assignment])).values()]);
+        setSharedAssignmentsLoaded(true);
       });
   }, [user, accountProfile?.club, isIndependentTrialAccount]);
+  useEffect(() => {
+    if (!appState || !sharedAssignmentsLoaded || !deletedSharedAssignmentIds.length) return;
+    const deletedIds = new Set(deletedSharedAssignmentIds);
+    const currentAssignments = Array.isArray(appState.assignments) ? appState.assignments : [];
+    const remainingAssignments = currentAssignments.filter((assignment) =>
+      ![assignment?.id, assignment?.assignment_id, assignment?.sharedAssignmentId]
+        .some((id) => id !== undefined && id !== null && deletedIds.has(String(id))),
+    );
+    if (remainingAssignments.length !== currentAssignments.length) {
+      updateAppState({ ...appState, assignments: remainingAssignments });
+      setItems((current) => current.filter((assignment) =>
+        ![assignment?.id, assignment?.assignment_id, assignment?.sharedAssignmentId]
+          .some((id) => id !== undefined && id !== null && deletedIds.has(String(id))),
+      ));
+      setSharedAssignments((current) => current.filter((assignment) => !deletedIds.has(String(assignment.sharedAssignmentId || assignment.id))));
+      try {
+        const saved = JSON.parse(sessionStorage.getItem("scoutingActiveReport") || "null");
+        if (saved?.active && deletedIds.has(String(saved.active.sharedAssignmentId || saved.active.id))) {
+          sessionStorage.removeItem("scoutingActiveReport");
+          setActive(null);
+        }
+      } catch {}
+    }
+  }, [appState, sharedAssignmentsLoaded, deletedSharedAssignmentIds, updateAppState]);
   useEffect(() => {
     if (!user || !accountProfile?.club) return;
     let reportQuery = supabase.from("club_reports").select("*").eq("club", accountProfile.club).eq("status", "Published");
@@ -853,6 +886,7 @@ export default function ScoutingReportsPageFinal() {
     const assignmentId = String(assignment?.assignment_id || assignment?.id || "");
     const sharedAssignmentId = assignment?.sharedAssignmentId || assignment?.id;
     const isPublished = String(assignment?.status || "").toLowerCase() === "published";
+    const creatorId = assignment?.createdById || assignment?.created_by || "";
     const groupedAssignments = Array.isArray(assignment?.fixtureGroupItems) ? assignment.fixtureGroupItems : [assignment];
     const groupedIds = [...new Set(groupedAssignments.flatMap((item) => [item?.sharedAssignmentId, item?.id]
       .filter((id) => id !== undefined && id !== null).map((id) => Number(id))).filter(Number.isFinite))];
@@ -874,16 +908,21 @@ export default function ScoutingReportsPageFinal() {
         setDeleteError(error?.message || "The report was not deleted. You can only delete reports you authored.");
         return;
       }
-    } else if (user && accountProfile?.club && sharedAssignmentId) {
-      const { error } = await supabase
-        .from("club_assignments")
-        .delete()
-        .eq("club", accountProfile.club)
-        .in("id", groupedIds.length ? groupedIds : [Number(sharedAssignmentId)]);
-      if (error) {
-        console.error("Could not delete shared assignment", error);
-        setDeleteError(error.message || "This assignment could not be deleted. Please try again.");
+    } else {
+      const localDraft = Boolean(assignment?.importSource);
+      if (!user?.id || (!localDraft && String(creatorId) !== String(user.id))) {
+        setDeleteError("Only the scout who created this assignment can delete it.");
         return;
+      }
+      const idsToDelete = groupedIds.length ? groupedIds : [Number(sharedAssignmentId)];
+      if (!localDraft && accountProfile?.club && sharedAssignmentId && idsToDelete.every(Number.isFinite)) {
+        const { data, error } = await supabase.rpc("delete_own_club_assignments", { p_assignment_ids: idsToDelete });
+        if (error || Number(data) !== idsToDelete.length) {
+          console.error("Could not delete shared assignment", error || "No matching assignments were deleted");
+          setDeleteError(error?.message || "Only the scout who created this assignment can delete it.");
+          return;
+        }
+        setDeletedSharedAssignmentIds((current) => [...new Set([...current, ...idsToDelete.map(String)])]);
       }
     }
 
@@ -2065,7 +2104,7 @@ export default function ScoutingReportsPageFinal() {
       <section className="sr-grid">
         {shown.map((x) => (
           <article className="sr-card" key={x.id} onClick={() => { setProfile(null); openReport(x); }}>
-            <div className="sr-card-top"><span className="sr-card-status">{x.status}</span>{(String(x.status || "").toLowerCase() !== "published" || String(x.author_id || "") === String(user?.id || "")) && <button className="sr-trash" onClick={(e) => { e.stopPropagation(); deleteAssignment(x); }}>Delete</button>}</div>
+            <div className="sr-card-top"><span className="sr-card-status">{x.status}</span>{(String(x.status || "").toLowerCase() === "published" ? String(x.author_id || "") === String(user?.id || "") : String(x.createdById || x.created_by || "") === String(user?.id || "") || Boolean(x.importSource)) && <button className="sr-trash" onClick={(e) => { e.stopPropagation(); deleteAssignment(x); }}>Delete</button>}</div>
             {x.fixtureGroupId ? (() => {
               const fixtureName = x.fixtureAssignmentTitle || x.fixtureGroupFixture || x.game || "Fixture assignment";
               const teams = fixtureTeams(fixtureName);

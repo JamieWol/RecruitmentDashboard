@@ -161,6 +161,7 @@ export default function CreateAssignmentPage() {
     const existing = editing
       ? old.find((x) => String(x.id) === String(editing.id))
       : null;
+    const createdById = existing?.createdById || editing?.createdById || user?.id || "";
     const selectedScout = scouts.find((member) => String(member.id) === String(scout));
     const currentScoutName = profile?.full_name || user?.user_metadata?.full_name || user?.email || "";
     const newAssignmentId = () => {
@@ -182,6 +183,7 @@ export default function CreateAssignmentPage() {
       fixtureDates: fixtures.map((x) => (typeof x === "string" ? "" : x.date)),
       scout: selectedScout?.full_name || (String(scout) === String(user?.id) ? currentScoutName : scout),
       scoutId: scout,
+      createdById,
       date,
       viewing,
       status: "Not Started",
@@ -232,10 +234,9 @@ export default function CreateAssignmentPage() {
     }
     updateAppState({ ...appState, assignments: nextAssignments });
     if (profile?.club && scout) {
-      const createdBy = (await supabase.auth.getUser()).data.user.id;
       const assignmentsToSave = mode === "fixture" ? nextAssignments.slice(old.length) : [assignment];
       await Promise.all(assignmentsToSave.map((item) => supabase.from("club_assignments").upsert({
-        id: Number(item.id), club: profile.club, assigned_to: scout, created_by: createdBy,
+        id: Number(item.id), club: profile.club, assigned_to: scout, created_by: item.createdById || createdById,
         assignment: { ...item, id: Number(item.id) }, status: item.status,
       }, { onConflict: "id" })));
     }
