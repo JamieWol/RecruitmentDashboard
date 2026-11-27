@@ -143,8 +143,10 @@ function LoginGate() {
       <button className="sr-outline" type="button" onClick={refreshProfile}>Check Subscription Status</button>
       <button className="sr-outline" type="button" onClick={() => supabase.auth.signOut()}>Sign Out</button>
     </div></div>;
-    const pendingTitle = profile?.approval_status === "rejected" ? "Access Request Declined" : trialRequest ? "Your Free Trial Request Is Being Reviewed" : ownerSetup ? "Your Platform Request Is Being Reviewed" : "Awaiting Admin Approval";
-    const pendingMessage = profileError || (profile?.approval_status === "rejected"
+    const pendingTitle = profile?.approval_status === "revoked" ? "Access Revoked" : profile?.approval_status === "rejected" ? "Access Request Declined" : trialRequest ? "Your Free Trial Request Is Being Reviewed" : ownerSetup ? "Your Platform Request Is Being Reviewed" : "Awaiting Admin Approval";
+    const pendingMessage = profileError || (profile?.approval_status === "revoked"
+      ? "The main ScoutPro administrator has revoked access to this account. Contact them if you think this is a mistake."
+      : profile?.approval_status === "rejected"
       ? "Your access request was declined. Contact your administrator if you think this is a mistake."
       : trialRequest
         ? "Once approved, your 30-day trial will begin. It includes up to 4 published reports and does not require payment details."
