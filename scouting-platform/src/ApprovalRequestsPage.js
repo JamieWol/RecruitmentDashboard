@@ -13,13 +13,14 @@ export default function ApprovalRequestsPage() {
   const [notice, setNotice] = useState("");
   const isPlatformAdmin = profile?.role === "platform_admin";
   const isClubAdmin = profile?.role === "club_admin";
+  const canManageAccess = isPlatformAdmin || isClubAdmin;
 
   const loadRequests = useCallback(async () => {
     setLoading(true);
     setError("");
     const [pendingResult, approvedResult] = await Promise.all([
       supabase.rpc("list_pending_access_requests"),
-      isPlatformAdmin ? supabase.rpc("list_approved_access_accounts") : Promise.resolve({ data: [], error: null }),
+      canManageAccess ? supabase.rpc("list_approved_access_accounts") : Promise.resolve({ data: [], error: null }),
     ]);
     if (pendingResult.error) {
       setError(pendingResult.error.message || "Could not load access requests.");
@@ -30,7 +31,7 @@ export default function ApprovalRequestsPage() {
       setApprovedAccounts([]);
     } else setApprovedAccounts(approvedResult.data || []);
     setLoading(false);
-  }, [isPlatformAdmin]);
+  }, [canManageAccess]);
 
   useEffect(() => { loadRequests(); }, [loadRequests]);
 
@@ -98,8 +99,8 @@ export default function ApprovalRequestsPage() {
         </div>
       </article>)}
     </section>}
-    {isPlatformAdmin && <section className="sr-approved-accounts" aria-labelledby="sr-approved-accounts-title">
-      <div className="sr-approved-accounts-heading"><div><h2 id="sr-approved-accounts-title">Active accounts</h2><p>Revoke access for an approved scout or club admin. Their account and data remain, and any Stripe subscription must be canceled separately.</p></div><span>{approvedAccounts.length} accounts</span></div>
+    {canManageAccess && <section className="sr-approved-accounts" aria-labelledby="sr-approved-accounts-title">
+      <div className="sr-approved-accounts-heading"><div><h2 id="sr-approved-accounts-title">Active accounts</h2><p>{isPlatformAdmin ? "Revoke access for any approved scout or club admin." : `Manage approved scouts at ${profile?.club || "your club"}.`} Their account and data remain, and any Stripe subscription must be canceled separately.</p></div><span>{approvedAccounts.length} accounts</span></div>
       {loading ? <div className="sr-approval-empty">Loading active accounts…</div> : approvedAccounts.length === 0 ? <div className="sr-approval-empty"><strong>No active accounts</strong><span>Approved non-admin accounts will appear here.</span></div> : <section className="sr-approval-list" aria-label="Active accounts">
         {approvedAccounts.map((account) => <article className="sr-approval-card" key={account.id}>
           <div className="sr-approval-person"><div className="sr-approval-avatar" aria-hidden="true">{(account.full_name || account.email || "?").trim().charAt(0).toUpperCase()}</div><div><h2>{account.full_name || "Name not provided"}</h2><p>{account.email}</p></div></div>
