@@ -363,6 +363,7 @@ function Header() {
     <button type="button" className="sr-profile-trigger" aria-label={`Profile menu for ${profileName}`} aria-haspopup="menu" aria-expanded={settingsOpen} onClick={() => setSettingsOpen((open) => !open)}>
       <span className="sr-profile-avatar" aria-hidden="true">{profileInitials}</span>
       <span className="sr-profile-trigger-name">{profileName}</span>
+      <svg className="sr-profile-trigger-chevron" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 7.5 5 5 5-5" /></svg>
     </button>
     {settingsOpen && <div className={`sr-settings-dropdown sr-profile-dropdown${mobile ? " sr-settings-dropdown-mobile" : ""}`} role="menu">
       <div className="sr-profile-dropdown-heading"><span className="sr-profile-avatar" aria-hidden="true">{profileInitials}</span><span className="sr-profile-summary"><strong>{profileName}</strong><small>{profileEmail}</small></span></div>
@@ -468,6 +469,7 @@ function Header() {
         .sr-profile-trigger { display: flex; align-items: center; gap: 9px; width: auto; max-width: 100%; min-width: 48px; min-height: 48px; padding: 4px 10px 4px 4px; border: 1px solid #ffffff45; border-radius: 28px; background: #ffffff0b; color: white; text-align: left; cursor: pointer; }
         .sr-profile-trigger:hover, .sr-profile-trigger[aria-expanded="true"] { background: #ffffff18; border-color: #ffffff80; }
         .sr-profile-trigger-name { overflow: hidden; color: white; font-size: 13px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+        .sr-profile-trigger-chevron { width: 13px; height: 13px; flex: 0 0 13px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2.2; }
         .sr-profile-avatar { display: grid; place-items: center; width: 38px; height: 38px; flex: 0 0 38px; border: 1.5px solid #d5f2ff; border-radius: 50%; color: #d5f2ff; font-size: 13px; font-weight: 800; }
         .sr-profile-summary { display: flex; flex: 1 1 auto; flex-direction: column; min-width: 0; gap: 2px; }
         .sr-profile-summary strong, .sr-profile-summary small { overflow: hidden; color: white; text-overflow: ellipsis; white-space: nowrap; }
