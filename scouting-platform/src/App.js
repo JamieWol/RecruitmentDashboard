@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, useNavigate, useSearchParams } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AuthProvider, useAuth } from "./AuthContext";
 import { supabase } from "./supabaseClient";
 import LandingPage from "./LandingPage";
@@ -327,13 +327,49 @@ function Header() {
   const { user, profile } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const profileMenuRef = useRef(null);
   const canReviewAccess = profile?.role === "platform_admin" || profile?.role === "club_admin";
+  const profileName = profile?.full_name || user?.user_metadata?.full_name || user?.email?.split("@")[0] || "ScoutPro account";
+  const profileEmail = user?.email || "";
+  const profileInitials = profileName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "SP";
+
+  useEffect(() => {
+    if (!settingsOpen) return undefined;
+    const closeOnOutsideClick = (event) => {
+      if (!profileMenuRef.current?.contains(event.target)) setSettingsOpen(false);
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setSettingsOpen(false);
+    };
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    document.addEventListener("touchstart", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsideClick);
+      document.removeEventListener("touchstart", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [settingsOpen]);
 
   const settingsMenuItems = () => <>
-    {canReviewAccess && <button type="button" onClick={() => { goTo("/approval-requests"); setSettingsOpen(false); }}>Access approvals</button>}
-    <button type="button" onClick={() => { goTo("/billing"); setSettingsOpen(false); }}>Plans & Billing</button>
-    <button type="button" onClick={() => { goTo("/report-management"); setSettingsOpen(false); }}>Report Management</button>
+    {canReviewAccess && <button type="button" role="menuitem" onClick={() => { goTo("/approval-requests"); setSettingsOpen(false); setMenuOpen(false); }}>Access approvals</button>}
+    <button type="button" role="menuitem" onClick={() => { goTo("/billing"); setSettingsOpen(false); setMenuOpen(false); }}>Plans &amp; Billing</button>
+    <button type="button" role="menuitem" onClick={() => { goTo("/report-management"); setSettingsOpen(false); setMenuOpen(false); }}>Report Management</button>
+    <div className="sr-profile-dropdown-divider" />
+    <button type="button" role="menuitem" className="sr-profile-signout" onClick={() => { setSettingsOpen(false); setMenuOpen(false); supabase.auth.signOut(); }}>Sign out</button>
   </>;
+
+  const profileMenu = (mobile = false) => <div className={`sr-profile-menu${mobile ? " sr-profile-menu-mobile" : ""}`}>
+    <button type="button" className="sr-profile-trigger" aria-label={`Profile menu for ${profileName}`} aria-haspopup="menu" aria-expanded={settingsOpen} onClick={() => setSettingsOpen((open) => !open)}>
+      <span className="sr-profile-avatar" aria-hidden="true">{profileInitials}</span>
+      <span className="sr-profile-trigger-name">{profileName}</span>
+    </button>
+    {settingsOpen && <div className={`sr-settings-dropdown sr-profile-dropdown${mobile ? " sr-settings-dropdown-mobile" : ""}`} role="menu">
+      <div className="sr-profile-dropdown-heading"><span className="sr-profile-avatar" aria-hidden="true">{profileInitials}</span><span className="sr-profile-summary"><strong>{profileName}</strong><small>{profileEmail}</small></span></div>
+      <div className="sr-profile-dropdown-divider" />
+      {settingsMenuItems()}
+    </div>}
+  </div>;
 
   const goTo = (path) => {
     navigate(path);
@@ -350,6 +386,7 @@ function Header() {
 
   return (
     <header
+      ref={profileMenuRef}
       className="sr-app-header"
       style={{
         width: "100%",
@@ -386,8 +423,7 @@ function Header() {
             {link.label}
           </span>
         ))}
-        {user && <div className="sr-settings-menu" style={{ position: "relative", marginLeft: 0, flex: "0 0 auto" }}><button type="button" className="sr-settings-trigger" aria-label="Settings" title="Settings" aria-expanded={settingsOpen} onClick={() => setSettingsOpen((open) => !open)}>⚙</button>{settingsOpen && <div className="sr-settings-dropdown">{settingsMenuItems()}</div>}</div>}
-        {user && <button className="header-signout" style={{ marginLeft: 0, flex: "0 0 auto" }} onClick={() => supabase.auth.signOut()}>Sign out</button>}
+        {user && profileMenu()}
       </nav>
 
       <button type="button" className={`hamburger ${menuOpen ? "open" : ""}`} aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"} aria-expanded={menuOpen} aria-controls="mobile-navigation" onClick={() => setMenuOpen(!menuOpen)}>
@@ -410,7 +446,7 @@ function Header() {
             {link.label}
           </span>
         ))}
-        {user && <div className="sr-mobile-account-actions"><div className="sr-mobile-account-buttons"><button type="button" className="sr-settings-trigger" onClick={() => setSettingsOpen((open) => !open)} aria-expanded={settingsOpen}>⚙ Settings</button><button className="header-signout" onClick={() => supabase.auth.signOut()}>Sign out</button></div>{settingsOpen && <div className="sr-settings-dropdown sr-settings-dropdown-mobile">{settingsMenuItems()}</div>}</div>}
+        {user && profileMenu(true)}
       </nav>
 
       <style>{`
@@ -428,11 +464,26 @@ function Header() {
         .sr-settings-dropdown button:hover { background: #285b8d; }
         .sr-settings-dropdown button:disabled { opacity: .6; cursor: wait; }
         .sr-settings-message { display: block; margin: 6px 8px; color: #c9efff; font-size: 12px; line-height: 1.4; white-space: normal; }
-        .sr-mobile-account-actions { width: 100%; display: flex; flex-direction: column; gap: 8px; padding-top: 10px; }
-        .sr-mobile-account-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
-        .sr-mobile-account-actions .sr-settings-trigger { width: 100%; font-size: 15px; }
-        .sr-mobile-account-actions .header-signout { margin: 0; }
-        .sr-settings-dropdown-mobile { position: static; width: 100%; max-width: none; box-shadow: none; }
+        .sr-profile-menu { position: relative; flex: 0 1 auto; width: auto; max-width: 230px; }
+        .sr-profile-trigger { display: flex; align-items: center; gap: 9px; width: auto; max-width: 100%; min-width: 48px; min-height: 48px; padding: 4px 10px 4px 4px; border: 1px solid #ffffff45; border-radius: 28px; background: #ffffff0b; color: white; text-align: left; cursor: pointer; }
+        .sr-profile-trigger:hover, .sr-profile-trigger[aria-expanded="true"] { background: #ffffff18; border-color: #ffffff80; }
+        .sr-profile-trigger-name { overflow: hidden; color: white; font-size: 13px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+        .sr-profile-avatar { display: grid; place-items: center; width: 38px; height: 38px; flex: 0 0 38px; border: 1.5px solid #d5f2ff; border-radius: 50%; color: #d5f2ff; font-size: 13px; font-weight: 800; }
+        .sr-profile-summary { display: flex; flex: 1 1 auto; flex-direction: column; min-width: 0; gap: 2px; }
+        .sr-profile-summary strong, .sr-profile-summary small { overflow: hidden; color: white; text-overflow: ellipsis; white-space: nowrap; }
+        .sr-profile-summary strong { font-size: 12px; }
+        .sr-profile-summary small { color: #d1e4f7; font-size: 10px; }
+        .sr-profile-dropdown { width: 300px; padding: 10px; }
+        .sr-profile-dropdown-heading { display: flex; align-items: center; gap: 11px; min-width: 0; padding: 7px 7px 12px; }
+        .sr-profile-dropdown-heading .sr-profile-avatar { width: 42px; height: 42px; flex-basis: 42px; }
+        .sr-profile-dropdown-heading .sr-profile-summary strong { font-size: 14px; }
+        .sr-profile-dropdown-heading .sr-profile-summary small { font-size: 12px; }
+        .sr-profile-dropdown-divider { height: 1px; margin: 3px 4px 6px; background: #ffffff24; }
+        .sr-settings-dropdown .sr-profile-signout { color: #ffd2cc; }
+        .sr-settings-dropdown .sr-profile-signout:hover { background: #713c48; }
+        .sr-profile-menu-mobile { width: 100%; max-width: none; display: flex; justify-content: flex-end; padding-top: 10px; }
+        .sr-profile-menu-mobile .sr-profile-trigger { min-height: 48px; }
+        .sr-profile-menu-mobile .sr-settings-dropdown-mobile { position: static; width: 100%; max-width: none; margin-top: 8px; box-shadow: none; }
 
         .hamburger { display: none; flex-direction: column; justify-content: space-between; width: 25px; height: 20px; cursor: pointer; z-index: 4; }
         .hamburger span { height: 3px; background: #fff; border-radius: 2px; transition: all 0.3s ease; }
